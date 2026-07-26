@@ -398,7 +398,7 @@
 
   <header>
     <div>
-      <h1>Release <span>Signal</span></h1>
+      <h1>Sprint <span>Signal</span></h1>
       <div class="sub">Everything QA needs before a release — sprint quality and automation test health, in one place.</div>
     </div>
     <div class="status-chip"><span class="dot" id="statusDot"></span><span id="statusText">not connected</span></div>
@@ -416,12 +416,23 @@
     <canvas id="sparkline"></canvas>
   </div>
 
-  <!-- CONNECT CARD -->
-  <div class="card" id="connectCard">
+  <!-- AUTO-CONNECT LOADING (shown by default while auto-connecting) -->
+  <div class="card" id="autoConnectLoading">
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;">
+      <svg viewBox="0 0 24 24" width="20" height="20" style="animation:spin .8s linear infinite;flex-shrink:0;"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="40" stroke-dashoffset="10"/></svg>
+      <div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:15px;">Connecting you to your destination.</div>
+        <div style="color:var(--muted);font-size:12.5px;margin-top:2px;">Chill for a sec.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONNECT CARD (fallback — only shown if auto-connect fails) -->
+  <div class="card hidden" id="connectCard">
     <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2 L12 8"/><circle cx="12" cy="14" r="7"/><path d="M9 14h6"/></svg>Connect to Jira</h2>
 
     <div id="liveMode">
-      <div class="row" style="margin-top:0;display: none;">
+      <div class="row" style="margin-top:0;">
         <label style="display:flex;align-items:center;gap:8px;margin:0;">
           <input type="checkbox" id="sharedMode" style="width:auto;" checked>
           Use shared team access (no personal Jira token needed)
@@ -465,7 +476,7 @@
         This dashboard calls the Jira REST API directly from your browser — nothing is sent to or stored by Claude.
       </div>
       <div class="note hidden" id="sharedNote">
-        Ready when you are — click Connect.
+        Hit Connect to see your team's Jira dashboard.
       </div>
       <div class="error-box hidden" id="connectError"></div>
     </div>
@@ -515,7 +526,7 @@
         <svg viewBox="0 0 24 24" width="14" height="14" style="animation:spin .8s linear infinite;"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="40" stroke-dashoffset="10"/></svg>
         loading issues…
       </span>
-      <button class="btn-ghost btn" id="disconnectBtn">Disconnect</button>
+      <button class="btn-ghost btn hidden" id="disconnectBtn">Disconnect</button>
     </div>
     <div class="error-box hidden" id="issuesError"></div>
   </div>
@@ -1212,7 +1223,9 @@ function setStatus(text, state){
 }
 
 // ---------- LIVE: connect ----------
-document.getElementById('connectBtn').addEventListener('click', async ()=>{
+document.getElementById('connectBtn').addEventListener('click', ()=> attemptConnect(false));
+
+async function attemptConnect(isAutoAttempt){
   const errBox = document.getElementById('connectError');
   errBox.classList.add('hidden');
   const sharedMode = document.getElementById('sharedMode').checked;
@@ -1222,6 +1235,7 @@ document.getElementById('connectBtn').addEventListener('click', async ()=>{
   if(sharedMode){
     baseUrlRaw = document.getElementById('baseUrlShared').value.trim().replace(/\/$/,'');
     if(!baseUrlRaw){
+      if(isAutoAttempt) return showFallbackForm('Jira base URL is missing — fill it in and hit Connect.');
       errBox.textContent = 'Fill in the Jira base URL.';
       errBox.classList.remove('hidden');
       return;
@@ -1230,6 +1244,7 @@ document.getElementById('connectBtn').addEventListener('click', async ()=>{
     useProxy = true;
     proxyUrl = document.getElementById('proxyUrl').value.trim().replace(/\/$/,'');
     if(!proxyUrl){
+      if(isAutoAttempt) return showFallbackForm('Proxy URL is missing — fill it in and hit Connect.');
       errBox.textContent = 'Enter the shared proxy worker URL.';
       errBox.classList.remove('hidden');
       return;
@@ -1253,8 +1268,10 @@ document.getElementById('connectBtn').addEventListener('click', async ()=>{
     }
   }
 
-  document.getElementById('connectSpinner').classList.remove('hidden');
-  document.getElementById('connectBtn').disabled = true;
+  if(!isAutoAttempt){
+    document.getElementById('connectSpinner').classList.remove('hidden');
+    document.getElementById('connectBtn').disabled = true;
+  }
   try{
     auth = { baseUrl: baseUrlRaw, headerValue, proxyUrl: useProxy ? proxyUrl : null };
     const data = await jiraFetch('/rest/api/3/myself');
@@ -1262,6 +1279,7 @@ document.getElementById('connectBtn').addEventListener('click', async ()=>{
       throw new Error('Connected, but response looked unexpected. Check your URL/email/token.');
     }
     setStatus('connected', 'on');
+    document.getElementById('autoConnectLoading').classList.add('hidden');
     document.getElementById('connectCard').classList.add('hidden');
     document.getElementById('controlsCard').classList.remove('hidden');
     await resolveModuleField();
@@ -1269,19 +1287,39 @@ document.getElementById('connectBtn').addEventListener('click', async ()=>{
   }catch(e){
     setStatus('connection failed', 'err');
     const corsLikely = e instanceof TypeError;
+    let message;
     if(corsLikely && !useProxy){
-      errBox.textContent = 'Request failed before reaching Jira — this is CORS, which Jira Cloud applies by default to third-party pages. Check "Route through a CORS proxy" above and enter your deployed worker URL (see the proxy-worker.js file provided alongside this dashboard), or use the "Paste exported data" tab instead.';
+      message = 'Request failed before reaching Jira — this is CORS, which Jira Cloud applies by default to third-party pages. Check "Route through a CORS proxy" above and enter your deployed worker URL, or use the "Paste exported data" tab instead.';
     }else if(corsLikely){
-      errBox.textContent = 'Request failed reaching your proxy. Double-check the proxy URL is correct and the worker is deployed and reachable.';
+      message = 'Request failed reaching the proxy. Double-check the proxy URL is correct and the worker is deployed and reachable.';
     }else{
-      errBox.textContent = 'Connection error: ' + e.message;
+      message = 'Connection error: ' + e.message;
     }
-    errBox.classList.remove('hidden');
+    if(isAutoAttempt){
+      showFallbackForm(message);
+    }else{
+      errBox.textContent = message;
+      errBox.classList.remove('hidden');
+    }
   }finally{
     document.getElementById('connectSpinner').classList.add('hidden');
     document.getElementById('connectBtn').disabled = false;
   }
-});
+}
+
+function showFallbackForm(message){
+  document.getElementById('autoConnectLoading').classList.add('hidden');
+  document.getElementById('connectCard').classList.remove('hidden');
+  if(message){
+    const errBox = document.getElementById('connectError');
+    errBox.textContent = message;
+    errBox.classList.remove('hidden');
+  }
+}
+
+// Auto-connect on page load using the shared team credential — no click required.
+// Falls back to showing the manual connect form only if this fails.
+attemptConnect(true);
 
 async function jiraFetch(path){
   let url, headers;
@@ -1524,11 +1562,13 @@ function normalizeJiraIssue(iss){
 // ---------- disconnect ----------
 document.getElementById('disconnectBtn').addEventListener('click', ()=>{
   auth = null; allIssues = []; sprintsMeta = [];
-  document.getElementById('connectCard').classList.remove('hidden');
+  document.getElementById('connectCard').classList.add('hidden');
   document.getElementById('controlsCard').classList.add('hidden');
   document.getElementById('dashboard').classList.add('hidden');
   document.getElementById('sparklineRow').classList.add('hidden');
+  document.getElementById('autoConnectLoading').classList.remove('hidden');
   setStatus('not connected', '');
+  attemptConnect(true);
 });
 
 // ---------- dashboard ----------
