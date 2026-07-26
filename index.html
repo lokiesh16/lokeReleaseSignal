@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Release Signal</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#0b0d12;
+    --bg-grad: radial-gradient(1200px 600px at 15% -10%, rgba(108,92,231,0.10), transparent 60%),
+               radial-gradient(900px 500px at 100% 0%, rgba(34,211,238,0.06), transparent 55%);
+    --surface:#141720;
+    --surface-2:#1a1e28;
+    --surface-hover:#1e2330;
+    --line:#262b36;
+    --line-soft:#1e222c;
+    --text:#eceef3;
+    --muted:#8a90a0;
+    --muted-dim:#5f6577;
+    --accent:#6c5ce7;
+    --accent-2:#22d3ee;
+    --accent-dim:#443b8f;
+    --bug:#e5484d;
+    --enh:#3dd68c;
+    --task:#5b8def;
+    --story:#f5a623;
+    --sub:#9b8afb;
+    --other:#8a90a0;
+    --good:#3dd68c;
+    --bad:#e5484d;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md: 0 8px 24px -8px rgba(0,0,0,0.5);
+    --shadow-glow: 0 0 0 1px rgba(108,92,231,0.15), 0 8px 32px -8px rgba(108,92,231,0.25);
+    --ease: cubic-bezier(.22,.9,.32,1);
+  }
+  *{box-sizing:border-box;}
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.01ms !important; transition-duration:0.01ms !important;}
+  }
+  body{
+    margin:0;
+    background-color:var(--bg);
+    background-image:var(--bg-grad);
+    background-attachment:fixed;
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    padding:32px 20px 70px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+  header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:6px;}
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:32px;
+    font-weight:700;
+    margin:0;
+    letter-spacing:-0.015em;
+  }
+  h1 span{
+    background:linear-gradient(135deg, var(--accent), var(--accent-2), var(--accent));
+    background-size:200% auto;
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    animation:shimmer 6s ease-in-out infinite;
+  }
+  @keyframes shimmer{
+    0%, 100%{background-position:0% 50%;}
+    50%{background-position:100% 50%;}
+  }
+  .sub{color:var(--muted);font-size:13.5px;margin-top:5px;}
+  .status-chip{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11.5px;
+    padding:6px 12px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--muted);
+    display:flex;align-items:center;gap:7px;
+    box-shadow:var(--shadow-sm);
+  }
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:all .3s var(--ease);}
+  .dot.on{background:var(--good); animation:pulseDot 2.2s ease-in-out infinite;}
+  @keyframes pulseDot{
+    0%, 100%{box-shadow:0 0 6px var(--good);}
+    50%{box-shadow:0 0 14px var(--good), 0 0 4px var(--good);}
+  }
+  .dot.err{background:var(--bad);box-shadow:0 0 10px var(--bad);}
+
+  .sparkline-row{margin:18px 0 26px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px 0;display:flex;align-items:center;gap:16px;}
+  .sparkline-row .label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);white-space:nowrap;text-transform:uppercase;letter-spacing:.06em;}
+  #sparkline{flex:1;height:34px;}
+
+  @keyframes fadeSlideUp{
+    from{opacity:0; transform:translateY(10px);}
+    to{opacity:1; transform:translateY(0);}
+  }
+  @keyframes spin{
+    from{transform:rotate(0deg);}
+    to{transform:rotate(360deg);}
+  }
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:22px;
+    margin-bottom:18px;
+    box-shadow:var(--shadow-sm);
+    animation:fadeSlideUp .45s var(--ease) both;
+  }
+  .card h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:15px;
+    margin:0 0 14px;
+    font-weight:600;
+    color:var(--text);
+    display:flex;align-items:center;gap:8px;
+    letter-spacing:.01em;
+  }
+  .card h2 svg{width:16px;height:16px;color:var(--accent);flex-shrink:0;}
+  label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.04em;}
+  input[type=text],input[type=password],select{
+    width:100%;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:10px 12px;
+    border-radius:7px;
+    font-size:13.5px;
+    font-family:'Inter',sans-serif;
+    transition:border-color .2s var(--ease), box-shadow .2s var(--ease);
+  }
+  input:hover,select:hover{border-color:var(--muted-dim);}
+  input:focus,select:focus{outline:none; border-color:var(--accent-dim); box-shadow:0 0 0 3px rgba(108,92,231,0.18);}
+  .grid3{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:12px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:720px){.grid3,.grid2{grid-template-columns:1fr;}}
+  .btn{
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    padding:10px 20px;
+    border-radius:7px;
+    font-weight:600;
+    font-size:13.5px;
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+    transition:transform .15s var(--ease), box-shadow .2s var(--ease), background .15s var(--ease);
+    box-shadow:0 1px 0 rgba(255,255,255,0.08) inset;
+  }
+  .btn:hover{background:#7d6ef0; transform:translateY(-1px); box-shadow:0 6px 16px -4px rgba(108,92,231,0.5);}
+  .btn:active{transform:translateY(0) scale(0.96);}
+  .btn:disabled{background:var(--surface-2);color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none;}
+  .btn-ghost{
+    background:transparent;border:1px solid var(--line);color:var(--muted);box-shadow:none;
+  }
+  .btn-ghost:hover{color:var(--text);border-color:var(--accent-dim);background:var(--surface-2);}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;}
+  .tabs{display:flex;gap:2px;margin-bottom:16px;border:1px solid var(--line);border-radius:9px;padding:3px;width:fit-content;background:var(--surface-2);}
+  .tab{
+    padding:7px 14px;border-radius:6px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;
+    color:var(--muted);cursor:pointer;user-select:none;transition:all .2s var(--ease);
+  }
+  .tab:hover{color:var(--text);}
+  .tab.active{background:var(--surface); color:var(--text); box-shadow:var(--shadow-sm);}
+  .note{
+    font-size:12px;color:var(--muted);background:var(--surface-2);
+    border:1px solid var(--line);border-left:3px solid var(--story);
+    padding:11px 13px;border-radius:7px;margin-top:14px;line-height:1.6;
+  }
+  .note a{color:var(--accent-2);}
+  .error-box{
+    font-size:12.5px;color:#ffb4b4;background:#2a1518;border:1px solid #4a2226;
+    padding:11px 13px;border-radius:7px;margin-top:14px;line-height:1.5;font-family:'IBM Plex Mono',monospace;
+    white-space:pre-wrap;
+  }
+  textarea{
+    width:100%;min-height:140px;background:var(--surface-2);border:1px solid var(--line);
+    color:var(--text);padding:10px;border-radius:7px;font-family:'IBM Plex Mono',monospace;font-size:12px;
+    transition:border-color .2s var(--ease);
+  }
+  textarea:focus{outline:none;border-color:var(--accent-dim);}
+
+  .stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;}
+  @media(max-width:720px){.stat-row{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:900px){.stat-row[style*="repeat(6"]{grid-template-columns:repeat(3,1fr) !important;}}
+  .stat{
+    background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:17px 18px;
+    transition:transform .2s var(--ease), border-color .2s var(--ease), background .2s var(--ease);
+    animation:fadeSlideUp .45s var(--ease) both;
+  }
+  .stat:hover{transform:translateY(-2px); border-color:var(--muted-dim); background:var(--surface-hover);}
+  .stat:nth-child(1){animation-delay:0.03s;}
+  .stat:nth-child(2){animation-delay:0.09s;}
+  .stat:nth-child(3){animation-delay:0.15s;}
+  .stat:nth-child(4){animation-delay:0.21s;}
+  .stat:nth-child(5){animation-delay:0.27s;}
+  .stat:nth-child(6){animation-delay:0.33s;}
+  .stat .num{font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-0.02em;}
+  .stat .lbl{font-size:11px;color:var(--muted);margin-top:5px;text-transform:uppercase;letter-spacing:.06em;}
+
+  .filters{display:flex;gap:26px;flex-wrap:wrap;}
+  .filter-group{min-width:200px;}
+  .chip-set{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px;}
+  .chip{
+    font-family:'IBM Plex Mono',monospace;font-size:11.5px;padding:6px 12px;border-radius:20px;
+    border:1px solid var(--line);color:var(--muted);cursor:pointer;user-select:none;
+    transition:all .18s var(--ease);
+  }
+  .chip:hover{border-color:var(--muted-dim); color:var(--text);}
+  .chip:active{transform:scale(0.94);}
+  .chip.active{color:#fff;border-color:transparent;box-shadow:var(--shadow-sm);}
+  .chip[data-type="Bug"].active{background:var(--bug);}
+  .chip[data-type="Enhancement"].active{background:var(--enh);}
+  .chip[data-type="Task"].active{background:var(--task);}
+  .chip[data-type="Story"].active{background:var(--story);}
+  .chip[data-type="Sub-task"].active{background:var(--sub);}
+  .chip.other-type.active{background:var(--other);}
+  select[multiple]{min-height:110px;}
+
+  /* Custom multi-select (reporter/module filters) */
+  .ms-wrap{position:relative;}
+  #filtersCard{position:relative; z-index:25;}
+  .ms-trigger{
+    width:100%; display:flex; align-items:center; gap:9px;
+    background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    padding:10px 12px; border-radius:7px; font-size:13.5px; font-family:'Inter',sans-serif;
+    cursor:pointer; transition:border-color .2s var(--ease); text-align:left;
+  }
+  .ms-trigger:hover{border-color:var(--muted-dim);}
+  .ms-trigger:disabled{opacity:.6; cursor:not-allowed;}
+  .ms-popover{
+    position:absolute; top:calc(100% + 8px); left:0; right:0; z-index:20; max-height:280px;
+    overflow-y:auto; background:var(--surface); border:1px solid var(--line); border-radius:11px;
+    padding:10px; box-shadow:var(--shadow-md); animation:fadeSlideUp .18s var(--ease) both;
+  }
+  .ms-actions{display:flex; gap:8px; margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid var(--line-soft);}
+  .ms-action{
+    background:transparent; border:1px solid var(--line); color:var(--muted); font-size:11px;
+    padding:4px 11px; border-radius:20px; cursor:pointer; font-family:'IBM Plex Mono',monospace;
+    transition:all .15s var(--ease);
+  }
+  .ms-action:hover{color:var(--text); border-color:var(--accent-dim);}
+  .ms-option{
+    display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:6px;
+    cursor:pointer; font-size:13px; color:var(--text); transition:background .15s var(--ease);
+  }
+  .ms-option:hover{background:var(--surface-hover);}
+  .ms-option input{width:auto; accent-color:var(--accent); cursor:pointer;}
+
+  .chart-wrap{position:relative;height:320px;}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line-soft);}
+  th{
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.05em;font-weight:500;
+    background:var(--surface); position:sticky; top:0; z-index:1;
+  }
+  tbody tr{transition:background .15s var(--ease);}
+  tbody tr:hover{background:var(--surface-2);}
+  tbody tr:nth-child(even){background:rgba(255,255,255,0.012);}
+  td.key{font-family:'IBM Plex Mono',monospace;color:var(--accent-2);}
+  td.key a:hover{color:#fff;}
+  .type-badge{
+    display:inline-block;padding:3px 9px;border-radius:20px;font-size:10.5px;
+    font-family:'IBM Plex Mono',monospace;color:#0b0d12;font-weight:700;letter-spacing:.02em;
+  }
+  .type-badge.Bug{background:var(--bug);}
+  .type-badge.Enhancement{background:var(--enh);}
+  .type-badge.Task{background:var(--task);}
+  .type-badge.Story{background:var(--story);}
+  .type-badge.Sub-task{background:var(--sub);}
+  .type-badge.other{background:var(--other);}
+  .table-wrap{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:9px;}
+  .empty{color:var(--muted);font-size:13px;padding:36px;text-align:center;}
+  .hidden{display:none !important;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px;}
+  ::-webkit-scrollbar-thumb:hover{background:var(--muted-dim);}
+
+  .view-tabs{display:flex;gap:2px;margin:20px 0 22px;border:1px solid var(--line);border-radius:9px;padding:3px;width:fit-content;background:var(--surface-2);}
+  .view-tab{
+    padding:9px 18px;border-radius:6px;font-size:13px;font-family:'Space Grotesk',sans-serif;font-weight:600;
+    color:var(--muted);cursor:pointer;user-select:none;transition:all .2s var(--ease);
+  }
+  .view-tab:hover{color:var(--text);}
+  .view-tab.active{background:var(--accent); color:#fff;}
+
+  /* Custom calendar picker */
+  .dp-wrap{position:relative;}
+  #autoRunCard{position:relative; z-index:30;}
+  #controlsCard{position:relative; z-index:26;}
+  .dp-trigger{
+    width:100%; display:flex; align-items:center; gap:9px;
+    background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    padding:10px 12px; border-radius:7px; font-size:13.5px; font-family:'Inter',sans-serif;
+    cursor:pointer; transition:border-color .2s var(--ease);
+  }
+  .dp-trigger:hover{border-color:var(--muted-dim);}
+  .dp-trigger svg{width:15px;height:15px;color:var(--accent-2);flex-shrink:0;}
+  .dp-popover{
+    position:absolute; top:calc(100% + 8px); left:0; z-index:20; width:280px;
+    background:var(--surface); border:1px solid var(--line); border-radius:11px;
+    padding:14px; box-shadow:var(--shadow-md); animation:fadeSlideUp .18s var(--ease) both;
+  }
+  .dp-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .dp-header span{font-family:'Space Grotesk',sans-serif; font-size:13.5px; font-weight:600; color:var(--text);}
+  .dp-nav{
+    background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    width:26px; height:26px; border-radius:6px; cursor:pointer; font-size:16px; line-height:1;
+    display:flex; align-items:center; justify-content:center; transition:all .15s var(--ease);
+  }
+  .dp-nav:hover{border-color:var(--accent-dim); color:var(--accent-2);}
+  .dp-weekdays{display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px;}
+  .dp-weekdays span{text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--muted); text-transform:uppercase;}
+  .dp-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px;}
+  .dp-day{
+    aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text);
+    border-radius:6px; cursor:pointer; transition:all .15s var(--ease); border:1px solid transparent;
+  }
+  .dp-day:hover:not(.dp-disabled):not(.dp-empty){background:var(--surface-hover); border-color:var(--muted-dim);}
+  .dp-day.dp-empty{cursor:default;}
+  .dp-day.dp-disabled{color:var(--muted-dim); cursor:not-allowed; opacity:.35;}
+  .dp-day.dp-today{border-color:var(--accent-2); color:var(--accent-2);}
+  .dp-day.dp-selected{background:var(--accent); color:#fff; font-weight:600;}
+  .dp-day.dp-has-run:not(.dp-selected)::after{
+    content:''; position:absolute; width:4px; height:4px; border-radius:50%; background:var(--accent-2);
+    margin-top:16px;
+  }
+  .dp-day{position:relative;}
+
+  /* Quality gauge (hero) */
+  .gauge-card{
+    display:flex;align-items:center;gap:32px;flex-wrap:wrap;
+    background:linear-gradient(160deg, var(--surface) 0%, var(--surface-2) 100%);
+    border:1px solid var(--line);
+  }
+  .gauge-svg-wrap{position:relative;width:220px;height:130px;flex-shrink:0;}
+  .gauge-readout{position:absolute;bottom:6px;left:0;right:0;text-align:center;}
+  .gauge-readout .score{font-family:'Space Grotesk',sans-serif;font-size:40px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;}
+  @keyframes scorePop{
+    0%{transform:scale(1);}
+    40%{transform:scale(1.18);}
+    100%{transform:scale(1);}
+  }
+  .gauge-readout .score.pop{animation:scorePop .4s var(--ease);}
+  .gauge-readout .grade{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-top:2px;}
+  .gauge-detail{flex:1;min-width:220px;}
+  .gauge-detail h3{font-family:'Space Grotesk',sans-serif;font-size:16px;margin:0 0 6px;font-weight:600;}
+  .gauge-detail p{margin:0;font-size:13px;color:var(--muted);line-height:1.6;}
+  .gauge-breakdown{display:flex;gap:20px;margin-top:14px;flex-wrap:wrap;}
+  .gauge-breakdown div{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);}
+  .gauge-breakdown span{color:var(--text);font-weight:600;}
+  .print-only{display:none;}
+
+  @media print{
+    .no-print, header .status-chip, #sparklineRow, #connectCard, #controlsCard{display:none !important;}
+    .print-only{display:block;}
+    body{background:#fff !important; color:#111 !important; padding:0; -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    .wrap{max-width:100%;}
+    .card{
+      background:#fff !important; border:1px solid #ddd !important; box-shadow:none !important;
+      animation:none !important; break-inside:avoid; page-break-inside:avoid; margin-bottom:14px;
+    }
+    .card h2{color:#111 !important;}
+    .card h2 svg{color:#444 !important;}
+    h1{color:#111 !important;}
+    h1 span{-webkit-text-fill-color:#444; background:none;}
+    .sub{color:#555 !important;}
+    .stat{background:#fafafa !important; border:1px solid #ddd !important; animation:none !important;}
+    .stat .lbl{color:#666 !important;}
+    .gauge-card{background:#fafafa !important;}
+    .gauge-detail p{color:#555 !important;}
+    .gauge-breakdown div{color:#555 !important;}
+    .gauge-breakdown span{color:#111 !important;}
+    table{font-size:11px;}
+    th{background:#f2f2f2 !important; color:#444 !important; position:static;}
+    td,th{border-bottom:1px solid #e2e2e2 !important; color:#222 !important;}
+    tbody tr:nth-child(even){background:#fafafa !important;}
+    tbody tr:hover{background:transparent !important;}
+    td.key a{color:#3949ab !important;}
+    .table-wrap{max-height:none !important; overflow:visible !important; border:1px solid #ddd !important;}
+    .type-badge{color:#fff !important;}
+    .print-title{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700; color:#111;}
+    .print-meta{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:#555; margin-top:4px; margin-bottom:18px; line-height:1.6;}
+    @page{ margin:16mm 12mm; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Release <span>Signal</span></h1>
+      <div class="sub">Everything QA needs before a release — sprint quality and automation test health, in one place.</div>
+    </div>
+    <div class="status-chip"><span class="dot" id="statusDot"></span><span id="statusText">not connected</span></div>
+  </header>
+
+  <div class="view-tabs no-print">
+    <div class="view-tab active" data-view="sprint">Sprint Quality</div>
+    <div class="view-tab" data-view="automation">Automation Reports</div>
+  </div>
+
+  <div id="sprintView">
+
+  <div class="sparkline-row hidden" id="sparklineRow">
+    <div class="label">Recent sprints</div>
+    <canvas id="sparkline"></canvas>
+  </div>
+
+  <!-- CONNECT CARD -->
+  <div class="card" id="connectCard">
+    <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2 L12 8"/><circle cx="12" cy="14" r="7"/><path d="M9 14h6"/></svg>Connect to Jira</h2>
+
+    <div id="liveMode">
+      <div class="row" style="margin-top:0;display: none;">
+        <label style="display:flex;align-items:center;gap:8px;margin:0;">
+          <input type="checkbox" id="sharedMode" style="width:auto;" checked>
+          Use shared team access (no personal Jira token needed)
+        </label>
+      </div>
+      <div class="grid3" id="personalCreds" style="margin-top:12px;">
+        <div>
+          <label>Jira base URL</label>
+          <input type="text" id="baseUrl" placeholder="https://yourcompany.atlassian.net" value="https://habitnu.atlassian.net">
+        </div>
+        <div>
+          <label>Email</label>
+          <input type="text" id="email" placeholder="you@company.com" value="lokesh@habitnu.com">
+        </div>
+        <div>
+          <label>API token</label>
+          <input type="password" id="token" placeholder="paste token">
+        </div>
+      </div>
+      <div class="grid3 hidden" id="sharedBaseUrlWrap" style="margin-top:12px;">
+        <div>
+          <label>Jira base URL</label>
+          <input type="text" id="baseUrlShared" placeholder="https://yourcompany.atlassian.net" value="https://habitnu.atlassian.net">
+        </div>
+      </div>
+      <div class="grid2 hidden" id="useProxyWrap" style="margin-top:12px;">
+        <div>
+          <label style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="useProxy" style="width:auto;" checked>
+            Route through a CORS proxy (recommended)
+          </label>
+        </div>
+      </div>
+      <input type="text" id="proxyUrl" value="https://lokiesh16--e06803fa88dd11f18f441607ee4eb77e.web.val.run" style="display:none;">
+      <div class="row">
+        <button class="btn" id="connectBtn">Connect</button>
+        <span id="connectSpinner" class="hidden" style="color:var(--muted);font-size:12.5px;">connecting…</span>
+      </div>
+      <div class="note" id="personalNote">
+        Generate a token at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank">id.atlassian.com/manage-profile/security/api-tokens</a>.
+        This dashboard calls the Jira REST API directly from your browser — nothing is sent to or stored by Claude.
+      </div>
+      <div class="note hidden" id="sharedNote">
+        Hit Connect to see your team's Jira dashboard.
+      </div>
+      <div class="error-box hidden" id="connectError"></div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="card hidden" id="controlsCard">
+    <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 4v5"/></svg>Scope</h2>
+    <div class="grid3">
+      <div>
+        <label>Board</label>
+        <select id="boardSelect"></select>
+      </div>
+      <div>
+        <label>Sprint</label>
+        <div class="ms-wrap">
+          <button type="button" class="ms-trigger" id="sprintTrigger">
+            <span id="sprintTriggerLabel">Pick a sprint</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px;margin-left:auto;flex-shrink:0;"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="ms-popover hidden" id="sprintPopover">
+            <input type="text" id="sprintSearchInput" placeholder="type to filter, e.g. 144" style="margin-bottom:8px;">
+            <div class="ms-list" id="sprintList"></div>
+          </div>
+        </div>
+        <input type="text" id="sprintInput" style="display:none;">
+      </div>
+      <div style="display:flex;align-items:flex-end;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
+          <input type="checkbox" id="compareToggle" style="width:auto;">
+          Compare across recent sprints
+        </label>
+      </div>
+    </div>
+    <div class="row hidden" id="compareCountRow" style="margin-top:8px;">
+      <label style="margin:0;">Compare</label>
+      <select id="compareCount" style="width:auto;min-width:160px;">
+        <option value="2" selected>Last 2 sprints</option>
+        <option value="3">Last 3 sprints</option>
+        <option value="4">Last 4 sprints</option>
+        <option value="6">Last 6 sprints</option>
+      </select>
+    </div>
+    <div class="row">
+      <button class="btn" id="fetchIssuesBtn">Load sprint issues</button>
+      <span id="issuesSpinner" class="hidden" style="color:var(--muted);font-size:12.5px;display:inline-flex;align-items:center;gap:7px;">
+        <svg viewBox="0 0 24 24" width="14" height="14" style="animation:spin .8s linear infinite;"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="40" stroke-dashoffset="10"/></svg>
+        loading issues…
+      </span>
+      <button class="btn-ghost btn" id="disconnectBtn">Disconnect</button>
+    </div>
+    <div class="error-box hidden" id="issuesError"></div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" class="hidden">
+    <div class="row no-print" style="justify-content:flex-end;margin-top:0;margin-bottom:16px;">
+      <button class="btn btn-ghost" id="exportPdfBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px;vertical-align:-2px;margin-right:6px;"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>Export as PDF
+      </button>
+    </div>
+
+    <div class="print-only" id="printReportHeader">
+      <div class="print-title">Sprint Signal — Release Report</div>
+      <div class="print-meta" id="printMeta"></div>
+    </div>
+    <div class="card gauge-card">
+      <div class="gauge-svg-wrap">
+        <svg viewBox="0 0 220 130" width="220" height="130">
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#e5484d"/>
+              <stop offset="50%" stop-color="#f5a623"/>
+              <stop offset="100%" stop-color="#3dd68c"/>
+            </linearGradient>
+          </defs>
+          <path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="#262b36" stroke-width="14" stroke-linecap="round"/>
+          <path id="gaugeArc" d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round"
+                stroke-dasharray="283" stroke-dashoffset="283" style="transition:stroke-dashoffset 1s cubic-bezier(.22,.9,.32,1);"/>
+        </svg>
+        <div class="gauge-readout">
+          <div class="score" id="gaugeScore">—</div>
+          <div class="grade" id="gaugeGrade">calculating</div>
+        </div>
+      </div>
+      <div class="gauge-detail">
+        <h3>Quality score</h3>
+        <p>A read on this scope: how much of the work is bugs vs. forward progress, and how much of that bug load is actually closed out.</p>
+        <div class="gauge-breakdown">
+          <div>Bug share of work: <span id="gaugeBugShare">—</span></div>
+          <div>Bug resolution rate: <span id="gaugeResolveRate">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="num" id="statTotal">0</div><div class="lbl">Issues in view</div></div>
+      <div class="stat"><div class="num" id="statBugs" style="color:var(--bug)">0</div><div class="lbl">Bugs</div></div>
+      <div class="stat"><div class="num" id="statEnh" style="color:var(--enh)">0</div><div class="lbl">Enhancements</div></div>
+      <div class="stat"><div class="num" id="statReporter">—</div><div class="lbl">Top reporter</div></div>
+    </div>
+
+    <div class="card" id="filtersCard">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <h2 style="margin-bottom:0;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>Filters</h2>
+        <button type="button" class="btn-ghost btn" id="resetFiltersBtn" style="padding:6px 14px;font-size:12px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:12px;height:12px;vertical-align:-1px;margin-right:5px;"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>Reset filters
+        </button>
+      </div>
+      <div class="filters" style="margin-top:14px;">
+        <div class="filter-group">
+          <label>Issue type</label>
+          <div class="chip-set" id="typeChips"></div>
+        </div>
+        <div class="filter-group" style="flex:1;">
+          <label>Reporter</label>
+          <div class="ms-wrap">
+            <button type="button" class="ms-trigger" id="reporterMsTrigger">
+              <span id="reporterMsLabel">All reporters</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px;margin-left:auto;flex-shrink:0;"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="ms-popover hidden" id="reporterMsPopover">
+              <div class="ms-actions">
+                <button type="button" class="ms-action" data-target="reporterSelect" data-action="all">Select all</button>
+                <button type="button" class="ms-action" data-target="reporterSelect" data-action="none">Clear</button>
+              </div>
+              <div class="ms-list" id="reporterMsList"></div>
+            </div>
+          </div>
+          <select id="reporterSelect" multiple style="display:none;"></select>
+        </div>
+        <div class="filter-group" style="flex:1;">
+          <label>Module</label>
+          <div class="ms-wrap">
+            <button type="button" class="ms-trigger" id="moduleMsTrigger">
+              <span id="moduleMsLabel">All modules</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px;margin-left:auto;flex-shrink:0;"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="ms-popover hidden" id="moduleMsPopover">
+              <div class="ms-actions">
+                <button type="button" class="ms-action" data-target="moduleSelect" data-action="all">Select all</button>
+                <button type="button" class="ms-action" data-target="moduleSelect" data-action="none">Clear</button>
+              </div>
+              <div class="ms-list" id="moduleMsList"></div>
+            </div>
+          </div>
+          <select id="moduleSelect" multiple style="display:none;"></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 id="chartTitle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-7"/></svg><span>Issues by type</span></h2>
+      <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a5 5 0 0 0-5 5v2H5v2h2v2H5v2h2v2a5 5 0 0 0 10 0v-2h2v-2h-2v-2h2V9h-2V7a5 5 0 0 0-5-5z"/><path d="M9 12h6"/></svg>Bug status</h2>
+      <div class="stat-row" style="margin-bottom:16px;">
+        <div class="stat"><div class="num" id="statOpenBugs" style="color:var(--bug)">0</div><div class="lbl">Open bugs</div></div>
+        <div class="stat"><div class="num" id="statResolvedBugs" style="color:var(--good)">0</div><div class="lbl">Resolved bugs</div></div>
+      </div>
+      <div class="chart-wrap" style="height:280px;"><canvas id="statusChart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>Issue list</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Key</th><th>Type</th><th>Summary</th><th>Reporter</th><th>Module</th><th>Status</th><th>Sprint</th></tr></thead>
+          <tbody id="issueTableBody"></tbody>
+        </table>
+      </div>
+      <div class="empty hidden" id="tableEmpty">No issues match the current filters.</div>
+    </div>
+  </div>
+
+  </div><!-- /sprintView -->
+
+  <div id="automationView" class="hidden">
+
+    <div class="card" id="autoRunCard">
+      <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 4v5"/></svg>Automation run</h2>
+      <div class="grid3">
+        <div>
+          <label>Report type</label>
+          <select id="autoReportType">
+            <option value="web-report">Web</option>
+            <option value="coaches-report">Coaches</option>
+            <option value="ios-reports">iOS</option>
+          </select>
+        </div>
+        <div>
+          <label>Day</label>
+          <div class="dp-wrap">
+            <button type="button" class="dp-trigger" id="autoDateButton">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 4v3"/><path d="M16 4v3"/></svg>
+              <span id="autoDateLabel">Pick a day</span>
+            </button>
+            <div class="dp-popover hidden" id="autoDatePopover">
+              <div class="dp-header">
+                <button type="button" class="dp-nav" id="dpPrevMonth" aria-label="Previous month">‹</button>
+                <span id="dpMonthLabel"></span>
+                <button type="button" class="dp-nav" id="dpNextMonth" aria-label="Next month">›</button>
+              </div>
+              <div class="dp-weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+              <div class="dp-grid" id="dpGrid"></div>
+            </div>
+          </div>
+          <input type="date" id="autoDateInput" style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;">
+        </div>
+        <div>
+          <label>Run (if multiple that day)</label>
+          <select id="autoRunSelect"></select>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn" id="autoLoadBtn">Load run</button>
+        <a class="btn btn-ghost" id="autoFullReportLink" href="#" target="_blank" rel="noopener" style="text-decoration:none;">View full Allure report ↗</a>
+        <label style="display:flex;align-items:center;gap:8px;margin:0;">
+          <input type="checkbox" id="autoLast7Only" style="width:auto;" checked>
+          Limit calendar to the last 7 days
+        </label>
+      </div>
+      <div class="error-box hidden" id="autoError"></div>
+    </div>
+
+    <div id="autoResults" class="hidden">
+      <div class="stat-row" style="grid-template-columns:repeat(6,1fr);">
+        <div class="stat"><div class="num" id="autoTotal">0</div><div class="lbl">Total tests</div></div>
+        <div class="stat"><div class="num" id="autoPassed" style="color:var(--good)">0</div><div class="lbl">Passed</div></div>
+        <div class="stat"><div class="num" id="autoFailed" style="color:var(--bug)">0</div><div class="lbl">Failed</div></div>
+        <div class="stat"><div class="num" id="autoBroken" style="color:var(--story)">0</div><div class="lbl">Broken</div></div>
+        <div class="stat"><div class="num" id="autoSkipped" style="color:var(--muted)">0</div><div class="lbl">Skipped</div></div>
+        <div class="stat"><div class="num" id="autoPassRate" style="color:var(--accent-2)">0%</div><div class="lbl">Pass rate</div></div>
+      </div>
+
+      <div class="card">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-7"/></svg>Result breakdown</h2>
+        <div class="chart-wrap" style="height:280px;"><canvas id="autoStatusChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>Pass rate — last runs</h2>
+        <div class="chart-wrap" style="height:220px;"><canvas id="autoTrendChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>Suite breakdown</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Suite</th><th>Total</th><th>Passed</th><th>Failed</th><th>Broken</th><th>Skipped</th></tr></thead>
+            <tbody id="autoSuiteTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /automationView -->
+
+</div>
+
+
+<script>
+// ---------- resilient Chart.js loader (falls back across CDNs) ----------
+const CHART_CDNS = [
+  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
+  'https://unpkg.com/chart.js@4.4.4/dist/chart.umd.min.js'
+];
+let chartLoadPromise = null;
+function loadChartJs(){
+  if(chartLoadPromise) return chartLoadPromise;
+  chartLoadPromise = (async ()=>{
+    for(const src of CHART_CDNS){
+      if(window.Chart) return true;
+      try{
+        await new Promise((resolve, reject)=>{
+          const s = document.createElement('script');
+          s.src = src;
+          s.onload = resolve;
+          s.onerror = reject;
+          document.head.appendChild(s);
+        });
+        if(window.Chart) return true;
+      }catch(e){ /* try next CDN */ }
+    }
+    return !!window.Chart;
+  })();
+  return chartLoadPromise;
+}
+loadChartJs(); // kick off immediately in the background
+
+// ---------- state ----------
+let auth = null;          // { baseUrl, headerValue }
+let allIssues = [];       // normalized issues currently loaded (single sprint or multi-sprint)
+let sprintsMeta = [];     // [{id,name}] for compare mode / sparkline
+let compareMode = false;
+let mainChart = null;
+let sparkChart = null;
+let activeTypeFilters = new Set();
+let boards = [];
+
+const TYPE_COLORS = {Bug:'--bug', Enhancement:'--enh', Task:'--task', Story:'--story', 'Sub-task':'--sub'};
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function colorForType(t){
+  const key = TYPE_COLORS[t] ? TYPE_COLORS[t] : '--other';
+  return cssVar(key);
+}
+
+// proxy URL field is always hidden now (pre-filled internally), no toggle needed
+
+document.getElementById('sharedMode').addEventListener('change', (e)=>{
+  const shared = e.target.checked;
+  document.getElementById('personalCreds').classList.toggle('hidden', shared);
+  document.getElementById('sharedBaseUrlWrap').classList.toggle('hidden', !shared);
+  document.getElementById('personalNote').classList.toggle('hidden', shared);
+  document.getElementById('sharedNote').classList.toggle('hidden', !shared);
+  document.getElementById('useProxyWrap').classList.toggle('hidden', shared);
+  if(shared){
+    document.getElementById('useProxy').checked = true; // shared mode requires the proxy
+  }
+});
+// initialize hidden state to match the checked-by-default shared mode
+document.getElementById('personalCreds').classList.add('hidden');
+document.getElementById('sharedBaseUrlWrap').classList.remove('hidden');
+document.getElementById('personalNote').classList.add('hidden');
+document.getElementById('sharedNote').classList.remove('hidden');
+document.getElementById('useProxyWrap').classList.add('hidden');
+
+// ---------- view switching ----------
+document.querySelectorAll('.view-tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const view = tab.dataset.view;
+    document.getElementById('sprintView').classList.toggle('hidden', view!=='sprint');
+    document.getElementById('automationView').classList.toggle('hidden', view!=='automation');
+    if(view==='automation' && autoRunsLoadedFor !== currentAutoFolder()) loadAutoRuns();
+  });
+});
+
+// ---------- Automation Reports (public GitHub repo, no auth needed) ----------
+const AUTO_REPO = 'lokiesh16/HabitNuTestReports';
+const AUTO_BRANCH = 'gh-pages';
+function autoRawBase(folder){ return `https://raw.githubusercontent.com/${AUTO_REPO}/${AUTO_BRANCH}/${folder}`; }
+function autoPagesBase(folder){ return `https://${AUTO_REPO.split('/')[0]}.github.io/${AUTO_REPO.split('/')[1]}/${folder}`; }
+let autoRunsLoadedFor = null;
+let autoRunsListAll = [];
+let autoStatusChart = null;
+let autoTrendChart = null;
+
+function currentAutoFolder(){
+  return document.getElementById('autoReportType').value;
+}
+
+function parseRunDate(run){
+  // run format: YYYY-MM-DD_HH-MM-SS
+  const m = run.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/);
+  if(!m) return null;
+  return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
+}
+
+function runDayString(run){
+  return run.slice(0, 10); // YYYY-MM-DD
+}
+
+function isoDateNDaysAgo(n){
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatDateLabel(iso){
+  if(!iso) return 'Pick a day';
+  const [y,m,d] = iso.split('-').map(Number);
+  const dt = new Date(y, m-1, d);
+  return dt.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+}
+
+let dpViewDate = new Date();
+
+function setAutoDate(iso){
+  document.getElementById('autoDateInput').value = iso;
+  document.getElementById('autoDateLabel').textContent = formatDateLabel(iso);
+  if(iso){
+    const [y,m] = iso.split('-').map(Number);
+    dpViewDate = new Date(y, m-1, 1);
+  }
+}
+
+function renderCalendarGrid(){
+  const grid = document.getElementById('dpGrid');
+  const dateInput = document.getElementById('autoDateInput');
+  const year = dpViewDate.getFullYear(), month = dpViewDate.getMonth();
+  document.getElementById('dpMonthLabel').textContent = dpViewDate.toLocaleDateString(undefined, { month:'long', year:'numeric' });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const todayIso = new Date().toISOString().slice(0,10);
+  const selectedIso = dateInput.value;
+  const minIso = dateInput.min || null;
+  const maxIso = dateInput.max || null;
+  const runDaysSet = new Set(autoRunsListAll.map(runDayString));
+
+  let html = '';
+  for(let i=0;i<firstDay;i++) html += '<div class="dp-day dp-empty"></div>';
+  for(let d=1; d<=daysInMonth; d++){
+    const iso = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const disabled = (minIso && iso < minIso) || (maxIso && iso > maxIso);
+    const classes = ['dp-day'];
+    if(disabled) classes.push('dp-disabled');
+    if(iso === todayIso) classes.push('dp-today');
+    if(iso === selectedIso) classes.push('dp-selected');
+    if(runDaysSet.has(iso)) classes.push('dp-has-run');
+    html += `<div class="${classes.join(' ')}" data-iso="${iso}">${d}</div>`;
+  }
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.dp-day:not(.dp-disabled):not(.dp-empty)').forEach(cell=>{
+    cell.addEventListener('click', ()=>{
+      setAutoDate(cell.dataset.iso);
+      document.getElementById('autoDatePopover').classList.add('hidden');
+      onAutoDateChange();
+    });
+  });
+}
+
+document.getElementById('autoDateButton').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  const popover = document.getElementById('autoDatePopover');
+  const opening = popover.classList.contains('hidden');
+  popover.classList.toggle('hidden');
+  if(opening) renderCalendarGrid();
+});
+document.getElementById('autoDatePopover').addEventListener('click', (e)=> e.stopPropagation());
+document.addEventListener('click', ()=>{
+  document.getElementById('autoDatePopover').classList.add('hidden');
+});
+document.getElementById('dpPrevMonth').addEventListener('click', ()=>{
+  dpViewDate = new Date(dpViewDate.getFullYear(), dpViewDate.getMonth()-1, 1);
+  renderCalendarGrid();
+});
+document.getElementById('dpNextMonth').addEventListener('click', ()=>{
+  dpViewDate = new Date(dpViewDate.getFullYear(), dpViewDate.getMonth()+1, 1);
+  renderCalendarGrid();
+});
+
+function applyAutoCalendarLimits(){
+  const only7 = document.getElementById('autoLast7Only').checked;
+  const dateInput = document.getElementById('autoDateInput');
+  if(only7){
+    dateInput.min = isoDateNDaysAgo(7);
+  }else{
+    dateInput.removeAttribute('min');
+  }
+  dateInput.max = isoDateNDaysAgo(0);
+}
+
+document.getElementById('autoReportType').addEventListener('change', ()=>{
+  autoRunsLoadedFor = null;
+  loadAutoRuns();
+});
+
+document.getElementById('autoLast7Only').addEventListener('change', ()=>{
+  applyAutoCalendarLimits();
+  const dateInput = document.getElementById('autoDateInput');
+  // if current date fell out of range, snap back to the latest available run's day
+  if(dateInput.min && dateInput.value < dateInput.min && autoRunsListAll.length){
+    setAutoDate(runDayString(autoRunsListAll[0]));
+  }
+  onAutoDateChange();
+});
+
+function onAutoDateChange(){
+  const day = document.getElementById('autoDateInput').value;
+  const errBox = document.getElementById('autoError');
+  errBox.classList.add('hidden');
+  const matches = autoRunsListAll.filter(r => runDayString(r) === day).sort().reverse(); // newest first that day
+  const sel = document.getElementById('autoRunSelect');
+  if(!matches.length){
+    sel.innerHTML = '<option value="">No runs on this day</option>';
+    document.getElementById('autoResults').classList.add('hidden');
+    errBox.textContent = `No ${document.getElementById('autoReportType').selectedOptions[0].textContent} runs found on ${day}. Try another day on the calendar.`;
+    errBox.classList.remove('hidden');
+    return;
+  }
+  sel.innerHTML = matches.map(r => {
+    const time = r.slice(11).replace(/-/g, ':');
+    return `<option value="${r}">${time}${matches.length>1 && r===matches[0] ? '  (latest)' : ''}</option>`;
+  }).join('');
+  loadAutoRun(matches[0]);
+}
+
+async function loadAutoRuns(){
+  const folder = currentAutoFolder();
+  const errBox = document.getElementById('autoError');
+  errBox.classList.add('hidden');
+  const sel = document.getElementById('autoRunSelect');
+  sel.innerHTML = '<option>loading…</option>';
+  try{
+    const res = await fetch(`https://api.github.com/repos/${AUTO_REPO}/contents/${folder}?ref=${AUTO_BRANCH}`);
+    if(!res.ok){
+      if(res.status === 403){
+        throw new Error('GitHub API rate limit likely hit (unauthenticated requests are capped around 60/hour). Wait a bit and try again.');
+      }
+      throw new Error('GitHub API responded with ' + res.status);
+    }
+    const data = await res.json();
+    const runPattern = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/;
+    autoRunsListAll = data.filter(item => item.type === 'dir' && runPattern.test(item.name))
+                       .map(item => item.name)
+                       .sort().reverse(); // newest first
+    if(!autoRunsListAll.length) throw new Error(`No dated run folders found under ${folder}/.`);
+    applyAutoCalendarLimits();
+    setAutoDate(runDayString(autoRunsListAll[0]));
+    autoRunsLoadedFor = folder;
+    onAutoDateChange();
+  }catch(e){
+    errBox.textContent = 'Could not load run list: ' + e.message;
+    errBox.classList.remove('hidden');
+    sel.innerHTML = '<option value="">failed to load</option>';
+  }
+}
+
+document.getElementById('autoLoadBtn').addEventListener('click', ()=>{
+  const value = document.getElementById('autoRunSelect').value;
+  if(value){
+    loadAutoRun(value);
+  }else{
+    const errBox = document.getElementById('autoError');
+    errBox.textContent = 'No run selected for this day.';
+    errBox.classList.remove('hidden');
+  }
+});
+
+async function fetchAutoJson(run, file){
+  const folder = currentAutoFolder();
+  const res = await fetch(`${autoRawBase(folder)}/${run}/widgets/${file}`);
+  if(!res.ok) throw new Error(`${file} -> HTTP ${res.status}`);
+  return res.json();
+}
+
+async function loadAutoRun(run){
+  const errBox = document.getElementById('autoError');
+  errBox.classList.add('hidden');
+  const folder = currentAutoFolder();
+  try{
+    const [summary, suites] = await Promise.all([
+      fetchAutoJson(run, 'summary.json'),
+      fetchAutoJson(run, 'suites.json'),
+    ]);
+    renderAutoSummary(summary);
+    renderAutoSuites(suites);
+    document.getElementById('autoFullReportLink').href = `${autoPagesBase(folder)}/${run}/index.html`;
+    document.getElementById('autoResults').classList.remove('hidden');
+    loadAutoTrend(); // fire and forget, renders when ready
+  }catch(e){
+    errBox.textContent = 'Could not load that run: ' + e.message;
+    errBox.classList.remove('hidden');
+  }
+}
+
+function renderAutoSummary(summary){
+  const s = summary.statistic || {};
+  const total = s.total || 0;
+  animateNum(document.getElementById('autoTotal'), total);
+  animateNum(document.getElementById('autoPassed'), s.passed || 0);
+  animateNum(document.getElementById('autoFailed'), s.failed || 0);
+  animateNum(document.getElementById('autoBroken'), s.broken || 0);
+  animateNum(document.getElementById('autoSkipped'), s.skipped || 0);
+  const rate = total ? Math.round(((s.passed||0) / total) * 100) : 0;
+  document.getElementById('autoPassRate').textContent = rate + '%';
+
+  if(typeof Chart === 'undefined') return;
+  const ctx = document.getElementById('autoStatusChart').getContext('2d');
+  if(autoStatusChart) autoStatusChart.destroy();
+  const labels = ['Passed','Failed','Broken','Skipped'];
+  const values = [s.passed||0, s.failed||0, s.broken||0, s.skipped||0];
+  const colors = [cssVar('--good'), cssVar('--bug'), cssVar('--story'), cssVar('--muted')];
+  autoStatusChart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'Tests', data: values, backgroundColor: colors }] },
+    options: baseChartOptions(false)
+  });
+}
+
+function renderAutoSuites(suitesData){
+  const items = suitesData.items || [];
+  const body = document.getElementById('autoSuiteTableBody');
+  function flatten(list, prefix){
+    let out = [];
+    list.forEach(item=>{
+      const name = prefix ? prefix + ' / ' + item.name : item.name;
+      if(item.children && item.children.length){
+        out = out.concat(flatten(item.children, name));
+      }else{
+        out.push({ name, stat: item.statistic || {} });
+      }
+    });
+    return out;
+  }
+  const rows = flatten(items, '');
+  body.innerHTML = rows.map(r=>`
+    <tr>
+      <td>${escapeHtml(r.name)}</td>
+      <td>${r.stat.total||0}</td>
+      <td style="color:var(--good)">${r.stat.passed||0}</td>
+      <td style="color:var(--bug)">${r.stat.failed||0}</td>
+      <td style="color:var(--story)">${r.stat.broken||0}</td>
+      <td style="color:var(--muted)">${r.stat.skipped||0}</td>
+    </tr>`).join('');
+}
+
+async function loadAutoTrend(){
+  if(typeof Chart === 'undefined') return;
+  const recent = autoRunsListAll.slice(0, 10).reverse(); // oldest -> newest, last 10
+  const results = await Promise.all(recent.map(async run=>{
+    try{
+      const summary = await fetchAutoJson(run, 'summary.json');
+      const s = summary.statistic || {};
+      const rate = s.total ? Math.round(((s.passed||0)/s.total)*100) : null;
+      return { run, rate };
+    }catch(e){
+      return { run, rate: null };
+    }
+  }));
+  const ctx = document.getElementById('autoTrendChart').getContext('2d');
+  if(autoTrendChart) autoTrendChart.destroy();
+  autoTrendChart = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: results.map(r=>r.run.slice(5,10)), // MM-DD
+      datasets:[{
+        label:'Pass rate %',
+        data: results.map(r=>r.rate),
+        borderColor: cssVar('--accent-2'),
+        backgroundColor:'transparent',
+        tension:.3,
+        spanGaps:true,
+        pointRadius:3
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ ticks:{color:cssVar('--muted'), font:{family:'IBM Plex Mono', size:10}}, grid:{color:'#232733'} },
+        y:{ min:0, max:100, ticks:{color:cssVar('--muted'), font:{family:'IBM Plex Mono', size:10}}, grid:{color:'#232733'} }
+      }
+    }
+  });
+}
+
+// ---------- custom multi-select widgets (reporter / module) ----------
+function updateMsLabel(selectId, labelId, singularNoun){
+  const select = document.getElementById(selectId);
+  const total = select.options.length;
+  const selected = select.selectedOptions.length;
+  document.getElementById(labelId).textContent =
+    total === 0 ? `No ${singularNoun}s` :
+    selected === total ? `All ${singularNoun}s (${total})` :
+    selected === 0 ? `None selected` :
+    `${selected} of ${total} selected`;
+}
+
+function buildMultiSelect(selectId, labelId, listId, singularNoun){
+  const select = document.getElementById(selectId);
+  const list = document.getElementById(listId);
+  const options = [...select.options];
+  list.innerHTML = options.map((o,i)=>`
+    <label class="ms-option">
+      <input type="checkbox" data-idx="${i}" ${o.selected?'checked':''}>
+      <span>${escapeHtml(o.value)}</span>
+    </label>
+  `).join('') || `<div style="color:var(--muted);font-size:12.5px;padding:8px;">No ${singularNoun}s to filter</div>`;
+  list.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change', ()=>{
+      options[+cb.dataset.idx].selected = cb.checked;
+      updateMsLabel(selectId, labelId, singularNoun);
+      renderAll();
+    });
+  });
+  updateMsLabel(selectId, labelId, singularNoun);
+}
+
+function setupMsWidget(triggerId, popoverId){
+  const trigger = document.getElementById(triggerId);
+  const popover = document.getElementById(popoverId);
+  trigger.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const opening = popover.classList.contains('hidden');
+    document.querySelectorAll('.ms-popover').forEach(p => p.classList.add('hidden'));
+    if(opening) popover.classList.remove('hidden');
+  });
+  popover.addEventListener('click', (e)=> e.stopPropagation());
+}
+setupMsWidget('reporterMsTrigger', 'reporterMsPopover');
+setupMsWidget('moduleMsTrigger', 'moduleMsPopover');
+document.addEventListener('click', ()=>{
+  document.querySelectorAll('.ms-popover').forEach(p => p.classList.add('hidden'));
+});
+document.querySelectorAll('.ms-action').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const selectId = btn.dataset.target;
+    const action = btn.dataset.action;
+    const select = document.getElementById(selectId);
+    [...select.options].forEach(o => o.selected = (action === 'all'));
+    const listId = selectId === 'reporterSelect' ? 'reporterMsList' : 'moduleMsList';
+    const labelId = selectId === 'reporterSelect' ? 'reporterMsLabel' : 'moduleMsLabel';
+    const noun = selectId === 'reporterSelect' ? 'reporter' : 'module';
+    document.getElementById(listId).querySelectorAll('input[type=checkbox]').forEach(cb=>{
+      cb.checked = (action === 'all');
+    });
+    updateMsLabel(selectId, labelId, noun);
+    renderAll();
+  });
+});
+
+document.getElementById('resetFiltersBtn').addEventListener('click', ()=>{
+  // reset issue-type chips: all active
+  activeTypeFilters = new Set([...new Set(allIssues.map(i=>i.issueType))]);
+  document.querySelectorAll('#typeChips .chip').forEach(chip => chip.classList.add('active'));
+
+  // reset reporter + module multi-selects: all selected
+  ['reporterSelect','moduleSelect'].forEach(selectId=>{
+    const select = document.getElementById(selectId);
+    [...select.options].forEach(o => o.selected = true);
+  });
+  const repList = document.getElementById('reporterMsList');
+  repList.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true);
+  updateMsLabel('reporterSelect', 'reporterMsLabel', 'reporter');
+  const modList = document.getElementById('moduleMsList');
+  modList.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = true);
+  updateMsLabel('moduleSelect', 'moduleMsLabel', 'module');
+
+  renderAll();
+});
+
+function setStatus(text, state){
+  document.getElementById('statusText').textContent = text;
+  const dot = document.getElementById('statusDot');
+  dot.className = 'dot' + (state==='on' ? ' on' : state==='err' ? ' err' : '');
+}
+
+// ---------- LIVE: connect ----------
+document.getElementById('connectBtn').addEventListener('click', async ()=>{
+  const errBox = document.getElementById('connectError');
+  errBox.classList.add('hidden');
+  const sharedMode = document.getElementById('sharedMode').checked;
+
+  let baseUrlRaw, headerValue, useProxy, proxyUrl;
+
+  if(sharedMode){
+    baseUrlRaw = document.getElementById('baseUrlShared').value.trim().replace(/\/$/,'');
+    if(!baseUrlRaw){
+      errBox.textContent = 'Fill in the Jira base URL.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+    headerValue = 'Basic '; // ignored by the proxy in shared mode — it injects its own stored credential
+    useProxy = true;
+    proxyUrl = document.getElementById('proxyUrl').value.trim().replace(/\/$/,'');
+    if(!proxyUrl){
+      errBox.textContent = 'Enter the shared proxy worker URL.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+  }else{
+    baseUrlRaw = document.getElementById('baseUrl').value.trim().replace(/\/$/,'');
+    const email = document.getElementById('email').value.trim();
+    const token = document.getElementById('token').value.trim();
+    if(!baseUrlRaw || !email || !token){
+      errBox.textContent = 'Fill in base URL, email, and API token.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+    headerValue = 'Basic ' + btoa(email + ':' + token);
+    useProxy = document.getElementById('useProxy').checked;
+    proxyUrl = document.getElementById('proxyUrl').value.trim().replace(/\/$/,'');
+    if(useProxy && !proxyUrl){
+      errBox.textContent = 'Enter your deployed proxy worker URL, or uncheck the proxy option.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+  }
+
+  document.getElementById('connectSpinner').classList.remove('hidden');
+  document.getElementById('connectBtn').disabled = true;
+  try{
+    auth = { baseUrl: baseUrlRaw, headerValue, proxyUrl: useProxy ? proxyUrl : null };
+    const data = await jiraFetch('/rest/api/3/myself');
+    if(!data || !data.accountId){
+      throw new Error('Connected, but response looked unexpected. Check your URL/email/token.');
+    }
+    setStatus('connected', 'on');
+    document.getElementById('connectCard').classList.add('hidden');
+    document.getElementById('controlsCard').classList.remove('hidden');
+    await resolveModuleField();
+    await loadBoards();
+  }catch(e){
+    setStatus('connection failed', 'err');
+    const corsLikely = e instanceof TypeError;
+    if(corsLikely && !useProxy){
+      errBox.textContent = 'Request failed before reaching Jira — this is CORS, which Jira Cloud applies by default to third-party pages. Check "Route through a CORS proxy" above and enter your deployed worker URL (see the proxy-worker.js file provided alongside this dashboard), or use the "Paste exported data" tab instead.';
+    }else if(corsLikely){
+      errBox.textContent = 'Request failed reaching your proxy. Double-check the proxy URL is correct and the worker is deployed and reachable.';
+    }else{
+      errBox.textContent = 'Connection error: ' + e.message;
+    }
+    errBox.classList.remove('hidden');
+  }finally{
+    document.getElementById('connectSpinner').classList.add('hidden');
+    document.getElementById('connectBtn').disabled = false;
+  }
+});
+
+async function jiraFetch(path){
+  let url, headers;
+  if(auth.proxyUrl){
+    url = auth.proxyUrl + '?target=' + encodeURIComponent(auth.baseUrl + path);
+    headers = { 'Authorization': auth.headerValue, 'Accept': 'application/json' };
+  }else{
+    url = auth.baseUrl + path;
+    headers = { 'Authorization': auth.headerValue, 'Accept': 'application/json' };
+  }
+  const res = await fetch(url, { headers });
+  if(!res.ok) throw new Error(path + ' -> HTTP ' + res.status);
+  return res.json();
+}
+
+let MODULE_FIELD_ID = null;
+async function resolveModuleField(){
+  try{
+    const fields = await jiraFetch('/rest/api/3/field');
+    const match = (fields || []).find(f => (f.name || '').trim().toLowerCase() === 'module');
+    MODULE_FIELD_ID = match ? match.id : null;
+  }catch(e){
+    MODULE_FIELD_ID = null; // Module filter will just be empty/hidden if this fails
+  }
+}
+
+async function loadBoards(){
+  let startAt = 0, all = [];
+  while(true){
+    const data = await jiraFetch(`/rest/agile/1.0/board?maxResults=50&startAt=${startAt}`);
+    all = all.concat(data.values || []);
+    if(data.isLast !== false || !data.values || data.values.length < 50) break;
+    startAt += 50;
+    if(all.length > 500) break; // safety cap
+  }
+  boards = all;
+  const sel = document.getElementById('boardSelect');
+  sel.innerHTML = boards.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
+  if(boards.length) await loadSprints(boards[0].id);
+  sel.addEventListener('change', ()=> loadSprints(sel.value));
+}
+
+async function loadSprints(boardId){
+  const errBox = document.getElementById('issuesError');
+  errBox.classList.add('hidden');
+  const trigger = document.getElementById('sprintTrigger');
+  const triggerLabel = document.getElementById('sprintTriggerLabel');
+  trigger.disabled = true;
+  triggerLabel.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" style="animation:spin .8s linear infinite;vertical-align:-2px;margin-right:6px;"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--accent-2)" stroke-width="3" stroke-linecap="round" stroke-dasharray="40" stroke-dashoffset="10"/></svg>Loading sprints…`;
+  try{
+    let startAt = 0, all = [];
+    while(true){
+      const data = await jiraFetch(`/rest/agile/1.0/board/${boardId}/sprint?maxResults=50&startAt=${startAt}&state=active,future,closed`);
+      all = all.concat(data.values || []);
+      if(data.isLast !== false || !data.values || data.values.length < 50) break;
+      startAt += 50;
+      if(all.length > 1000) break; // safety cap
+    }
+    let sprints = all.sort((a,b)=> (b.id - a.id));
+    sprintsMeta = sprints;
+    renderSprintOptions(sprints);
+  }catch(e){
+    errBox.textContent = 'Could not load sprints: ' + e.message;
+    errBox.classList.remove('hidden');
+    triggerLabel.textContent = 'Failed to load sprints';
+  }finally{
+    trigger.disabled = false;
+  }
+}
+
+function renderSprintOptions(sprints){
+  const active = sprints.find(s=>s.state==='active');
+  const defaultSprint = active || sprints[0] || null;
+  const input = document.getElementById('sprintInput');
+  input.value = defaultSprint ? `${defaultSprint.name} (${defaultSprint.state})` : '';
+  document.getElementById('sprintTriggerLabel').textContent = defaultSprint ? `${defaultSprint.name} (${defaultSprint.state})` : 'No sprints found';
+  document.getElementById('sprintSearchInput').value = '';
+  renderSprintList(sprints);
+}
+
+function renderSprintList(sprints){
+  const list = document.getElementById('sprintList');
+  const currentValue = document.getElementById('sprintInput').value;
+  if(!sprints.length){
+    list.innerHTML = `<div style="color:var(--muted);font-size:12.5px;padding:8px;">No sprints match</div>`;
+    return;
+  }
+  list.innerHTML = sprints.map(s=>{
+    const label = `${s.name} (${s.state})`;
+    const isSelected = label === currentValue;
+    return `<div class="ms-option" data-value="${escapeHtml(label)}" style="${isSelected ? 'background:var(--surface-hover);' : ''}">${escapeHtml(label)}</div>`;
+  }).join('');
+  list.querySelectorAll('.ms-option').forEach(opt=>{
+    opt.addEventListener('click', ()=>{
+      document.getElementById('sprintInput').value = opt.dataset.value;
+      document.getElementById('sprintTriggerLabel').textContent = opt.dataset.value;
+      document.getElementById('sprintPopover').classList.add('hidden');
+    });
+  });
+}
+
+document.getElementById('sprintTrigger').addEventListener('click', (e)=>{
+  e.stopPropagation();
+  const popover = document.getElementById('sprintPopover');
+  const opening = popover.classList.contains('hidden');
+  document.querySelectorAll('.ms-popover, .dp-popover').forEach(p => p.classList.add('hidden'));
+  if(opening){
+    popover.classList.remove('hidden');
+    renderSprintList(sprintsMeta);
+    document.getElementById('sprintSearchInput').focus();
+  }
+});
+document.getElementById('sprintPopover').addEventListener('click', (e)=> e.stopPropagation());
+document.getElementById('sprintSearchInput').addEventListener('input', (e)=>{
+  const q = e.target.value.trim().toLowerCase();
+  const filtered = q ? sprintsMeta.filter(s => `${s.name} (${s.state})`.toLowerCase().includes(q)) : sprintsMeta;
+  renderSprintList(filtered);
+});
+
+function resolveSprintFromInput(){
+  const value = document.getElementById('sprintInput').value.trim();
+  if(!value) return null;
+  let match = sprintsMeta.find(s => `${s.name} (${s.state})` === value);
+  if(match) return match;
+  match = sprintsMeta.find(s => s.name === value);
+  if(match) return match;
+  const lower = value.toLowerCase();
+  const candidates = sprintsMeta.filter(s => s.name.toLowerCase().includes(lower));
+  if(candidates.length === 1) return candidates[0];
+  return null;
+}
+
+document.getElementById('exportPdfBtn').addEventListener('click', ()=>{
+  const filtered = getFiltered();
+  const sprintNames = [...new Set(allIssues.map(i=>i.sprintName))];
+  const typeList = [...activeTypeFilters].join(', ') || 'None';
+  const repSel = document.getElementById('reporterSelect');
+  const totalReporters = repSel.options.length;
+  const selectedReporters = repSel.selectedOptions.length;
+  const modSel = document.getElementById('moduleSelect');
+  const totalModules = modSel.options.length;
+  const selectedModules = modSel.selectedOptions.length;
+
+  const reporterNote = selectedReporters === totalReporters ? 'All' : `${selectedReporters} of ${totalReporters} selected`;
+  const moduleNote = selectedModules === totalModules ? 'All' : `${selectedModules} of ${totalModules} selected`;
+
+  document.getElementById('printMeta').innerHTML =
+    `Scope: ${escapeHtml(sprintNames.join(', '))} &nbsp;•&nbsp; Issue types: ${escapeHtml(typeList)}<br>` +
+    `Reporter filter: ${reporterNote} &nbsp;•&nbsp; Module filter: ${moduleNote} &nbsp;•&nbsp; ${filtered.length} issues in this report<br>` +
+    `Generated ${new Date().toLocaleString()}`;
+
+  window.print();
+});
+
+document.getElementById('compareToggle').addEventListener('change', (e)=>{
+  document.getElementById('compareCountRow').classList.toggle('hidden', !e.target.checked);
+});
+
+document.getElementById('fetchIssuesBtn').addEventListener('click', async ()=>{
+  const errBox = document.getElementById('issuesError');
+  errBox.classList.add('hidden');
+  const btn = document.getElementById('fetchIssuesBtn');
+  const spinner = document.getElementById('issuesSpinner');
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  compareMode = document.getElementById('compareToggle').checked;
+  try{
+    if(compareMode){
+      const compareN = parseInt(document.getElementById('compareCount').value, 10) || 2;
+      const recent = sprintsMeta.slice(0, compareN).reverse(); // oldest->newest within the chosen window
+      let combined = [];
+      for(const s of recent){
+        const issues = await fetchSprintIssues(s.id);
+        issues.forEach(i => i.sprintName = s.name);
+        combined = combined.concat(issues);
+      }
+      allIssues = combined;
+      renderSparkline(recent.map(s=>s.name), recent);
+    }else{
+      const sprint = resolveSprintFromInput();
+      if(!sprint){
+        errBox.textContent = 'Could not match that to a sprint — pick one from the suggestions, or check the spelling.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+      const issues = await fetchSprintIssues(sprint.id);
+      issues.forEach(i => i.sprintName = sprint.name);
+      allIssues = issues;
+      document.getElementById('sparklineRow').classList.add('hidden');
+    }
+    initDashboard();
+  }catch(e){
+    errBox.textContent = 'Could not load issues: ' + e.message;
+    errBox.classList.remove('hidden');
+  }finally{
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+  }
+});
+
+async function fetchSprintIssues(sprintId){
+  let startAt = 0, out = [];
+  const fieldList = 'issuetype,reporter,summary,status,created' + (MODULE_FIELD_ID ? ',' + MODULE_FIELD_ID : '');
+  while(true){
+    const data = await jiraFetch(`/rest/agile/1.0/sprint/${sprintId}/issue?startAt=${startAt}&maxResults=100&fields=${fieldList}`);
+    (data.issues||[]).forEach(iss=>{
+      out.push(normalizeJiraIssue(iss));
+    });
+    startAt += (data.maxResults||100);
+    if(!data.issues || data.issues.length < (data.maxResults||100) || out.length >= 500) break;
+  }
+  return out;
+}
+
+function extractModuleValue(fieldValue){
+  if(fieldValue == null) return 'None';
+  if(Array.isArray(fieldValue)){
+    if(!fieldValue.length) return 'None';
+    return fieldValue.map(v => (v && (v.value || v.name)) || String(v)).join(', ');
+  }
+  if(typeof fieldValue === 'object') return fieldValue.value || fieldValue.name || 'None';
+  return String(fieldValue);
+}
+
+function normalizeJiraIssue(iss){
+  const f = iss.fields || {};
+  return {
+    key: iss.key,
+    summary: f.summary || '',
+    issueType: (f.issuetype && f.issuetype.name) || 'Other',
+    reporter: (f.reporter && (f.reporter.displayName || f.reporter.emailAddress)) || 'Unassigned',
+    status: (f.status && f.status.name) || '',
+    created: f.created || '',
+    module: MODULE_FIELD_ID ? extractModuleValue(f[MODULE_FIELD_ID]) : 'Unknown',
+    sprintName: ''
+  };
+}
+
+// ---------- PASTE mode ----------
+// ---------- disconnect ----------
+document.getElementById('disconnectBtn').addEventListener('click', ()=>{
+  auth = null; allIssues = []; sprintsMeta = [];
+  document.getElementById('connectCard').classList.remove('hidden');
+  document.getElementById('controlsCard').classList.add('hidden');
+  document.getElementById('dashboard').classList.add('hidden');
+  document.getElementById('sparklineRow').classList.add('hidden');
+  setStatus('not connected', '');
+});
+
+// ---------- dashboard ----------
+async function initDashboard(){
+  const chartReady = await loadChartJs();
+  if(!chartReady){
+    const errBox = document.getElementById('issuesError');
+    errBox.textContent = 'Could not load the charting library from any CDN (cdnjs, jsdelivr, unpkg) — likely a network restriction or an ad/script blocker on this page. The stats and issue table below will still work; try disabling any content blockers for this page and reloading if you need the charts.';
+    errBox.classList.remove('hidden');
+  }
+
+  const types = [...new Set(allIssues.map(i=>i.issueType))].sort();
+  activeTypeFilters = new Set(types);
+  const chipSet = document.getElementById('typeChips');
+  chipSet.innerHTML = types.map(t=>{
+    const known = TYPE_COLORS[t] ? '' : 'other-type';
+    return `<div class="chip active ${known}" data-type="${t}">${t}</div>`;
+  }).join('');
+  chipSet.querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      const t = chip.dataset.type;
+      if(activeTypeFilters.has(t)){ activeTypeFilters.delete(t); chip.classList.remove('active'); }
+      else { activeTypeFilters.add(t); chip.classList.add('active'); }
+      renderAll();
+    });
+  });
+
+  const reporters = [...new Set(allIssues.map(i=>i.reporter))].sort();
+  const repSel = document.getElementById('reporterSelect');
+  repSel.innerHTML = reporters.map(r=>`<option value="${r}" selected>${r}</option>`).join('');
+  buildMultiSelect('reporterSelect', 'reporterMsLabel', 'reporterMsList', 'reporter');
+
+  const modules = [...new Set(allIssues.map(i=>i.module))].sort();
+  const modSel = document.getElementById('moduleSelect');
+  modSel.innerHTML = modules.map(m=>`<option value="${escapeHtml(m)}" selected>${escapeHtml(m)}</option>`).join('');
+  buildMultiSelect('moduleSelect', 'moduleMsLabel', 'moduleMsList', 'module');
+
+  document.getElementById('controlsCard').classList.remove('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  document.getElementById('chartTitle').querySelector('span').textContent = compareMode ? 'Issue type volume across sprints' : 'Issues by type';
+  renderAll();
+}
+
+function getFiltered(){
+  const repSel = document.getElementById('reporterSelect');
+  const selectedReporters = new Set([...repSel.selectedOptions].map(o=>o.value));
+  const modSel = document.getElementById('moduleSelect');
+  const selectedModules = new Set([...modSel.selectedOptions].map(o=>o.value));
+  return allIssues.filter(i => activeTypeFilters.has(i.issueType) && selectedReporters.has(i.reporter) && selectedModules.has(i.module));
+}
+
+let statusChart = null;
+const STATUS_PALETTE = ['#6c5ce7','#3dd68c','#f5a623','#5b8def','#e5484d','#9b8afb','#4dd0e1','#f472b6','#a3a3a3'];
+function colorForStatus(status){
+  let hash = 0;
+  for(let i=0;i<status.length;i++){ hash = (hash*31 + status.charCodeAt(i)) >>> 0; }
+  return STATUS_PALETTE[hash % STATUS_PALETTE.length];
+}
+
+function renderStatusChart(filtered){
+  if(typeof Chart === 'undefined') return;
+  const ctx = document.getElementById('statusChart').getContext('2d');
+  if(statusChart) statusChart.destroy();
+  const statuses = [...new Set(filtered.map(i=>i.status || 'Unknown'))].sort();
+  const counts = statuses.map(s => filtered.filter(i=>(i.status || 'Unknown')===s).length);
+  statusChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: statuses,
+      datasets:[{ label:'Issues', data: counts, backgroundColor: statuses.map(colorForStatus) }]
+    },
+    options: baseChartOptions(false)
+  });
+}
+
+function animateNum(el, to){
+  const from = parseInt(el.textContent, 10) || 0;
+  if(from === to){ el.textContent = to; return; }
+  const duration = 500, start = performance.now();
+  function tick(now){
+    const p = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(from + (to - from) * eased);
+    if(p < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function renderQualityGauge(filtered){
+  const bugs = filtered.filter(i=>i.issueType==='Bug');
+  const total = filtered.length || 1;
+  const bugShare = bugs.length / total;
+  const resolved = bugs.filter(i=>classifyStatus(i.status)==='done').length;
+  const resolveRate = bugs.length ? resolved / bugs.length : 1; // no bugs = perfect resolution rate
+  const score = Math.round(resolveRate * 70 + (1 - bugShare) * 30);
+
+  const arc = document.getElementById('gaugeArc');
+  const circumference = 283; // approx length of the semicircle path at r=90
+  arc.style.strokeDasharray = String(circumference);
+  arc.style.strokeDashoffset = String(circumference * (1 - score / 100));
+
+  document.getElementById('gaugeScore').textContent = score;
+  const scoreEl = document.getElementById('gaugeScore');
+  scoreEl.classList.remove('pop');
+  void scoreEl.offsetWidth; // force reflow so the animation can retrigger
+  scoreEl.classList.add('pop');
+  const grade = score >= 80 ? 'Healthy' : score >= 60 ? 'Watch' : 'At risk';
+  document.getElementById('gaugeGrade').textContent = grade;
+  document.getElementById('gaugeBugShare').textContent = Math.round(bugShare * 100) + '%';
+  document.getElementById('gaugeResolveRate').textContent = bugs.length ? Math.round(resolveRate * 100) + '%' : 'n/a';
+}
+
+function renderAll(){
+  const filtered = getFiltered();
+  renderStats(filtered);
+  renderQualityGauge(filtered);
+  renderChart(filtered);
+  renderStatusChart(filtered);
+  renderTable(filtered);
+}
+
+function classifyStatus(status){
+  return /done|closed|resolved/i.test(status || '') ? 'done' : 'open';
+}
+
+function renderStats(filtered){
+  animateNum(document.getElementById('statTotal'), filtered.length);
+  animateNum(document.getElementById('statBugs'), filtered.filter(i=>i.issueType==='Bug').length);
+  animateNum(document.getElementById('statEnh'), filtered.filter(i=>i.issueType==='Enhancement').length);
+  const counts = {};
+  filtered.forEach(i=> counts[i.reporter] = (counts[i.reporter]||0)+1);
+  const top = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('statReporter').textContent = top ? `${top[0]} (${top[1]})` : '—';
+
+  const bugs = filtered.filter(i=>i.issueType==='Bug');
+  animateNum(document.getElementById('statOpenBugs'), bugs.filter(i=>classifyStatus(i.status)==='open').length);
+  animateNum(document.getElementById('statResolvedBugs'), bugs.filter(i=>classifyStatus(i.status)==='done').length);
+}
+
+function renderChart(filtered){
+  if(typeof Chart === 'undefined') return;
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  if(mainChart) mainChart.destroy();
+
+  if(compareMode){
+    const sprintNames = [...new Set(allIssues.map(i=>i.sprintName))];
+    const types = [...new Set(allIssues.map(i=>i.issueType))].sort();
+    const datasets = types.map(t=>({
+      label: t,
+      backgroundColor: colorForType(t),
+      data: sprintNames.map(s => filtered.filter(i=>i.sprintName===s && i.issueType===t).length)
+    }));
+    mainChart = new Chart(ctx, {
+      type:'bar',
+      data:{ labels: sprintNames, datasets },
+      options: baseChartOptions(true)
+    });
+  }else{
+    const types = [...new Set(allIssues.map(i=>i.issueType))].sort();
+    const counts = types.map(t=> filtered.filter(i=>i.issueType===t).length);
+    mainChart = new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels: types,
+        datasets: [{
+          label:'Issues',
+          data: counts,
+          backgroundColor: types.map(colorForType)
+        }]
+      },
+      options: baseChartOptions(false)
+    });
+  }
+}
+
+function baseChartOptions(stacked){
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{ display: stacked, labels:{ color: cssVar('--muted'), font:{family:'IBM Plex Mono'} } },
+      tooltip:{ titleFont:{family:'IBM Plex Mono'}, bodyFont:{family:'IBM Plex Mono'} }
+    },
+    scales:{
+      x:{ stacked, ticks:{color:cssVar('--muted'), font:{family:'IBM Plex Mono', size:11}}, grid:{color:'#232733'} },
+      y:{ stacked, beginAtZero:true, ticks:{color:cssVar('--muted'), stepSize:1, font:{family:'IBM Plex Mono', size:11}}, grid:{color:'#232733'} }
+    }
+  };
+}
+
+function renderSparkline(names, sprintObjs){
+  if(typeof Chart === 'undefined') return;
+  document.getElementById('sparklineRow').classList.remove('hidden');
+  const ctx = document.getElementById('sparkline').getContext('2d');
+  if(sparkChart) sparkChart.destroy();
+  const counts = names.map(n => allIssues.filter(i=>i.sprintName===n).length);
+  sparkChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels:names, datasets:[{ data:counts, borderColor: cssVar('--accent'), backgroundColor:'transparent', tension:.35, pointRadius:2 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{enabled:false}},
+      scales:{ x:{display:false}, y:{display:false} }
+    }
+  });
+}
+
+function renderTable(filtered){
+  const body = document.getElementById('issueTableBody');
+  const empty = document.getElementById('tableEmpty');
+  if(!filtered.length){
+    body.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  body.innerHTML = filtered.map(i=>{
+    const badgeClass = TYPE_COLORS[i.issueType] ? i.issueType : 'other';
+    return `<tr>
+      <td class="key"><a href="${jiraIssueUrl(i.key)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;border-bottom:1px dotted var(--accent-2);">${i.key}</a></td>
+      <td><span class="type-badge ${badgeClass}">${i.issueType}</span></td>
+      <td>${escapeHtml(i.summary)}</td>
+      <td>${escapeHtml(i.reporter)}</td>
+      <td>${escapeHtml(i.module)}</td>
+      <td>${escapeHtml(i.status)}</td>
+      <td>${escapeHtml(i.sprintName)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function jiraIssueUrl(key){
+  const base = (auth && auth.baseUrl) || document.getElementById('baseUrl').value.trim().replace(/\/$/,'') || 'https://habitnu.atlassian.net';
+  return `${base}/browse/${key}`;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+</script>
+</body>
+</html>
