@@ -485,12 +485,18 @@
   <!-- CONTROLS -->
   <div class="card hidden" id="controlsCard">
     <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 4v5"/></svg>Scope</h2>
+
+    <div class="tabs" style="margin-bottom:16px;">
+      <div class="tab active" data-scopemode="sprint">By Sprint</div>
+      <div class="tab" data-scopemode="module">By Module</div>
+    </div>
+
     <div class="grid3">
-      <div>
+      <div id="boardSelectWrap">
         <label>Board</label>
         <select id="boardSelect"></select>
       </div>
-      <div>
+      <div id="sprintModeControls">
         <label>Sprint</label>
         <div class="ms-wrap">
           <button type="button" class="ms-trigger" id="sprintTrigger">
@@ -504,11 +510,28 @@
         </div>
         <input type="text" id="sprintInput" style="display:none;">
       </div>
-      <div style="display:flex;align-items:flex-end;">
+      <div id="sprintModeCompareWrap" style="display:flex;align-items:flex-end;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;">
           <input type="checkbox" id="compareToggle" style="width:auto;">
           Compare across recent sprints
         </label>
+      </div>
+      <div id="moduleModeControls" class="hidden" style="grid-column:1 / -1;">
+        <label>Module(s) — searches across all boards/projects</label>
+        <div class="ms-wrap">
+          <button type="button" class="ms-trigger" id="scopeModuleTrigger">
+            <span id="scopeModuleTriggerLabel">All modules</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px;margin-left:auto;flex-shrink:0;"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="ms-popover hidden" id="scopeModulePopover">
+            <div class="ms-actions">
+              <button type="button" class="ms-action" data-target="scopeModuleSelect" data-action="all">Select all</button>
+              <button type="button" class="ms-action" data-target="scopeModuleSelect" data-action="none">Clear</button>
+            </div>
+            <div class="ms-list" id="scopeModuleMsList"></div>
+          </div>
+        </div>
+        <select id="scopeModuleSelect" multiple style="display:none;"></select>
       </div>
     </div>
     <div class="row hidden" id="compareCountRow" style="margin-top:8px;">
@@ -1157,7 +1180,7 @@ function buildMultiSelect(selectId, labelId, listId, singularNoun){
     cb.addEventListener('change', ()=>{
       options[+cb.dataset.idx].selected = cb.checked;
       updateMsLabel(selectId, labelId, singularNoun);
-      renderAll();
+      if(selectId !== 'scopeModuleSelect') renderAll();
     });
   });
   updateMsLabel(selectId, labelId, singularNoun);
@@ -1179,20 +1202,24 @@ setupMsWidget('moduleMsTrigger', 'moduleMsPopover');
 document.addEventListener('click', ()=>{
   document.querySelectorAll('.ms-popover').forEach(p => p.classList.add('hidden'));
 });
+const MS_WIDGET_MAP = {
+  reporterSelect: { listId: 'reporterMsList', labelId: 'reporterMsLabel', noun: 'reporter' },
+  moduleSelect: { listId: 'moduleMsList', labelId: 'moduleMsLabel', noun: 'module' },
+  scopeModuleSelect: { listId: 'scopeModuleMsList', labelId: 'scopeModuleTriggerLabel', noun: 'module' },
+};
 document.querySelectorAll('.ms-action').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     const selectId = btn.dataset.target;
     const action = btn.dataset.action;
     const select = document.getElementById(selectId);
+    const widget = MS_WIDGET_MAP[selectId];
+    if(!select || !widget) return;
     [...select.options].forEach(o => o.selected = (action === 'all'));
-    const listId = selectId === 'reporterSelect' ? 'reporterMsList' : 'moduleMsList';
-    const labelId = selectId === 'reporterSelect' ? 'reporterMsLabel' : 'moduleMsLabel';
-    const noun = selectId === 'reporterSelect' ? 'reporter' : 'module';
-    document.getElementById(listId).querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    document.getElementById(widget.listId).querySelectorAll('input[type=checkbox]').forEach(cb=>{
       cb.checked = (action === 'all');
     });
-    updateMsLabel(selectId, labelId, noun);
-    renderAll();
+    updateMsLabel(selectId, widget.labelId, widget.noun);
+    if(selectId !== 'scopeModuleSelect') renderAll(); // scope-mode selection only takes effect on "Load issues by module"
   });
 });
 
@@ -1283,6 +1310,7 @@ async function attemptConnect(isAutoAttempt){
     document.getElementById('connectCard').classList.add('hidden');
     document.getElementById('controlsCard').classList.remove('hidden');
     await resolveModuleField();
+    await loadModuleFieldOptions();
     await loadBoards();
   }catch(e){
     setStatus('connection failed', 'err');
@@ -1345,6 +1373,80 @@ async function resolveModuleField(){
     MODULE_FIELD_ID = null; // Module filter will just be empty/hidden if this fails
   }
 }
+
+let SCOPE_MODULE_OPTIONS = [];
+async function loadModuleFieldOptions(){
+  if(!MODULE_FIELD_ID){ SCOPE_MODULE_OPTIONS = []; return; }
+  try{
+    const contexts = await jiraFetch(`/rest/api/3/field/${MODULE_FIELD_ID}/context`);
+    const contextId = contexts && contexts.values && contexts.values[0] && contexts.values[0].id;
+    if(!contextId){ SCOPE_MODULE_OPTIONS = []; return; }
+    let startAt = 0, all = [];
+    while(true){
+      const data = await jiraFetch(`/rest/api/3/field/${MODULE_FIELD_ID}/context/${contextId}/option?maxResults=200&startAt=${startAt}`);
+      all = all.concat((data.values || []).map(o => o.value));
+      if(!data.values || data.values.length < 200) break;
+      startAt += 200;
+      if(all.length > 1000) break;
+    }
+    SCOPE_MODULE_OPTIONS = all;
+  }catch(e){
+    SCOPE_MODULE_OPTIONS = []; // Module scope mode just won't have options to narrow by
+  }
+
+  // populate the scope-level module multi-select (all selected by default = "no restriction")
+  const select = document.getElementById('scopeModuleSelect');
+  select.innerHTML = SCOPE_MODULE_OPTIONS.map(m=>`<option value="${escapeHtml(m)}" selected>${escapeHtml(m)}</option>`).join('');
+  buildMultiSelect('scopeModuleSelect', 'scopeModuleTriggerLabel', 'scopeModuleMsList', 'module');
+}
+setupMsWidget('scopeModuleTrigger', 'scopeModulePopover');
+
+async function fetchIssuesByModule(){
+  const select = document.getElementById('scopeModuleSelect');
+  const selectedModules = [...select.selectedOptions].map(o=>o.value);
+  const totalOptions = select.options.length;
+  const numMatch = (MODULE_FIELD_ID || '').match(/(\d+)/);
+  const fieldNum = numMatch ? numMatch[1] : null;
+
+  let jql = '';
+  if(fieldNum && totalOptions && selectedModules.length < totalOptions){
+    const hasNone = selectedModules.includes('None');
+    const named = selectedModules.filter(m => m !== 'None').map(m => `"${m.replace(/"/g,'\\"')}"`);
+    let clause = '';
+    if(named.length) clause += `cf[${fieldNum}] in (${named.join(',')})`;
+    if(hasNone) clause += (clause ? ' OR ' : '') + `cf[${fieldNum}] is EMPTY`;
+    if(clause) jql += clause;
+  }
+  jql += (jql ? ' ' : '') + 'ORDER BY created DESC';
+
+  const fieldList = 'issuetype,reporter,summary,status,created' + (MODULE_FIELD_ID ? ',' + MODULE_FIELD_ID : '');
+  let out = [], nextPageToken = null;
+  while(true){
+    let url = `/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&maxResults=100&fields=${fieldList}`;
+    if(nextPageToken) url += `&nextPageToken=${encodeURIComponent(nextPageToken)}`;
+    const data = await jiraFetch(url);
+    (data.issues || []).forEach(iss => out.push(normalizeJiraIssue(iss)));
+    if(!data.issues || !data.issues.length || data.isLast || !data.nextPageToken || out.length >= 500) break;
+    nextPageToken = data.nextPageToken;
+  }
+  return out;
+}
+
+let scopeMode = 'sprint';
+document.querySelectorAll('#controlsCard .tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('#controlsCard .tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    scopeMode = tab.dataset.scopemode;
+    const isModule = scopeMode === 'module';
+    document.getElementById('boardSelectWrap').classList.toggle('hidden', isModule);
+    document.getElementById('sprintModeControls').classList.toggle('hidden', isModule);
+    document.getElementById('sprintModeCompareWrap').classList.toggle('hidden', isModule);
+    document.getElementById('moduleModeControls').classList.toggle('hidden', !isModule);
+    document.getElementById('compareCountRow').classList.toggle('hidden', isModule || !document.getElementById('compareToggle').checked);
+    document.getElementById('fetchIssuesBtn').textContent = isModule ? 'Load issues by module' : 'Load sprint issues';
+  });
+});
 
 async function loadBoards(){
   let startAt = 0, all = [];
@@ -1485,9 +1587,14 @@ document.getElementById('fetchIssuesBtn').addEventListener('click', async ()=>{
   const spinner = document.getElementById('issuesSpinner');
   btn.disabled = true;
   spinner.classList.remove('hidden');
-  compareMode = document.getElementById('compareToggle').checked;
+  compareMode = document.getElementById('compareToggle').checked && scopeMode === 'sprint';
   try{
-    if(compareMode){
+    if(scopeMode === 'module'){
+      const issues = await fetchIssuesByModule();
+      issues.forEach(i => i.sprintName = 'All boards (by module)');
+      allIssues = issues;
+      document.getElementById('sparklineRow').classList.add('hidden');
+    }else if(compareMode){
       const compareN = parseInt(document.getElementById('compareCount').value, 10) || 2;
       const recent = sprintsMeta.slice(0, compareN).reverse(); // oldest->newest within the chosen window
       let combined = [];
