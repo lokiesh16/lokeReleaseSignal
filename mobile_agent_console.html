@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mobile Agent Console</title>
+<style>
+  :root {
+    --ink: #10141C;
+    --ink-raised: #171C26;
+    --ink-line: #262D3A;
+    --paper: #E7E5DE;
+    --paper-dim: #9AA1AF;
+    --signal: #F0A202;
+    --signal-dim: #6b5320;
+    --circuit: #2DD4BF;
+    --alert: #E5484D;
+    --mono: 'SF Mono', 'JetBrains Mono', 'Menlo', ui-monospace, monospace;
+    --sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 32px 20px 80px;
+  }
+
+  .wrap { max-width: 880px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--circuit);
+    box-shadow: 0 0 8px var(--circuit);
+    flex-shrink: 0;
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+
+  .sub {
+    color: var(--paper-dim);
+    font-size: 13.5px;
+    margin: 0 0 28px;
+    padding-left: 21px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--ink-line);
+  }
+
+  .tab {
+    background: none;
+    border: none;
+    color: var(--paper-dim);
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: 500;
+    padding: 10px 4px;
+    margin-right: 24px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transform: translateY(1px);
+  }
+
+  .tab.active {
+    color: var(--paper);
+    border-bottom-color: var(--signal);
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .card {
+    background: var(--ink-raised);
+    border: 1px solid var(--ink-line);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 16px;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--paper-dim);
+    font-weight: 600;
+  }
+
+  label .opt { text-transform: none; letter-spacing: 0; font-weight: 400; opacity: 0.7; }
+
+  input, select, textarea {
+    background: var(--ink);
+    border: 1px solid var(--ink-line);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 9px 10px;
+    border-radius: 6px;
+    width: 100%;
+  }
+
+  textarea { resize: vertical; min-height: 60px; }
+
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--signal);
+  }
+
+  input::placeholder, textarea::placeholder { color: #4A5568; }
+
+  .checkline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--paper-dim);
+  }
+  .checkline input { width: auto; }
+
+  .terminal {
+    background: #0A0D13;
+    border: 1px solid var(--ink-line);
+    border-radius: 10px;
+    padding: 18px 18px 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--circuit);
+    white-space: pre-wrap;
+    word-break: break-word;
+    position: relative;
+    min-height: 60px;
+  }
+
+  .terminal .prompt { color: var(--signal); }
+  .terminal .flag { color: var(--paper-dim); }
+  .terminal .val { color: var(--paper); }
+  .cursor {
+    display: inline-block;
+    width: 7px; height: 15px;
+    background: var(--circuit);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .copybar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+  }
+
+  .hint { font-size: 12px; color: var(--paper-dim); }
+
+  button.copy {
+    background: var(--signal);
+    color: #1a1204;
+    border: none;
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 12.5px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  button.copy:active { transform: translateY(1px); }
+  button.copy.copied { background: var(--circuit); }
+
+  .note {
+    font-size: 12px;
+    color: var(--paper-dim);
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--ink-line);
+  }
+  .note b { color: var(--signal); font-weight: 600; }
+
+  /* --- report viewer --- */
+  .dropzone {
+    border: 1px dashed var(--ink-line);
+    border-radius: 10px;
+    padding: 28px;
+    text-align: center;
+    color: var(--paper-dim);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .dropzone.drag { border-color: var(--signal); color: var(--paper); }
+  .dropzone input[type=file] { display: none; }
+
+  .status-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 20px;
+  }
+  .status-pass { background: rgba(45,212,191,0.15); color: var(--circuit); }
+  .status-fail { background: rgba(229,72,77,0.15); color: var(--alert); }
+  .status-stuck, .status-error { background: rgba(240,162,2,0.15); color: var(--signal); }
+
+  .report-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  .report-goal { font-size: 14px; line-height: 1.5; }
+
+  .step {
+    border-left: 2px solid var(--ink-line);
+    padding: 2px 0 14px 16px;
+    margin-left: 6px;
+    position: relative;
+  }
+  .step::before {
+    content: '';
+    position: absolute;
+    left: -5px; top: 4px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--ink-line);
+  }
+  .step.flagged::before { background: var(--alert); }
+  .step-head {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--paper-dim);
+    margin-bottom: 3px;
+  }
+  .step-head .n { color: var(--signal); font-weight: 700; }
+  .step-reason { font-size: 13px; margin-bottom: 4px; }
+  .flag-box {
+    background: rgba(229,72,77,0.08);
+    border: 1px solid rgba(229,72,77,0.3);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12.5px;
+    color: #F3AEB0;
+    margin-top: 6px;
+  }
+  .flag-box b { color: var(--alert); }
+
+  .empty-hint { color: var(--paper-dim); font-size: 13px; text-align: center; padding: 20px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header><span class="dot"></span><h1>Mobile Agent Console</h1></header>
+  <p class="sub">build the run command · read the results</p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="build">Build Command</button>
+    <button class="tab" data-tab="run">Run in Browser</button>
+    <button class="tab" data-tab="manual">Manual Capture</button>
+    <button class="tab" data-tab="report">View Run Report</button>
+  </div>
+
+  <!-- ============ BUILD TAB ============ -->
+  <div class="panel active" id="panel-build">
+
+    <div class="card">
+      <div class="grid">
+        <div class="field full">
+          <label>Goal <span class="opt">— plain-English test case</span></label>
+          <textarea id="goal" placeholder="Log a meal of '2 fried eggs' and verify the calorie total isn't doubled">Log a meal of '2 fried eggs' and verify the calorie total isn't doubled</textarea>
+        </div>
+
+        <div class="field">
+          <label>Platform</label>
+          <select id="platform">
+            <option value="iOS" selected>iOS</option>
+            <option value="Android">Android</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Device name</label>
+          <input id="device" placeholder="Lokesh's iPhone" value="Lokesh's iPhone">
+        </div>
+
+        <div class="field">
+          <label>Bundle / package ID</label>
+          <input id="bundleId" placeholder="habitnu2.stag" value="habitnu2.stag">
+        </div>
+        <div class="field">
+          <label>Platform version <span class="opt">optional</span></label>
+          <input id="platformVersion" placeholder="18.6.2" value="18.6.2">
+        </div>
+
+        <div class="field">
+          <label>UDID <span class="opt">real device only</span></label>
+          <input id="udid" placeholder="00008110-000964160C91401E" value="00008110-000964160C91401E">
+        </div>
+        <div class="field">
+          <label>Xcode Team ID <span class="opt">real device only</span></label>
+          <input id="xcodeOrg" placeholder="e.g. AB12CD34EF">
+        </div>
+
+        <div class="field">
+          <label>Appium server</label>
+          <input id="server" placeholder="http://localhost:4723" value="http://localhost:4723">
+        </div>
+        <div class="field">
+          <label>Max steps</label>
+          <input id="maxSteps" type="number" value="25" min="1">
+        </div>
+
+        <div class="field full">
+          <label>Extra capabilities <span class="opt">raw JSON, merged in as-is</span></label>
+          <textarea id="extraCaps" placeholder='{"appium:wdaLocalPort": 8100, "appium:settings[snapshotMaxDepth]": 70}'>{"appium:wdaLocalPort": 8100, "appium:useNewWDA": false, "appium:connectHardwareKeyboard": true, "appium:settings[snapshotMaxDepth]": 70}</textarea>
+        </div>
+
+        <div class="field full">
+          <label class="checkline"><input type="checkbox" id="noJudge"> Skip the per-step LLM-as-judge pass (faster, less thorough)</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="terminal" id="terminalOut"></div>
+    <div class="copybar">
+      <span class="hint" id="capsHint"></span>
+      <button class="copy" id="copyBtn">Copy command</button>
+    </div>
+    <div class="note">
+      <b>Before running:</b> <code>appium</code> needs to be running in its own terminal tab first, and your <code>ANTHROPIC_API_KEY</code> needs to be exported in the tab you run this command from.
+    </div>
+  </div>
+
+  <!-- ============ RUN IN BROWSER TAB ============ -->
+  <div class="panel" id="panel-run">
+
+    <div class="card" id="bridgeStatusCard">
+      <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+        <span class="dot" id="bridgeDot" style="background:var(--paper-dim); box-shadow:none;"></span>
+        <span id="bridgeStatusText">Checking for local bridge server…</span>
+      </div>
+      <div class="note" style="margin-top:10px; border-top:none; padding-top:0;">
+        This needs a small local server running once per session:
+        <code>python -m mobile_agent.server</code> — leave that terminal tab open.
+        It's what actually talks to Appium; the browser can't do that on its own.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="grid">
+        <div class="field full">
+          <label>Goal</label>
+          <textarea id="rGoal" placeholder="Log a meal of '2 fried eggs' and verify the calorie total isn't doubled">Log a meal of '2 fried eggs' and verify the calorie total isn't doubled</textarea>
+        </div>
+        <div class="field full">
+          <label>LLM backend</label>
+          <select id="rLlmBackend">
+            <option value="anthropic" selected>Anthropic (Claude — needs ANTHROPIC_API_KEY)</option>
+            <option value="ollama">Ollama (local model — free, offline)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Model</label>
+          <input id="rModel" value="claude-sonnet-4-6" placeholder="e.g. qwen2.5:7b or gemma2:9b for Ollama">
+        </div>
+        <div class="field" id="rOllamaUrlField" style="display:none;">
+          <label>Ollama URL</label>
+          <input id="rOllamaUrl" value="http://localhost:11434">
+        </div>
+        <div class="field">
+          <label>Platform</label>
+          <select id="rPlatform"><option value="iOS" selected>iOS</option><option value="Android">Android</option></select>
+        </div>
+        <div class="field">
+          <label>Device name</label>
+          <input id="rDevice" value="Lokesh's iPhone">
+        </div>
+        <div class="field">
+          <label>Bundle / package ID</label>
+          <input id="rBundleId" value="habitnu2.stag">
+        </div>
+        <div class="field">
+          <label>Platform version</label>
+          <input id="rPlatformVersion" value="18.6.2">
+        </div>
+        <div class="field">
+          <label>UDID</label>
+          <input id="rUdid" value="00008110-000964160C91401E">
+        </div>
+        <div class="field">
+          <label>Xcode Team ID</label>
+          <input id="rXcodeOrg" placeholder="e.g. AB12CD34EF">
+        </div>
+        <div class="field full">
+          <label>Extra capabilities <span class="opt">raw JSON</span></label>
+          <textarea id="rExtraCaps">{"appium:wdaLocalPort": 8100, "appium:useNewWDA": false, "appium:connectHardwareKeyboard": true, "appium:settings[snapshotMaxDepth]": 70}</textarea>
+        </div>
+        <div class="field full">
+          <label class="checkline"><input type="checkbox" id="rDebug"> Debug mode — print every element the LLM was shown, each step (use this if it swipes/scrolls instead of tapping something that's clearly on screen)</label>
+        </div>
+        <div class="field full">
+          <label>Known locators <span class="opt">optional — human-verified locators from Appium Inspector, referenced by the agent as "known:&lt;name&gt;". Use this for elements where automatic resolution has proven ambiguous (e.g. a PickerWheel Inspector confirmed has 2 matching nodes for its value).</span></label>
+          <textarea id="rKnownLocators" placeholder='{"weight_picker_wheel": {"strategy": "xpath", "value": "(//XCUIElementTypePickerWheel)[1]", "description": "verified in Inspector - responds to selectPickerWheelValue"}}'></textarea>
+        </div>
+        <div class="field full">
+          <label class="checkline"><input type="checkbox" id="rCaptureNetwork"> Capture network traffic — correlates real API calls/failures with each step (requires mitmdump installed + device proxy configured to route through this machine)</label>
+        </div>
+      </div>
+    </div>
+
+    <button class="copy" id="runBtn" style="width:100%; padding:12px; font-size:14px;">Run</button>
+
+    <div class="terminal" id="runLog" style="margin-top:16px; display:none; max-height:360px; overflow-y:auto;"></div>
+    <div id="runResultCard"></div>
+    <button class="copy" id="genScriptBtnRun" style="display:none; margin-top:10px;">Generate pytest script</button>
+    <div id="scriptOutRun"></div>
+  </div>
+
+  <!-- ============ MANUAL CAPTURE TAB ============ -->
+  <div class="panel" id="panel-manual">
+    <div class="card">
+      <p style="font-size:13.5px; color:var(--paper-dim); margin:0 0 14px;">
+        No LLM, no Appium — you drive the app yourself on the real device.
+        This just captures every API call and lets you mark when you did
+        each thing, so the report groups calls by what you were doing
+        when they happened.
+      </p>
+      <div class="grid">
+        <div class="field">
+          <label>Proxy port</label>
+          <input id="mcPort" type="number" value="8080">
+        </div>
+      </div>
+      <button class="copy" id="mcStartBtn" style="width:100%; padding:12px; font-size:14px; margin-top:10px;">Start Capture</button>
+    </div>
+
+    <div class="card" id="mcActiveCard" style="display:none;">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+        <span class="dot" style="background:var(--circuit); box-shadow:0 0 8px var(--circuit);"></span>
+        <span style="font-size:13.5px;">Capturing — use the app now. Mark each action right before you do it.</span>
+      </div>
+      <div class="field full">
+        <label>Action label <span class="opt">optional — describe what you're about to do</span></label>
+        <input id="mcLabel" placeholder="e.g. tap upload photo button">
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <button class="copy" id="mcMarkBtn" style="flex:1; padding:12px;">Mark Action</button>
+        <button class="copy" id="mcStopBtn" style="flex:1; padding:12px; background: var(--alert);">Stop &amp; Save</button>
+      </div>
+      <div id="mcMarkerList" style="margin-top:14px; font-family:var(--mono); font-size:12px; color:var(--paper-dim);"></div>
+      <div style="margin-top:14px; font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600;">Live calls</div>
+      <div class="terminal" id="mcLiveFeed" style="margin-top:6px; max-height:280px; overflow-y:auto; font-size:12px;"></div>
+    </div>
+
+    <div id="mcResultCard"></div>
+  </div>
+
+  <!-- ============ REPORT TAB ============ -->
+  <div class="panel" id="panel-report">
+    <div class="card">
+      <div class="dropzone" id="dropzone">
+        Drop an <code>agent_runs/*.json</code> file here, or click to choose one
+        <input type="file" id="fileInput" accept=".json">
+      </div>
+    </div>
+    <div id="reportOut"></div>
+    <button class="copy" id="genScriptBtnReport" style="display:none; margin-top:10px;">Generate pytest script</button>
+    <div id="scriptOutReport"></div>
+  </div>
+
+</div>
+
+<script>
+  // ---------- tabs ----------
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------- command builder ----------
+  const ids = ['goal','platform','device','bundleId','platformVersion','udid','xcodeOrg','server','maxSteps','extraCaps','noJudge'];
+  const els = {};
+  ids.forEach(id => els[id] = document.getElementById(id));
+
+  function shQuote(s) {
+    return "'" + String(s).replace(/'/g, `'\\''`) + "'";
+  }
+
+  function buildCommand() {
+    const parts = [];
+    parts.push({flag: 'python -m mobile_agent.cli', val: ''});
+
+    const goal = els.goal.value.trim();
+    if (goal) parts.push({flag: '--goal', val: shQuote(goal)});
+
+    if (els.platform.value !== 'iOS') parts.push({flag: '--platform', val: els.platform.value});
+
+    const device = els.device.value.trim();
+    if (device) parts.push({flag: '--device', val: shQuote(device)});
+
+    const bundleId = els.bundleId.value.trim();
+    if (bundleId) parts.push({flag: '--bundle-id', val: bundleId});
+
+    const pv = els.platformVersion.value.trim();
+    if (pv) parts.push({flag: '--platform-version', val: pv});
+
+    const udid = els.udid.value.trim();
+    if (udid) parts.push({flag: '--udid', val: udid});
+
+    const org = els.xcodeOrg.value.trim();
+    if (org) parts.push({flag: '--xcode-org-id', val: org});
+
+    const server = els.server.value.trim();
+    if (server && server !== 'http://localhost:4723') parts.push({flag: '--appium-server', val: server});
+
+    const steps = els.maxSteps.value.trim();
+    if (steps && steps !== '25') parts.push({flag: '--max-steps', val: steps});
+
+    if (els.noJudge.checked) parts.push({flag: '--no-judge', val: ''});
+
+    let capsHint = '';
+    const capsRaw = els.extraCaps.value.trim();
+    if (capsRaw) {
+      try {
+        JSON.parse(capsRaw);
+        parts.push({flag: '--extra-caps', val: shQuote(capsRaw)});
+        capsHint = 'valid JSON';
+      } catch (e) {
+        capsHint = '⚠ extra-caps JSON is invalid — fix before copying';
+      }
+    }
+    document.getElementById('capsHint').textContent = capsHint;
+
+    return parts;
+  }
+
+  function render() {
+    const parts = buildCommand();
+    const term = document.getElementById('terminalOut');
+    term.innerHTML = '';
+
+    parts.forEach((p, i) => {
+      const wrap = document.createElement('span');
+      if (i === 0) {
+        wrap.innerHTML = `<span class="prompt">$</span> <span class="val">${p.flag}</span>`;
+      } else {
+        wrap.innerHTML = ` \\\n  <span class="flag">${p.flag}</span>${p.val ? ' <span class="val">' + escapeHtml(p.val) + '</span>' : ''}`;
+      }
+      term.appendChild(wrap);
+    });
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    term.appendChild(cursor);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  ids.forEach(id => els[id].addEventListener('input', render));
+  render();
+
+  document.getElementById('copyBtn').addEventListener('click', () => {
+    const parts = buildCommand();
+    const text = parts.map((p, i) => i === 0 ? p.flag : `  ${p.flag}${p.val ? ' ' + p.val : ''}`).join(' \\\n');
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.textContent = 'Copied ✓';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy command'; btn.classList.remove('copied'); }, 1600);
+    });
+  });
+
+  // ---------- run in browser (talks to local bridge server) ----------
+  const BRIDGE_URL = 'http://localhost:5055';
+
+  async function checkBridge() {
+    const dot = document.getElementById('bridgeDot');
+    const text = document.getElementById('bridgeStatusText');
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/health');
+      if (res.ok) {
+        dot.style.background = 'var(--circuit)';
+        dot.style.boxShadow = '0 0 8px var(--circuit)';
+        text.textContent = 'Bridge server connected — ready to run.';
+        return true;
+      }
+    } catch (e) {}
+    dot.style.background = 'var(--alert)';
+    dot.style.boxShadow = 'none';
+    text.textContent = 'Bridge server not reachable — start it with: python -m mobile_agent.server';
+    return false;
+  }
+  checkBridge();
+  setInterval(checkBridge, 4000);
+
+  // ---------- LLM backend toggle ----------
+  const llmBackendSelect = document.getElementById('rLlmBackend');
+  const ollamaUrlField = document.getElementById('rOllamaUrlField');
+  const modelInput = document.getElementById('rModel');
+  llmBackendSelect.addEventListener('change', () => {
+    const isOllama = llmBackendSelect.value === 'ollama';
+    ollamaUrlField.style.display = isOllama ? 'block' : 'none';
+    if (isOllama && modelInput.value === 'claude-sonnet-4-6') modelInput.value = 'qwen2.5:7b';
+    if (!isOllama && modelInput.value !== 'claude-sonnet-4-6' && !modelInput.value.includes(':')) return;
+    if (!isOllama && (modelInput.value === 'qwen2.5:7b' || modelInput.value === 'gemma2:9b')) modelInput.value = 'claude-sonnet-4-6';
+  });
+
+  document.getElementById('runBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('runBtn');
+    const logEl = document.getElementById('runLog');
+    const resultEl = document.getElementById('runResultCard');
+    resultEl.innerHTML = '';
+    logEl.style.display = 'block';
+    logEl.textContent = '';
+
+    let extraCaps = {};
+    const rawCaps = document.getElementById('rExtraCaps').value.trim();
+    if (rawCaps) {
+      try { extraCaps = JSON.parse(rawCaps); }
+      catch (e) {
+        logEl.textContent = '⚠ extra capabilities is not valid JSON: ' + e.message;
+        return;
+      }
+    }
+
+    let knownLocators = {};
+    const rawKnownLocators = document.getElementById('rKnownLocators').value.trim();
+    if (rawKnownLocators) {
+      try { knownLocators = JSON.parse(rawKnownLocators); }
+      catch (e) {
+        logEl.textContent = '⚠ known locators is not valid JSON: ' + e.message;
+        return;
+      }
+    }
+
+    const payload = {
+      goal: document.getElementById('rGoal').value.trim(),
+      platform: document.getElementById('rPlatform').value,
+      device: document.getElementById('rDevice').value.trim(),
+      bundle_id: document.getElementById('rBundleId').value.trim(),
+      platform_version: document.getElementById('rPlatformVersion').value.trim(),
+      udid: document.getElementById('rUdid').value.trim(),
+      xcode_org_id: document.getElementById('rXcodeOrg').value.trim(),
+      extra_caps: extraCaps,
+      debug: document.getElementById('rDebug').checked,
+      known_locators: knownLocators,
+      llm_backend: document.getElementById('rLlmBackend').value,
+      model: document.getElementById('rModel').value.trim(),
+      ollama_base_url: document.getElementById('rOllamaUrl').value.trim(),
+      capture_network: document.getElementById('rCaptureNetwork').checked,
+    };
+
+    btn.textContent = 'Starting…';
+    btn.disabled = true;
+
+    let runId;
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to start run');
+      runId = data.run_id;
+    } catch (e) {
+      logEl.textContent = 'Could not reach the bridge server: ' + e.message +
+        '\n\nMake sure it is running: python -m mobile_agent.server';
+      btn.textContent = 'Run';
+      btn.disabled = false;
+      return;
+    }
+
+    btn.textContent = 'Running…';
+    let paused = false;
+
+    const poll = setInterval(async () => {
+      if (paused) return;
+      const res = await fetch(BRIDGE_URL + '/api/logs/' + runId);
+      const data = await res.json();
+      logEl.textContent = data.logs.join('\n');
+      logEl.scrollTop = logEl.scrollHeight;
+
+      if (data.status === 'needs_input') {
+        paused = true;
+        btn.textContent = 'Paused — needs locator';
+        renderLocatorPrompt(runId, data.pending_context, () => {
+          paused = false;
+          btn.textContent = 'Running…';
+        });
+        return;
+      }
+
+      if (data.status === 'done' || data.status === 'error') {
+        clearInterval(poll);
+        btn.textContent = 'Run';
+        btn.disabled = false;
+        if (data.result) {
+          lastRunReportData = {
+            goal: payload.goal,
+            steps: data.result.steps || [],
+          };
+          document.getElementById('genScriptBtnRun').style.display = 'block';
+          renderReport({
+            goal: payload.goal,
+            final_status: data.result.status,
+            final_note: data.result.note,
+            steps: data.result.steps || [],
+            bug_flags: (data.result.steps || []).filter(s => s.judge && s.judge.verdict === 'flag'),
+          }, resultEl);
+        }
+      }
+    }, 1200);
+  });
+
+  function renderLocatorPrompt(runId, context, onResumed) {
+    const resultEl = document.getElementById('runResultCard');
+    const candidates = context.candidates || [];
+
+    const candidateRows = candidates.map((c, i) => `
+      <label style="display:flex; align-items:flex-start; gap:10px; padding:10px; border:1px solid var(--ink-line); border-radius:6px; margin-bottom:6px; cursor:pointer;">
+        <input type="radio" name="locatorChoice" value="${i}" ${c.unique ? 'checked' : ''} style="margin-top:3px;">
+        <span style="flex:1;">
+          <span style="font-family:var(--mono); font-size:12.5px; color:${c.unique ? 'var(--circuit)' : 'var(--signal)'};">${escapeHtml(c.strategy_display)}</span>
+          <span style="display:block; font-family:var(--mono); font-size:12px; color:var(--paper-dim); margin-top:2px; word-break:break-all;">${escapeHtml(c.value)}</span>
+          <span style="display:block; font-size:11.5px; margin-top:3px; color:${c.unique ? 'var(--circuit)' : 'var(--alert)'};">
+            ${c.match_count === 1 ? '✓ unique match' : c.match_count === 0 ? '✗ no matches' : c.match_count < 0 ? '⚠ query failed' : `⚠ ${c.match_count} matches - ambiguous`}
+          </span>
+        </span>
+      </label>`).join('');
+
+    resultEl.innerHTML = `
+      <div class="card" style="border-color: var(--signal);">
+        <div style="font-size:13.5px; margin-bottom:10px;">
+          <b>Agent is stuck</b> on <code>${escapeHtml(context.element_tag || 'an element')}</code>
+          ${context.element_label ? ` labeled "${escapeHtml(context.element_label)}"` : ''}
+          ${context.element_value ? ` (value="${escapeHtml(context.element_value)}")` : ''} —
+          self-correction didn't resolve it. Pick a verified locator below to continue this run.
+        </div>
+        ${candidateRows || '<div class="empty-hint">No candidates found for this element.</div>'}
+        <div class="copybar">
+          <span class="hint">Recommended: candidates marked "unique match"</span>
+          <div style="display:flex; gap:8px;">
+            <button class="copy" id="skipLocatorBtn" style="background: var(--ink-line); color: var(--paper);">Skip (mark stuck)</button>
+            <button class="copy" id="continueLocatorBtn">Run — Continue</button>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('continueLocatorBtn').addEventListener('click', async () => {
+      const selected = document.querySelector('input[name="locatorChoice"]:checked');
+      if (!selected || !candidates[selected.value]) return;
+      const chosen = candidates[selected.value];
+      await fetch(BRIDGE_URL + '/api/resolve/' + runId, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({strategy: chosen.strategy, value: chosen.value}),
+      });
+      resultEl.innerHTML = '';
+      onResumed();
+    });
+
+    document.getElementById('skipLocatorBtn').addEventListener('click', async () => {
+      await fetch(BRIDGE_URL + '/api/resolve/' + runId, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({skip: true}),
+      });
+      resultEl.innerHTML = '';
+      onResumed();
+    });
+  }
+
+  // ---------- pytest script generation (shared by Run + Report tabs) ----------
+  let lastRunReportData = null;
+  let lastUploadedReportData = null;
+
+  function escapeHtmlForCode(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  async function requestScript(reportData, outEl, btn) {
+    btn.textContent = 'Generating…';
+    btn.disabled = true;
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/generate-script', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(reportData),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to generate script');
+
+      const filename = 'test_' + (reportData.goal || 'flow').toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) + '.py';
+
+      outEl.innerHTML = `
+        <div class="terminal" style="color: var(--paper); margin-top:10px; max-height:420px; overflow:auto;">${escapeHtmlForCode(data.script)}</div>
+        <div class="copybar">
+          <span class="hint">${filename}</span>
+          <div style="display:flex; gap:8px;">
+            <button class="copy" id="copyScriptBtn">Copy</button>
+            <button class="copy" id="downloadScriptBtn">Download .py</button>
+          </div>
+        </div>`;
+
+      document.getElementById('copyScriptBtn').addEventListener('click', () => {
+        navigator.clipboard.writeText(data.script);
+        const b = document.getElementById('copyScriptBtn');
+        b.textContent = 'Copied ✓'; b.classList.add('copied');
+        setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('copied'); }, 1600);
+      });
+      document.getElementById('downloadScriptBtn').addEventListener('click', () => {
+        const blob = new Blob([data.script], {type: 'text/x-python'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    } catch (e) {
+      outEl.innerHTML = `<div class="empty-hint">Couldn't generate script: ${escapeHtmlForCode(e.message)}</div>`;
+    } finally {
+      btn.textContent = 'Generate pytest script';
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById('genScriptBtnRun').addEventListener('click', () => {
+    if (!lastRunReportData) return;
+    requestScript(lastRunReportData, document.getElementById('scriptOutRun'), document.getElementById('genScriptBtnRun'));
+  });
+  document.getElementById('genScriptBtnReport').addEventListener('click', () => {
+    if (!lastUploadedReportData) return;
+    requestScript(lastUploadedReportData, document.getElementById('scriptOutReport'), document.getElementById('genScriptBtnReport'));
+  });
+
+  // ---------- manual capture (no LLM, no Appium) ----------
+  let mcMarkerLabels = [];
+  let mcLivePoll = null;
+
+  function renderMcLiveFeed(calls) {
+    const feed = document.getElementById('mcLiveFeed');
+    const wasScrolledToBottom = feed.scrollHeight - feed.scrollTop <= feed.clientHeight + 20;
+    feed.innerHTML = calls.map(c => {
+      const color = c.is_error ? 'var(--alert)' : 'var(--circuit)';
+      const time = new Date(c.timestamp * 1000).toLocaleTimeString();
+      return `<span style="color:var(--paper-dim);">[${time}]</span> <span style="color:${color};">${escapeHtml(c.method)} ${escapeHtml(c.url)} → ${c.status_code}</span>`;
+    }).join('\n') || '<span style="color:var(--paper-dim);">waiting for traffic…</span>';
+    if (wasScrolledToBottom) feed.scrollTop = feed.scrollHeight;
+  }
+
+  function startMcLivePoll() {
+    let failCount = 0;
+    mcLivePoll = setInterval(async () => {
+      try {
+        const res = await fetch(BRIDGE_URL + '/api/manual-capture/status', {cache: 'no-store'});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        failCount = 0;
+        if (data.active) renderMcLiveFeed(data.calls || []);
+      } catch (e) {
+        failCount++;
+        console.error('manual-capture live poll failed:', e);
+        if (failCount >= 2) {
+          document.getElementById('mcLiveFeed').innerHTML =
+            `<span style="color:var(--alert);">Live feed error: ${escapeHtml(e.message)} (bridge server reachable?)</span>`;
+        }
+      }
+    }, 1500);
+  }
+
+  function stopMcLivePoll() {
+    if (mcLivePoll) { clearInterval(mcLivePoll); mcLivePoll = null; }
+  }
+
+  document.getElementById('mcStartBtn').addEventListener('click', async () => {
+    const port = parseInt(document.getElementById('mcPort').value) || 8080;
+    const btn = document.getElementById('mcStartBtn');
+    btn.textContent = 'Starting…';
+    btn.disabled = true;
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/manual-capture/start', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({port}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to start');
+      mcMarkerLabels = ['session start'];
+      document.getElementById('mcActiveCard').style.display = 'block';
+      document.getElementById('mcMarkerList').textContent = '1. session start';
+      document.getElementById('mcResultCard').innerHTML = '';
+      document.getElementById('mcLiveFeed').innerHTML = '<span style="color:var(--paper-dim);">waiting for traffic…</span>';
+      btn.style.display = 'none';
+      startMcLivePoll();
+    } catch (e) {
+      document.getElementById('mcResultCard').innerHTML =
+        `<div class="empty-hint">Couldn't start: ${escapeHtml(e.message)}</div>`;
+    } finally {
+      btn.textContent = 'Start Capture';
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('mcMarkBtn').addEventListener('click', async () => {
+    const labelInput = document.getElementById('mcLabel');
+    const label = labelInput.value.trim();
+    const res = await fetch(BRIDGE_URL + '/api/manual-capture/mark', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({label}),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      mcMarkerLabels.push(label || `action ${mcMarkerLabels.length}`);
+      document.getElementById('mcMarkerList').textContent =
+        mcMarkerLabels.map((l, i) => `${i + 1}. ${l}`).join('\n');
+      labelInput.value = '';
+      labelInput.focus();
+    }
+  });
+
+  document.getElementById('mcLabel').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('mcMarkBtn').click();
+  });
+
+  document.getElementById('mcStopBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('mcStopBtn');
+    btn.textContent = 'Saving…';
+    btn.disabled = true;
+    stopMcLivePoll();
+    const res = await fetch(BRIDGE_URL + '/api/manual-capture/stop', {method: 'POST'});
+    const data = await res.json();
+    document.getElementById('mcActiveCard').style.display = 'none';
+    document.getElementById('mcStartBtn').style.display = 'block';
+    btn.textContent = 'Stop & Save';
+    btn.disabled = false;
+    if (res.ok) {
+      renderReport(data.report, document.getElementById('mcResultCard'));
+      const hint = document.createElement('div');
+      hint.className = 'hint';
+      hint.style.marginTop = '8px';
+      hint.textContent = `Saved to ${data.report_path}`;
+      document.getElementById('mcResultCard').appendChild(hint);
+    } else {
+      document.getElementById('mcResultCard').innerHTML =
+        `<div class="empty-hint">Couldn't stop: ${escapeHtml(data.error || '')}</div>`;
+    }
+  });
+
+
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const reportOut = document.getElementById('reportOut');
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) readFile(e.target.files[0]); });
+
+  ['dragover','dragleave','drop'].forEach(evt => {
+    dropzone.addEventListener(evt, e => {
+      e.preventDefault();
+      if (evt === 'dragover') dropzone.classList.add('drag');
+      if (evt !== 'dragover') dropzone.classList.remove('drag');
+      if (evt === 'drop' && e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+    });
+  });
+
+  function readFile(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        lastUploadedReportData = { goal: data.goal, steps: data.steps || [] };
+        document.getElementById('genScriptBtnReport').style.display = 'block';
+        renderReport(data);
+      } catch (err) {
+        reportOut.innerHTML = `<div class="card"><div class="empty-hint">Couldn't parse that as JSON: ${escapeHtml(err.message)}</div></div>`;
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function statusClass(status) {
+    if (status === 'pass') return 'status-pass';
+    if (status === 'fail') return 'status-fail';
+    return 'status-stuck';
+  }
+
+  function renderReport(data, targetEl) {
+    targetEl = targetEl || reportOut;
+    const flagCount = (data.bug_flags || []).length;
+    let html = `<div class="card">
+      <div class="report-meta">
+        <div class="report-goal"><b>Goal:</b> ${escapeHtml(data.goal || '(none)')}</div>
+        <span class="status-badge ${statusClass(data.final_status)}">${escapeHtml(data.final_status || 'unknown')}</span>
+      </div>
+      <div style="font-size:13px; color:var(--paper-dim); margin-bottom:4px;">${escapeHtml(data.final_note || '')}</div>
+      <div style="font-size:12px; color:var(--paper-dim);">${data.step_count || (data.steps||[]).length} steps · ${flagCount} judge flag${flagCount === 1 ? '' : 's'}</div>
+    </div>`;
+
+    const steps = data.steps || [];
+    if (steps.length) {
+      html += '<div class="card">';
+      steps.forEach(s => {
+        const flagged = s.judge && s.judge.verdict === 'flag';
+        const netCalls = s.network_calls || [];
+        const netErrors = netCalls.filter(c => c.is_error);
+        html += `<div class="step ${flagged || netErrors.length ? 'flagged' : ''}">
+          <div class="step-head"><span class="n">#${s.step}</span> ${escapeHtml(s.action || '')}${s.element_id ? ' → ' + escapeHtml(s.element_id) : ''}</div>
+          <div class="step-reason">${escapeHtml(s.reasoning || '')}</div>`;
+        if (flagged) {
+          html += `<div class="flag-box"><b>flagged (${escapeHtml(s.judge.confidence || '')}):</b> ${escapeHtml(s.judge.explanation || '')}</div>`;
+        }
+        netErrors.forEach(c => {
+          html += `<div class="flag-box"><b>network error:</b> ${escapeHtml(c.method)} ${escapeHtml(c.url)} → ${c.status_code}<br>${escapeHtml((c.response_body || '').slice(0, 300))}</div>`;
+        });
+        if (netCalls.length) {
+          const okCalls = netCalls.filter(c => !c.is_error);
+          if (okCalls.length) {
+            html += `<div style="font-size:11.5px; color:var(--paper-dim); margin-top:6px; font-family:var(--mono);">
+              ${okCalls.length} network call(s) in this step: ${okCalls.map(c => `${escapeHtml(c.method)} ${escapeHtml(c.url)} → ${c.status_code}`).join(' · ')}
+            </div>`;
+          }
+        } else if (s.network_calls !== undefined && s.network_calls !== null) {
+          html += `<div style="font-size:11.5px; color:var(--paper-dim); margin-top:6px;">0 network calls captured in this step's window</div>`;
+        }
+        html += `</div>`;
+      });
+      html += '</div>';
+    }
+
+    targetEl.innerHTML = html;
+  }
+</script>
+</body>
+</html>
