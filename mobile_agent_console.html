@@ -601,6 +601,15 @@
         <div class="hint" style="font-size:10.5px; margin-top:2px;">deterministic replay — no LLM calls</div>
         <div id="savedFlowsList" style="margin-top:10px; font-size:13px;">Loading…</div>
         <div id="savedFlowsPager" style="display:none; justify-content:space-between; align-items:center; margin-top:8px; font-size:11px;"></div>
+
+        <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--ink-line);">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+            <label style="margin:0;">From team</label>
+            <button class="copy" id="refreshSharedFlowsBtn" style="padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Refresh</button>
+          </div>
+          <div class="hint" style="font-size:10.5px; margin-top:2px;">published by teammates — import to run it locally</div>
+          <div id="sharedFlowsList" style="margin-top:8px; font-size:12px;">Loading…</div>
+        </div>
       </div>
       <div style="flex:1; min-width:0; padding:18px; box-sizing:border-box;">
         <div id="savedFlowDetailEmpty" class="empty-hint">Select a flow on the left to view its details, run it, and see its execution trace.</div>
@@ -2043,9 +2052,12 @@ ${containerEl.innerHTML}
         <div style="display:flex; gap:6px; flex-shrink:0;">
           <button class="copy flow-run-btn" data-slug="${escapeHtml(f.slug)}" data-name="${escapeHtml(f.name)}" style="padding:6px 10px; font-size:12px;">${state && state.status === 'running' ? 'Running…' : 'Run'}</button>
           <button class="copy flow-gen-tests-btn" data-slug="${escapeHtml(f.slug)}" data-name="${escapeHtml(f.name)}" title="Generate a page object + pytest test class from this flow's steps" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Generate tests</button>
+          <button class="copy flow-share-btn" data-slug="${escapeHtml(f.slug)}" title="Publish this flow to the team's shared repo so teammates can import it" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Share with team</button>
           <button class="copy flow-delete-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Delete</button>
         </div>
       </div>
+
+      <div class="hint flow-share-status" data-share-status-for="${escapeHtml(f.slug)}" style="font-size:11.5px; margin-top:6px;"></div>
 
       ${f.setup_script ? `
       <label style="display:flex; align-items:center; gap:5px; font-size:11px; margin-top:12px; cursor:pointer;" title="${escapeHtml(f.setup_script)}">
@@ -2102,13 +2114,87 @@ ${containerEl.innerHTML}
   loadSavedFlows();
   document.getElementById('refreshFlowsBtn').addEventListener('click', loadSavedFlows);
 
+  // -------- Shared Flows: publish/import via the team's shared repo --------
+  // A flow published here becomes a plain .json file in that repo's
+  // <subdir>/ folder (see shared_flows.py server-side) - reads are always
+  // unauthenticated (public repo), so listing/importing works for anyone
+  // with the bridge server running, but publishing needs SHARED_FLOWS_TOKEN
+  // configured in that person's own .env (same pattern as ALLURE_REPORTS_TOKEN).
+  async function loadSharedFlows() {
+    const listEl = document.getElementById('sharedFlowsList');
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/shared-flows');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to load shared flows');
+      const flows = data.flows || [];
+      listEl.innerHTML = flows.length ? flows.map(f => `
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:5px 0; border-bottom:1px solid var(--ink-line);">
+          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(f.name)}</span>
+          <button class="copy shared-flow-import-btn" data-path="${escapeHtml(f.path)}" data-slug="${escapeHtml(f.slug)}" style="padding:3px 8px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Import</button>
+        </div>`).join('') : '<div class="empty-hint" style="font-size:11.5px;">Nothing published yet.</div>';
+    } catch (e) {
+      listEl.innerHTML = `<div class="empty-hint" style="font-size:11.5px;">${escapeHtml(e.message)}</div>`;
+    }
+  }
+  loadSharedFlows();
+  document.getElementById('refreshSharedFlowsBtn').addEventListener('click', loadSharedFlows);
+
+  document.getElementById('sharedFlowsList').addEventListener('click', async (e) => {
+    const importBtn = e.target.closest('.shared-flow-import-btn');
+    if (!importBtn) return;
+    const path = importBtn.dataset.path;
+    const slug = importBtn.dataset.slug;
+    importBtn.disabled = true;
+    importBtn.textContent = 'Importing…';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/shared-flows/import', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path, slug}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to import');
+      importBtn.textContent = 'Imported ✓';
+      await loadSavedFlows();
+    } catch (err) {
+      importBtn.disabled = false;
+      importBtn.textContent = 'Import';
+      alert('Could not import: ' + err.message);
+    }
+  });
+
   document.getElementById('savedFlowDetail').addEventListener('click', async (e) => {
     const runBtn = e.target.closest('.flow-run-btn');
     const delBtn = e.target.closest('.flow-delete-btn');
     const genTestsBtn = e.target.closest('.flow-gen-tests-btn');
+    const shareBtn = e.target.closest('.flow-share-btn');
     const downloadBtn = e.target.closest('.flow-download-report-btn');
     const downloadCsvBtn = e.target.closest('.flow-download-csv-btn');
     const downloadPdfBtn = e.target.closest('.flow-download-pdf-btn');
+
+    if (shareBtn) {
+      const slug = shareBtn.dataset.slug;
+      const statusEl = document.querySelector(`.flow-share-status[data-share-status-for="${CSS.escape(slug)}"]`);
+      shareBtn.disabled = true;
+      shareBtn.textContent = 'Sharing…';
+      statusEl.textContent = '';
+      try {
+        const res = await fetch(BRIDGE_URL + '/api/shared-flows/publish', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({slug}),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'failed to publish');
+        statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Published — teammates can import it from "From team" on the left.</span>`;
+      } catch (err) {
+        statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(err.message)}</span>`;
+      } finally {
+        shareBtn.disabled = false;
+        shareBtn.textContent = 'Share with team';
+      }
+      return;
+    }
 
     if (genTestsBtn) {
       const slug = genTestsBtn.dataset.slug;
