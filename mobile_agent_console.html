@@ -2059,11 +2059,15 @@ ${containerEl.innerHTML}
 
       <div class="hint flow-share-status" data-share-status-for="${escapeHtml(f.slug)}" style="font-size:11.5px; margin-top:6px;"></div>
 
-      ${f.setup_script ? `
-      <label style="display:flex; align-items:center; gap:5px; font-size:11px; margin-top:12px; cursor:pointer;" title="${escapeHtml(f.setup_script)}">
-        <input type="checkbox" class="flow-run-setup-checkbox" data-slug="${escapeHtml(f.slug)}" style="width:auto;">
-        Run setup script first — <code style="font-size:10.5px;">${escapeHtml(f.setup_script)}</code>
-      </label>` : ''}
+      <div class="flow-setup-script-block" style="margin-top:12px;">
+        ${f.setup_script ? `
+        <label style="display:flex; align-items:center; gap:5px; font-size:11px; cursor:pointer;" title="${escapeHtml(f.setup_script)}">
+          <input type="checkbox" class="flow-run-setup-checkbox" data-slug="${escapeHtml(f.slug)}" style="width:auto;">
+          Run setup script first — <code style="font-size:10.5px;">${escapeHtml(f.setup_script)}</code>
+        </label>` : `<span class="hint" style="font-size:11px;">No setup script set for this flow.</span>`}
+        <button class="copy flow-setup-script-toggle-btn" data-slug="${escapeHtml(f.slug)}" style="display:block; margin-top:6px; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">${f.setup_script ? 'Change setup script' : 'Set setup script'}</button>
+        <div class="flow-setup-script-picker" data-slug="${escapeHtml(f.slug)}" style="display:none; margin-top:8px; border:1px solid var(--ink-line); border-radius:8px; padding:10px;"></div>
+      </div>
 
       ${f.login_email !== null && f.login_email !== undefined ? `
       <div style="display:flex; gap:6px; align-items:center; margin-top:8px; font-size:11px;" title="Overrides this flow's single login step and saves it back to the flow file - leave unchanged to keep using the current account.">
@@ -2163,6 +2167,93 @@ ${containerEl.innerHTML}
     }
   });
 
+  // -------- Setup script picker: pick a .py file from the local pytest
+  // project OR a configured GitHub automation repo, to run before this
+  // flow replays. Re-rendered from scratch on every navigation (source
+  // switch / folder click) since renderFlowDetail already replaces this
+  // whole panel's innerHTML on every flow selection anyway - state lives
+  // in setupScriptBrowseState, keyed by slug, so switching away and back
+  // to a flow mid-browse doesn't lose your place. --------
+  const setupScriptBrowseState = {}; // slug -> {source: 'local'|'github', path: string}
+
+  function setupScriptListUrl(source, path) {
+    const endpoint = source === 'github' ? '/api/setup-scripts/github' : '/api/setup-scripts/local';
+    return BRIDGE_URL + endpoint + '?path=' + encodeURIComponent(path || '');
+  }
+
+  async function loadSetupScriptDir(slug) {
+    const state = setupScriptBrowseState[slug];
+    const crumbsEl = document.querySelector(`.setup-script-crumbs[data-slug="${CSS.escape(slug)}"]`);
+    const entriesEl = document.querySelector(`.setup-script-entries[data-slug="${CSS.escape(slug)}"]`);
+    const statusEl = document.querySelector(`.setup-script-picker-status[data-slug="${CSS.escape(slug)}"]`);
+    if (!crumbsEl) return; // picker got closed/torn down mid-fetch
+    statusEl.textContent = '';
+    entriesEl.innerHTML = 'Loading…';
+    try {
+      const res = await fetch(setupScriptListUrl(state.source, state.path));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to list directory');
+      state.path = data.path || '';
+
+      const segments = state.path.split('/').filter(Boolean);
+      let acc = '';
+      let crumbHtml = `<a href="#" class="setup-script-crumb" data-slug="${escapeHtml(slug)}" data-path="">root</a>`;
+      segments.forEach(seg => {
+        acc = acc ? acc + '/' + seg : seg;
+        crumbHtml += ` / <a href="#" class="setup-script-crumb" data-slug="${escapeHtml(slug)}" data-path="${escapeHtml(acc)}">${escapeHtml(seg)}</a>`;
+      });
+      crumbsEl.innerHTML = crumbHtml;
+
+      const entries = data.entries || [];
+      entriesEl.innerHTML = entries.length ? entries.map(entry => `
+        <div class="setup-script-entry" data-slug="${escapeHtml(slug)}" data-path="${escapeHtml(entry.path)}" data-type="${entry.type}"
+             style="padding:5px 8px; border-radius:6px; cursor:pointer; font-size:12px; display:flex; align-items:center; gap:6px;">
+          <span>${entry.type === 'dir' ? '📁' : '🐍'}</span><span>${escapeHtml(entry.name)}</span>
+        </div>`).join('') : '<div class="empty-hint" style="font-size:11.5px;">Empty folder.</div>';
+    } catch (e) {
+      crumbsEl.innerHTML = '';
+      entriesEl.innerHTML = '';
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    }
+  }
+
+  function renderSetupScriptPicker(slug) {
+    const container = document.querySelector(`.flow-setup-script-picker[data-slug="${CSS.escape(slug)}"]`);
+    const state = setupScriptBrowseState[slug] || (setupScriptBrowseState[slug] = {source: 'local', path: ''});
+
+    const sourceBtn = (source, label) => `
+      <button class="copy setup-script-source-btn" data-slug="${escapeHtml(slug)}" data-source="${source}"
+              style="padding:4px 10px; font-size:11px; background:${state.source === source ? 'var(--signal)' : 'var(--ink-line)'}; color:${state.source === source ? '#1a1204' : 'var(--paper)'};">${label}</button>`;
+
+    container.innerHTML = `
+      <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
+        ${sourceBtn('local', 'Local project')}
+        ${sourceBtn('github', 'GitHub (automation repo)')}
+      </div>
+      <div class="setup-script-crumbs" data-slug="${escapeHtml(slug)}" style="font-size:11px; color:var(--paper-dim); margin-bottom:6px;"></div>
+      <div class="setup-script-entries" data-slug="${escapeHtml(slug)}" style="max-height:220px; overflow-y:auto;"></div>
+      <div class="setup-script-picker-status" data-slug="${escapeHtml(slug)}" style="font-size:11px; margin-top:6px;"></div>
+    `;
+    loadSetupScriptDir(slug);
+  }
+
+  async function saveFlowSetupScript(slug, source, path) {
+    const statusEl = document.querySelector(`.setup-script-picker-status[data-slug="${CSS.escape(slug)}"]`);
+    statusEl.textContent = 'Saving…';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/flows/' + encodeURIComponent(slug) + '/setup-script', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({source, path}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to set setup script');
+      await loadSavedFlows(); // re-renders this same flow's detail with the new value
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    }
+  }
+
   document.getElementById('savedFlowDetail').addEventListener('click', async (e) => {
     const runBtn = e.target.closest('.flow-run-btn');
     const delBtn = e.target.closest('.flow-delete-btn');
@@ -2171,6 +2262,48 @@ ${containerEl.innerHTML}
     const downloadBtn = e.target.closest('.flow-download-report-btn');
     const downloadCsvBtn = e.target.closest('.flow-download-csv-btn');
     const downloadPdfBtn = e.target.closest('.flow-download-pdf-btn');
+    const setupToggleBtn = e.target.closest('.flow-setup-script-toggle-btn');
+    const setupSourceBtn = e.target.closest('.setup-script-source-btn');
+    const setupCrumb = e.target.closest('.setup-script-crumb');
+    const setupEntry = e.target.closest('.setup-script-entry');
+
+    if (setupToggleBtn) {
+      const slug = setupToggleBtn.dataset.slug;
+      const picker = document.querySelector(`.flow-setup-script-picker[data-slug="${CSS.escape(slug)}"]`);
+      const opening = picker.style.display === 'none';
+      picker.style.display = opening ? 'block' : 'none';
+      if (opening) renderSetupScriptPicker(slug);
+      return;
+    }
+
+    if (setupSourceBtn) {
+      const slug = setupSourceBtn.dataset.slug;
+      const state = setupScriptBrowseState[slug] || (setupScriptBrowseState[slug] = {source: 'local', path: ''});
+      state.source = setupSourceBtn.dataset.source;
+      state.path = '';
+      renderSetupScriptPicker(slug);
+      return;
+    }
+
+    if (setupCrumb) {
+      e.preventDefault();
+      const slug = setupCrumb.dataset.slug;
+      setupScriptBrowseState[slug].path = setupCrumb.dataset.path;
+      await loadSetupScriptDir(slug);
+      return;
+    }
+
+    if (setupEntry) {
+      const slug = setupEntry.dataset.slug;
+      const state = setupScriptBrowseState[slug];
+      if (setupEntry.dataset.type === 'dir') {
+        state.path = setupEntry.dataset.path;
+        await loadSetupScriptDir(slug);
+      } else {
+        await saveFlowSetupScript(slug, state.source, setupEntry.dataset.path);
+      }
+      return;
+    }
 
     if (shareBtn) {
       const slug = shareBtn.dataset.slug;
