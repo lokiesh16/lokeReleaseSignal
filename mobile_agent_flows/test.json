@@ -1,0 +1,34 @@
+{
+  "name": "test",
+  "slug": "test",
+  "goal": "test",
+  "created_at": "2026-09-09T16:11:10Z",
+  "appium": {
+    "platform": "iOS",
+    "device": "Anand\u2019s iPhone",
+    "bundle_id": "habitnu2.stag",
+    "platform_version": "26.6.1",
+    "udid": "00008140-001E60C03C87001C",
+    "xcode_org_id": "THENRPWMLX",
+    "extra_caps": {
+      "appium:wdaLocalPort": 8100,
+      "appium:useNewWDA": false,
+      "appium:connectHardwareKeyboard": true,
+      "appium:settings[snapshotMaxDepth]": 70
+    }
+  },
+  "tests": [
+    {
+      "description": "",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "View Profile Details",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "profile_menu_view_profile"
+        }
+      ]
+    }
+  ]
+}
