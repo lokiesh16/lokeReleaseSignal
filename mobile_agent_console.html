@@ -778,6 +778,19 @@
             <button class="copy" id="lsDisconnectBtn" style="background: var(--alert); padding:12px 16px;">Disconnect</button>
           </div>
           <div id="lsLoadStatus" style="font-size:12px; margin-top:8px;"></div>
+
+          <div style="display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap;">
+            <select id="lsSwitchAppPreset" style="flex-shrink:0; width:auto;">
+              <option value="com.apple.Health">Apple Health</option>
+              <option value="com.apple.Preferences">Settings</option>
+              <option value="__custom__">Custom bundle id…</option>
+            </select>
+            <input id="lsSwitchAppCustom" placeholder="com.example.app" style="display:none; flex:1; min-width:160px;">
+            <button class="copy" id="lsSwitchAppBtn" style="flex-shrink:0;">Switch app</button>
+            <button class="copy" id="lsBackToAppBtn" style="flex-shrink:0; background:var(--ink-line); color:var(--paper);">Back to app under test</button>
+          </div>
+          <div id="lsSwitchAppStatus" style="font-size:12px; margin-top:6px;"></div>
+
           <div id="lsElementListWrap" style="margin-top:14px; display:none;"></div>
         </div>
 
@@ -4124,6 +4137,47 @@ ${containerEl.innerHTML}
       btn.textContent = 'Load locators from current screen';
       btn.disabled = false;
     }
+  });
+
+  document.getElementById('lsSwitchAppPreset').addEventListener('change', (e) => {
+    document.getElementById('lsSwitchAppCustom').style.display = e.target.value === '__custom__' ? 'block' : 'none';
+  });
+
+  // Switches the foreground app mid-flow (e.g. out to Apple Health, back to the
+  // app under test) via `mobile: activateApp` - the same WDA session stays
+  // alive throughout, so this is just another recordable step, not a
+  // reconnect. See ActionExecutor's SWITCH_APP branch in actions.py.
+  async function lsRunSwitchApp(bundleId) {
+    if (!lsSessionId || !bundleId) return;
+    const statusEl = document.getElementById('lsSwitchAppStatus');
+    statusEl.textContent = 'Switching…';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'switch_app', bundle_id: bundleId}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'switch failed');
+      lsCapturedSteps.push({action: 'switch_app', bundle_id: bundleId, label: `Switch to ${bundleId}`});
+      renderLsCapturedSteps();
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ switched to ${escapeHtml(bundleId)} - recorded</span>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    }
+  }
+
+  document.getElementById('lsSwitchAppBtn').addEventListener('click', () => {
+    const preset = document.getElementById('lsSwitchAppPreset').value;
+    const bundleId = preset === '__custom__'
+      ? document.getElementById('lsSwitchAppCustom').value.trim()
+      : preset;
+    lsRunSwitchApp(bundleId);
+  });
+
+  document.getElementById('lsBackToAppBtn').addEventListener('click', () => {
+    const bundleId = document.getElementById('lsBundleId').value.trim();
+    lsRunSwitchApp(bundleId);
   });
 
   document.getElementById('lsDisconnectBtn').addEventListener('click', async () => {
