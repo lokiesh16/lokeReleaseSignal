@@ -438,7 +438,7 @@
         </div>
         <div class="field">
           <label>Xcode Team ID <span class="opt">real device only</span></label>
-          <input id="xcodeOrg" placeholder="e.g. AB12CD34EF" value="THENRPWMLX">
+          <input id="xcodeOrg" placeholder="e.g. AB12CD34EF" value="KA5AZ85LG8">
         </div>
 
         <div class="field">
@@ -553,7 +553,7 @@
         </div>
         <div class="field">
           <label>Xcode Team ID</label>
-          <input id="rXcodeOrg" placeholder="e.g. AB12CD34EF" value="THENRPWMLX">
+          <input id="rXcodeOrg" placeholder="e.g. AB12CD34EF" value="KA5AZ85LG8">
         </div>
         <div class="field full">
           <label>Extra capabilities <span class="opt">raw JSON</span></label>
@@ -771,7 +771,7 @@
         </div>
         <div class="field">
           <label>Xcode Team ID</label>
-          <input id="lsXcodeOrg" placeholder="e.g. AB12CD34EF" value="THENRPWMLX">
+          <input id="lsXcodeOrg" placeholder="e.g. AB12CD34EF" value="KA5AZ85LG8">
         </div>
         <div class="field full">
           <label>Extra capabilities <span class="opt">raw JSON</span></label>
@@ -814,6 +814,54 @@
           </div>
           <div id="lsContextHint" style="font-size:11px; color:var(--paper-dim); margin-top:4px;">Nothing captured yet - use "capture value (parse_label)" on an element above to save one.</div>
           <div id="lsAssertExprStatus" style="font-size:12px; margin-top:6px;"></div>
+
+          <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--ink-line);">
+            <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Build &amp; test a locator</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <select id="lsLabStrategy" style="width:auto; flex:0 0 165px;">
+                <option value="accessibility id">accessibility id</option>
+                <option value="xpath">xpath</option>
+                <option value="class name">class name</option>
+                <option value="-ios predicate string">-ios predicate string</option>
+                <option value="-ios class chain">-ios class chain</option>
+                <option value="id">id</option>
+              </select>
+              <input id="lsLabValue" placeholder='e.g. //XCUIElementTypeStaticText[@name=&quot;{{stepsFromApple}} steps&quot;]' style="flex:1; min-width:220px; font-family:var(--mono); font-size:11.5px;" title="{{expr}} tokens get substituted with a value captured earlier via parse_label (see 'Captured so far' above) before this locator is tested or acted on.">
+              <button class="copy" id="lsLabTestBtn" style="flex-shrink:0;">Test locator</button>
+            </div>
+            <div id="lsLabTestStatus" style="font-size:12px; margin-top:6px;"></div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:10px;">
+              <select id="lsLabActType" style="width:auto; flex:0 0 130px;">
+                <option value="tap">tap</option>
+                <option value="type_text">type_text</option>
+                <option value="clear">clear</option>
+                <option value="swipe">swipe</option>
+                <option value="wait">wait</option>
+                <option value="assert_visible">assert_visible</option>
+                <option value="assert_value">assert_value</option>
+                <option value="parse_label">capture value (parse_label)</option>
+              </select>
+              <input id="lsLabActText" placeholder="text to type" style="display:none; width:auto; flex:1; min-width:120px;">
+              <select id="lsLabActDirection" style="display:none; width:auto; flex:0 0 100px;">
+                <option value="up">up</option><option value="down">down</option><option value="left">left</option><option value="right">right</option>
+              </select>
+              <input id="lsLabActSeconds" type="number" step="0.5" placeholder="seconds" style="display:none; width:auto; flex:0 0 90px;">
+              <select id="lsLabActExtract" style="display:none; width:auto; flex:0 0 130px;">
+                <option value="text">text</option><option value="number">number</option><option value="duration_seconds">duration_seconds</option>
+              </select>
+              <select id="lsLabActCompare" style="display:none; width:auto; flex:0 0 150px;">
+                <option value="equals">equals</option><option value="not_equals">not_equals</option><option value="contains">contains</option>
+                <option value="greater_than">greater_than</option><option value="less_than">less_than</option>
+                <option value="greater_than_or_equal">greater_than_or_equal</option><option value="less_than_or_equal">less_than_or_equal</option>
+                <option value="matches">matches</option>
+              </select>
+              <input id="lsLabActExpected" placeholder="expected value" style="display:none; width:auto; flex:1; min-width:100px;">
+              <input id="lsLabActSaveAs" placeholder="save as (e.g. stepsFromApp)" style="display:none; width:auto; flex:1; min-width:140px;">
+              <button class="copy" id="lsLabActRunBtn" style="flex-shrink:0;">Do it + Record</button>
+            </div>
+            <div id="lsLabActStatus" style="font-size:12px; margin-top:6px;"></div>
+          </div>
 
           <div id="lsElementListWrap" style="margin-top:14px; display:none;"></div>
         </div>
@@ -4301,6 +4349,114 @@ ${containerEl.innerHTML}
     }
   });
 
+  // ---------- Locator Lab: hand-write/test a locator against the live
+  // screen (Appium Inspector's "Search for element" equivalent), then act
+  // on it directly if it resolves - no need to have tapped a matching
+  // element in the loaded list first. ----------
+  (() => {
+    const typeSelect = document.getElementById('lsLabActType');
+    const textField = document.getElementById('lsLabActText');
+    const directionField = document.getElementById('lsLabActDirection');
+    const secondsField = document.getElementById('lsLabActSeconds');
+    const extractField = document.getElementById('lsLabActExtract');
+    const compareField = document.getElementById('lsLabActCompare');
+    const expectedField = document.getElementById('lsLabActExpected');
+    const saveAsField = document.getElementById('lsLabActSaveAs');
+    const applyVisibility = () => {
+      const t = typeSelect.value;
+      textField.style.display = t === 'type_text' ? 'block' : 'none';
+      directionField.style.display = t === 'swipe' ? 'block' : 'none';
+      secondsField.style.display = t === 'wait' ? 'block' : 'none';
+      const isAssertValue = t === 'assert_value';
+      const isParseLabel = t === 'parse_label';
+      extractField.style.display = (isAssertValue || isParseLabel) ? 'block' : 'none';
+      compareField.style.display = isAssertValue ? 'block' : 'none';
+      expectedField.style.display = isAssertValue ? 'block' : 'none';
+      saveAsField.style.display = isParseLabel ? 'block' : 'none';
+    };
+    typeSelect.addEventListener('change', applyVisibility);
+    applyVisibility();
+
+    document.getElementById('lsLabTestBtn').addEventListener('click', async () => {
+      if (!lsSessionId) return;
+      const strategy = document.getElementById('lsLabStrategy').value;
+      const value = document.getElementById('lsLabValue').value.trim();
+      const statusEl = document.getElementById('lsLabTestStatus');
+      if (!value) { statusEl.innerHTML = '<span style="color:var(--signal);">Enter a locator value first</span>'; return; }
+      statusEl.textContent = 'Testing…';
+      try {
+        const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/test_locator', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({strategy, value}),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'locator test failed');
+
+        const substitutedNote = data.resolved_value !== value
+          ? ` — resolved to <code>${escapeHtml(data.resolved_value)}</code>` : '';
+        const highlighted = data.found && lsHighlightBoundsOnScreenshot(data.bounds);
+        const screenshotHint = (data.found && !highlighted) ? ' — open the screenshot tray above to see it highlighted' : '';
+        if (!data.found) {
+          statusEl.innerHTML = `<span style="color:var(--alert);">✗ Not found${substitutedNote}</span>`;
+        } else if (data.count > 1) {
+          statusEl.innerHTML = `<span style="color:var(--signal);">⚠ Matches ${data.count} elements (ambiguous)${substitutedNote}${screenshotHint}</span>`;
+        } else {
+          statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Found${substitutedNote}${screenshotHint}</span>`;
+        }
+      } catch (e) {
+        statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+      }
+    });
+
+    document.getElementById('lsLabActRunBtn').addEventListener('click', async () => {
+      if (!lsSessionId) return;
+      const strategy = document.getElementById('lsLabStrategy').value;
+      const value = document.getElementById('lsLabValue').value.trim();
+      const actionType = typeSelect.value;
+      const statusEl = document.getElementById('lsLabActStatus');
+      if (!value) { statusEl.innerHTML = '<span style="color:var(--signal);">Enter a locator value first</span>'; return; }
+
+      const payload = {action: actionType, strategy, value};
+      const step = {action: actionType, strategy, value, label: value};
+      if (actionType === 'type_text') { payload.text = textField.value; step.text = payload.text; }
+      if (actionType === 'swipe') { payload.direction = directionField.value; step.direction = payload.direction; }
+      if (actionType === 'wait') { payload.seconds = parseFloat(secondsField.value || '1'); step.seconds = payload.seconds; }
+      if (actionType === 'assert_value') {
+        payload.extract = extractField.value; payload.compare = compareField.value; payload.expected = expectedField.value;
+        step.extract = payload.extract; step.compare = payload.compare; step.expected = payload.expected;
+      }
+      if (actionType === 'parse_label') {
+        payload.extract = extractField.value; payload.save_as = saveAsField.value.trim();
+        step.extract = payload.extract; step.save_as = payload.save_as;
+      }
+
+      const btn = document.getElementById('lsLabActRunBtn');
+      btn.disabled = true;
+      btn.textContent = 'Running…';
+      try {
+        const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'action failed');
+
+        lsCapturedSteps.push(step);
+        renderLsCapturedSteps();
+        lsRenderElementList(data.elements || []);
+        lsUpdateContext(data.context);
+        statusEl.innerHTML = `<span style="color:var(--circuit);">✓ ${escapeHtml(actionType)} recorded — screen refreshed with ${(data.elements || []).length} element(s)</span>`;
+      } catch (e) {
+        statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Do it + Record';
+      }
+    });
+  })();
+
   document.getElementById('lsDisconnectBtn').addEventListener('click', async () => {
     if (!lsSessionId) return;
     await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/stop', {method: 'POST'});
@@ -4329,6 +4485,26 @@ ${containerEl.innerHTML}
     document.getElementById('lsScreenshotMarker').style.display = 'none';
     document.getElementById('lsScreenshotMarkerEnd').style.display = 'none';
     document.getElementById('lsScreenshotSwipeBtn').disabled = true;
+  }
+
+  // Draws a found element's bounds over the open screenshot tray - same
+  // point-to-displayed-pixel scaling as the click handler below, just
+  // callable directly with a {x, y, width, height} rect (in points) instead
+  // of requiring an actual click, so the Locator Lab's "Test locator" can
+  // reuse this. No-op if the screenshot tray isn't open (lsScreenshotWindowSize
+  // is only populated by loadScreenshot) - the caller still shows a
+  // text-only result either way.
+  function lsHighlightBoundsOnScreenshot(bounds) {
+    if (!lsScreenshotWindowSize || !bounds) return false;
+    const img = document.getElementById('lsScreenshotImg');
+    const rect = img.getBoundingClientRect();
+    const highlight = document.getElementById('lsScreenshotHighlight');
+    highlight.style.left = ((bounds.x / lsScreenshotWindowSize.width) * rect.width) + 'px';
+    highlight.style.top = ((bounds.y / lsScreenshotWindowSize.height) * rect.height) + 'px';
+    highlight.style.width = ((bounds.width / lsScreenshotWindowSize.width) * rect.width) + 'px';
+    highlight.style.height = ((bounds.height / lsScreenshotWindowSize.height) * rect.height) + 'px';
+    highlight.style.display = 'block';
+    return true;
   }
 
   document.querySelectorAll('input[name="lsScreenshotMode"]').forEach(radio => {
