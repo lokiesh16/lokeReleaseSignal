@@ -944,6 +944,13 @@
                 <option value="up">up</option><option value="down">down</option><option value="left">left</option><option value="right">right</option>
               </select>
               <input id="lsLabActSeconds" type="number" step="0.5" placeholder="seconds" style="display:none; width:auto; flex:0 0 90px;">
+              <select id="lsLabActAttribute" style="display:none; width:auto; flex:0 0 110px;" title="Which raw XCUITest attribute to read - auto guesses (.text, then value, then label); pick one explicitly when they genuinely differ, e.g. a Switch's live on/off 'value' vs its static 'label'.">
+                <option value="">attribute: auto</option>
+                <option value="text">text</option>
+                <option value="value">value</option>
+                <option value="label">label</option>
+                <option value="name">name</option>
+              </select>
               <select id="lsLabActExtract" style="display:none; width:auto; flex:0 0 130px;">
                 <option value="text">text</option><option value="number">number</option><option value="duration_seconds">duration_seconds</option>
               </select>
@@ -3412,6 +3419,13 @@ ${containerEl.innerHTML}
             <option value="up">up</option><option value="down">down</option><option value="left">left</option><option value="right">right</option>
           </select>
           <input class="ls-act-seconds" type="number" step="0.5" placeholder="seconds" style="display:none; width:auto; flex:0 0 90px;">
+          <select class="ls-act-attribute" style="display:none; width:auto; flex:0 0 110px;" title="Which raw XCUITest attribute to read - auto guesses (.text, then value, then label); pick one explicitly when they genuinely differ, e.g. a Switch's live on/off 'value' vs its static 'label'.">
+            <option value="">attribute: auto</option>
+            <option value="text">text</option>
+            <option value="value">value</option>
+            <option value="label">label</option>
+            <option value="name">name</option>
+          </select>
           <select class="ls-act-extract" style="display:none; width:auto; flex:0 0 130px;">
             <option value="text">text</option><option value="number">number</option><option value="duration_seconds">duration_seconds</option>
           </select>
@@ -3513,6 +3527,7 @@ ${containerEl.innerHTML}
       const textField = row.querySelector('.ls-act-text');
       const directionField = row.querySelector('.ls-act-direction');
       const secondsField = row.querySelector('.ls-act-seconds');
+      const attributeField = row.querySelector('.ls-act-attribute');
       const extractField = row.querySelector('.ls-act-extract');
       const compareField = row.querySelector('.ls-act-compare');
       const expectedField = row.querySelector('.ls-act-expected');
@@ -3524,6 +3539,7 @@ ${containerEl.innerHTML}
         secondsField.style.display = t === 'wait' ? 'block' : 'none';
         const isAssertValue = t === 'assert_value';
         const isParseLabel = t === 'parse_label';
+        attributeField.style.display = (isAssertValue || isParseLabel) ? 'block' : 'none';
         extractField.style.display = (isAssertValue || isParseLabel) ? 'block' : 'none';
         compareField.style.display = isAssertValue ? 'block' : 'none';
         expectedField.style.display = isAssertValue ? 'block' : 'none';
@@ -3580,6 +3596,10 @@ ${containerEl.innerHTML}
         if (actionType === 'type_text') { payload.text = details.querySelector('.ls-act-text').value; step.text = payload.text; }
         if (actionType === 'swipe') { payload.direction = details.querySelector('.ls-act-direction').value; step.direction = payload.direction; }
         if (actionType === 'wait') { payload.seconds = parseFloat(details.querySelector('.ls-act-seconds').value || '1'); step.seconds = payload.seconds; }
+        if (actionType === 'assert_value' || actionType === 'parse_label') {
+          const attribute = details.querySelector('.ls-act-attribute').value;
+          if (attribute) { payload.attribute = attribute; step.attribute = attribute; }
+        }
         if (actionType === 'assert_value') {
           payload.extract = details.querySelector('.ls-act-extract').value;
           payload.compare = details.querySelector('.ls-act-compare').value;
@@ -3695,6 +3715,7 @@ ${containerEl.innerHTML}
         s.text != null ? `text="${s.text}"` : '',
         s.direction ? `direction=${s.direction}` : '',
         s.seconds != null ? `${s.seconds}s` : '',
+        s.attribute ? `attribute=${s.attribute}` : '',
         (s.extract && s.action === 'parse_label') ? `${s.extract} → save as "${s.save_as || '(unnamed)'}"` : '',
         (s.extract && s.action !== 'parse_label') ? `${s.extract} ${s.compare || 'equals'} ${s.expected}` : '',
         s.action === 'assert_expr' && s.expr ? `expr: ${s.expr}` : '',
@@ -4480,6 +4501,7 @@ ${containerEl.innerHTML}
     const textField = document.getElementById('lsLabActText');
     const directionField = document.getElementById('lsLabActDirection');
     const secondsField = document.getElementById('lsLabActSeconds');
+    const attributeField = document.getElementById('lsLabActAttribute');
     const extractField = document.getElementById('lsLabActExtract');
     const compareField = document.getElementById('lsLabActCompare');
     const expectedField = document.getElementById('lsLabActExpected');
@@ -4491,6 +4513,7 @@ ${containerEl.innerHTML}
       secondsField.style.display = t === 'wait' ? 'block' : 'none';
       const isAssertValue = t === 'assert_value';
       const isParseLabel = t === 'parse_label';
+      attributeField.style.display = (isAssertValue || isParseLabel) ? 'block' : 'none';
       extractField.style.display = (isAssertValue || isParseLabel) ? 'block' : 'none';
       compareField.style.display = isAssertValue ? 'block' : 'none';
       expectedField.style.display = isAssertValue ? 'block' : 'none';
@@ -4519,12 +4542,19 @@ ${containerEl.innerHTML}
           ? ` — resolved to <code>${escapeHtml(data.resolved_value)}</code>` : '';
         const highlighted = data.found && lsHighlightBoundsOnScreenshot(data.bounds);
         const screenshotHint = (data.found && !highlighted) ? ' — open the screenshot tray above to see it highlighted' : '';
+        // Raw attributes, Appium Inspector's "Selected Element" panel style -
+        // this is what tells you whether assert_value/parse_label should
+        // read "value" or "label" for THIS element, instead of guessing.
+        const attrsTable = (data.found && data.attributes) ? `
+          <div style="margin-top:6px; font-family:var(--mono); font-size:11px; color:var(--paper-dim);">
+            ${Object.entries(data.attributes).map(([k, v]) => `<div>${escapeHtml(k)}: <span style="color:var(--paper);">${escapeHtml(JSON.stringify(v))}</span></div>`).join('')}
+          </div>` : '';
         if (!data.found) {
           statusEl.innerHTML = `<span style="color:var(--alert);">✗ Not found${substitutedNote}</span>`;
         } else if (data.count > 1) {
-          statusEl.innerHTML = `<span style="color:var(--signal);">⚠ Matches ${data.count} elements (ambiguous)${substitutedNote}${screenshotHint}</span>`;
+          statusEl.innerHTML = `<span style="color:var(--signal);">⚠ Matches ${data.count} elements (ambiguous)${substitutedNote}${screenshotHint}</span>${attrsTable}`;
         } else {
-          statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Found${substitutedNote}${screenshotHint}</span>`;
+          statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Found${substitutedNote}${screenshotHint}</span>${attrsTable}`;
         }
       } catch (e) {
         statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
@@ -4544,6 +4574,9 @@ ${containerEl.innerHTML}
       if (actionType === 'type_text') { payload.text = textField.value; step.text = payload.text; }
       if (actionType === 'swipe') { payload.direction = directionField.value; step.direction = payload.direction; }
       if (actionType === 'wait') { payload.seconds = parseFloat(secondsField.value || '1'); step.seconds = payload.seconds; }
+      if (actionType === 'assert_value' || actionType === 'parse_label') {
+        if (attributeField.value) { payload.attribute = attributeField.value; step.attribute = attributeField.value; }
+      }
       if (actionType === 'assert_value') {
         payload.extract = extractField.value; payload.compare = compareField.value; payload.expected = expectedField.value;
         step.extract = payload.extract; step.compare = payload.compare; step.expected = payload.expected;
