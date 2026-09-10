@@ -791,6 +791,13 @@
           </div>
           <div id="lsSwitchAppStatus" style="font-size:12px; margin-top:6px;"></div>
 
+          <div style="display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap;" title="Compares values captured earlier via 'capture value (parse_label)' on any element - including ones on a different app you switched to and back from.">
+            <input id="lsAssertExprInput" placeholder="e.g. health_steps == app_steps" style="flex:1; min-width:220px;">
+            <button class="copy" id="lsAssertExprBtn" style="flex-shrink:0;">Compare captured values</button>
+          </div>
+          <div id="lsContextHint" style="font-size:11px; color:var(--paper-dim); margin-top:4px;">Nothing captured yet - use "capture value (parse_label)" on an element above to save one.</div>
+          <div id="lsAssertExprStatus" style="font-size:12px; margin-top:6px;"></div>
+
           <div id="lsElementListWrap" style="margin-top:14px; display:none;"></div>
         </div>
 
@@ -3072,6 +3079,24 @@ ${containerEl.innerHTML}
   // ---------- locator scraper (no LLM, no agent loop) ----------
   let lsSessionId = null;
   let lsLastElements = [];
+  // Mirrors the session-scoped context dict the server keeps per scrape
+  // session (see scrape_start/scrape_act in server.py) - every parse_label
+  // capture and assert_expr comparison reads/writes the SAME dict on the
+  // backend, across separate /act calls (e.g. capture a value from the
+  // Health app, switch back, capture another, then compare both) - this is
+  // just the client-side mirror so the "Compare captured values" panel can
+  // show what variable names are available to reference.
+  let lsContext = {};
+  function lsUpdateContext(context) {
+    if (!context) return;
+    lsContext = context;
+    const hint = document.getElementById('lsContextHint');
+    if (!hint) return;
+    const keys = Object.keys(lsContext);
+    hint.textContent = keys.length
+      ? 'Captured so far: ' + keys.map(k => `${k}=${JSON.stringify(lsContext[k])}`).join(', ')
+      : 'Nothing captured yet - use "capture value (parse_label)" on an element above to save one.';
+  }
   // key -> {_key, name, tag, label, accessibility_id, ios_class_chain, ios_predicate_string, xpath}
   // Keyed by tag+label rather than the snapshot-local element_id, since
   // that id isn't stable across a fresh "Load locators" call (a new
@@ -3251,7 +3276,8 @@ ${containerEl.innerHTML}
                 <option value="swipe">swipe</option>
                 <option value="wait">wait</option>
                 <option value="assert_visible">assert_visible</option>
-                <option value="assert_value">assert_value</option>` : '';
+                <option value="assert_value">assert_value</option>
+                <option value="parse_label">capture value (parse_label)</option>` : '';
 
     return `
       <details style="margin-top:8px; margin-left:26px;">
@@ -3278,6 +3304,7 @@ ${containerEl.innerHTML}
             <option value="matches">matches</option>
           </select>
           <input class="ls-act-expected" placeholder="expected value" style="display:none; width:auto; flex:1; min-width:100px;">
+          <input class="ls-act-saveas" placeholder="save as (e.g. health_steps)" style="display:none; width:auto; flex:1; min-width:140px;">
           <select class="ls-act-conditional" style="width:auto; flex:0 0 170px;" title="non_conditional_check: this step must find the element - fails the test if it's missing. conditional_check: only act on it if present - e.g. an iOS system alert (notifications/Face ID/save-password) that doesn't always show up - skip without failing when it's missing.">
             <option value="false">non_conditional_check</option>
             <option value="true">conditional_check</option>
@@ -3371,15 +3398,18 @@ ${containerEl.innerHTML}
       const extractField = row.querySelector('.ls-act-extract');
       const compareField = row.querySelector('.ls-act-compare');
       const expectedField = row.querySelector('.ls-act-expected');
+      const saveAsField = row.querySelector('.ls-act-saveas');
       const applyVisibility = () => {
         const t = sel.value;
         textField.style.display = t === 'type_text' ? 'block' : 'none';
         directionField.style.display = t === 'swipe' ? 'block' : 'none';
         secondsField.style.display = t === 'wait' ? 'block' : 'none';
         const isAssertValue = t === 'assert_value';
-        extractField.style.display = isAssertValue ? 'block' : 'none';
+        const isParseLabel = t === 'parse_label';
+        extractField.style.display = (isAssertValue || isParseLabel) ? 'block' : 'none';
         compareField.style.display = isAssertValue ? 'block' : 'none';
         expectedField.style.display = isAssertValue ? 'block' : 'none';
+        saveAsField.style.display = isParseLabel ? 'block' : 'none';
       };
       sel.addEventListener('change', applyVisibility);
       applyVisibility();
@@ -3440,6 +3470,12 @@ ${containerEl.innerHTML}
           step.compare = payload.compare;
           step.expected = payload.expected;
         }
+        if (actionType === 'parse_label') {
+          payload.extract = details.querySelector('.ls-act-extract').value;
+          payload.save_as = details.querySelector('.ls-act-saveas').value.trim();
+          step.extract = payload.extract;
+          step.save_as = payload.save_as;
+        }
 
         btn.disabled = true;
         btn.textContent = 'Running…';
@@ -3456,6 +3492,7 @@ ${containerEl.innerHTML}
           lsCapturedSteps.push(step);
           renderLsCapturedSteps();
           lsRenderElementList(data.elements || []);
+          lsUpdateContext(data.context);
           const via = useLocator ? '' : ` via position (${point.x}, ${point.y})`;
           document.getElementById('lsLoadStatus').innerHTML =
             `<span style="color:var(--circuit);">✓ ${escapeHtml(actionType)} on "${escapeHtml(el.label || el.tag || '')}"${via} recorded — screen refreshed with ${(data.elements || []).length} element(s)</span>`;
@@ -3503,7 +3540,10 @@ ${containerEl.innerHTML}
         s.text != null ? `text="${s.text}"` : '',
         s.direction ? `direction=${s.direction}` : '',
         s.seconds != null ? `${s.seconds}s` : '',
-        s.extract ? `${s.extract} ${s.compare || 'equals'} ${s.expected}` : '',
+        (s.extract && s.action === 'parse_label') ? `${s.extract} → save as "${s.save_as || '(unnamed)'}"` : '',
+        (s.extract && s.action !== 'parse_label') ? `${s.extract} ${s.compare || 'equals'} ${s.expected}` : '',
+        s.action === 'assert_expr' && s.expr ? `expr: ${s.expr}` : '',
+        s.action === 'switch_app' && s.bundle_id ? `bundle_id=${s.bundle_id}` : '',
         (s.x != null && s.y != null && s.x2 != null && s.y2 != null) ? `(${s.x}, ${s.y}) → (${s.x2}, ${s.y2}) — no locator` :
           (s.x != null && s.y != null) ? `by position (${s.x}, ${s.y}) — no locator` : '',
         s.reason ? `AI: ${s.reason}` : '',
@@ -4178,6 +4218,35 @@ ${containerEl.innerHTML}
   document.getElementById('lsBackToAppBtn').addEventListener('click', () => {
     const bundleId = document.getElementById('lsBundleId').value.trim();
     lsRunSwitchApp(bundleId);
+  });
+
+  // Pure context comparison, no element on screen involved - evaluates the
+  // expression against whatever's been captured via parse_label so far
+  // (see ActionExecutor's ASSERT_EXPR branch and _safe_eval's restricted
+  // grammar: comparisons, +-*/, abs/round/min/max/int/float/len/str).
+  document.getElementById('lsAssertExprBtn').addEventListener('click', async () => {
+    if (!lsSessionId) return;
+    const expr = document.getElementById('lsAssertExprInput').value.trim();
+    const statusEl = document.getElementById('lsAssertExprStatus');
+    if (!expr) { statusEl.innerHTML = '<span style="color:var(--signal);">Enter an expression first</span>'; return; }
+    statusEl.textContent = 'Comparing…';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'assert_expr', expr}),
+      });
+      const data = await res.json();
+      if (!res.ok || data.result?.status !== 'ok') {
+        throw new Error(data.error || data.result?.detail || 'comparison failed');
+      }
+      lsUpdateContext(data.context);
+      lsCapturedSteps.push({action: 'assert_expr', expr, label: `assert ${expr}`});
+      renderLsCapturedSteps();
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ ${escapeHtml(data.result.detail)} - recorded</span>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    }
   });
 
   document.getElementById('lsDisconnectBtn').addEventListener('click', async () => {
