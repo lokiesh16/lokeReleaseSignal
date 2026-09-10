@@ -4373,6 +4373,13 @@ ${containerEl.innerHTML}
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed to connect');
       lsSessionId = data.session_id;
+      // A fresh session always starts with an empty context server-side
+      // (see scrape_start) - resetting the client mirror here too, instead
+      // of leaving whatever a PREVIOUS session captured, is what stops
+      // "Captured so far" from showing a variable that looks available but
+      // no longer exists server-side (a NameError waiting to happen the
+      // moment anything tries to actually use it).
+      lsUpdateContext({});
       document.getElementById('lsConnectCard').style.display = 'none';
       document.getElementById('lsActiveCard').style.display = 'block';
       document.getElementById('lsEditFlowCard').style.display = 'block';
@@ -4626,6 +4633,9 @@ ${containerEl.innerHTML}
     lsScreenshotWindowSize = null;
     lsScreenshotPoint = null;
     document.getElementById('lsEditFlowCard').style.display = 'none';
+    // The session (and its server-side context) is gone - stop showing
+    // "Captured so far" values a NEXT session won't actually have.
+    lsUpdateContext({});
     // Keep the Captured Steps card (and whatever's already recorded in it)
     // visible across a disconnect - only hide it back if nothing was ever
     // captured this session, matching what it did before switch_app/the
