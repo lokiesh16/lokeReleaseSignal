@@ -962,6 +962,7 @@
       </div>
 
       <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Recorded steps</div>
+      <div id="lsStepRunStatus" style="font-size:12px; margin-bottom:6px;"></div>
       <div id="lsCapturedList" class="empty-hint">Click <b>Act</b> on an element above, run an action, and it'll show up here.</div>
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
         <button class="copy" id="lsClearCapturedBtn" style="background:var(--ink-line); color:var(--paper); padding:6px 10px; font-size:11.5px;">Clear all</button>
@@ -3630,6 +3631,7 @@ ${containerEl.innerHTML}
   const LS_ICON_EDIT = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`;
   const LS_ICON_EXPORT = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
   const LS_ICON_TRASH = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
+  const LS_ICON_PLAY = `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
 
   // One accent hue per action family - a flow reads as a sequence of
   // colored beats (typing is violet, taps are blue, assertions are teal,
@@ -3743,6 +3745,7 @@ ${containerEl.innerHTML}
               ${statusTags ? `<span style="display:flex; gap:4px; flex-shrink:0;">${statusTags}</span>` : ''}
             </span>
             <div style="display:flex; gap:2px; flex-shrink:0;">
+              <button class="ls-icon-btn ls-step-run-btn" data-step-idx="${i}" title="Run this step now against the live session - catches up context (parse_label/switch_app/etc.) without re-recording it, so a later step you're testing has something real to work with." style="--ls-icon-hover:var(--signal);">${LS_ICON_PLAY}</button>
               <button class="ls-icon-btn ls-step-edit-toggle" data-step-idx="${i}" title="Edit locator, note, optional/split" style="--ls-icon-hover:var(--paper);">${LS_ICON_EDIT}</button>
               ${canExport ? `<button class="ls-icon-btn" data-export-step="${i}" title="Copy this to Selected for export" style="--ls-icon-hover:var(--circuit);">${LS_ICON_EXPORT}</button>` : ''}
               <button class="ls-icon-btn" data-remove-step="${i}" title="Remove" style="--ls-icon-hover:var(--alert);">${LS_ICON_TRASH}</button>
@@ -3770,6 +3773,39 @@ ${containerEl.innerHTML}
       btn.addEventListener('click', () => {
         const panel = listEl.querySelector(`.ls-step-edit-panel[data-step-panel="${btn.dataset.stepIdx}"]`);
         panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+      });
+    });
+    listEl.querySelectorAll('.ls-step-run-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!lsSessionId) return;
+        const i = Number(btn.dataset.stepIdx);
+        const s = lsCapturedSteps[i];
+        const statusEl = document.getElementById('lsStepRunStatus');
+        statusEl.innerHTML = `<span style="color:var(--paper-dim);">Running step ${i + 1} (${escapeHtml(s.action)})…</span>`;
+        try {
+          // Re-executes the step exactly as recorded (its own action/locator/
+          // text/etc.) against the CURRENT live screen - doesn't append a
+          // duplicate to the list, just catches the session's context up to
+          // wherever this step is (e.g. a parse_label re-run puts its
+          // save_as value back in "Captured so far"), so a later step you're
+          // editing/testing has something real to compare against without
+          // re-doing everything from scratch through the tools above.
+          const payload = {...s};
+          delete payload.label; delete payload.description; delete payload.optional; delete payload.splitBefore; delete payload.tag;
+          const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'action failed');
+          if (data.result && data.result.status !== 'ok') throw new Error(data.result.detail || 'action failed');
+          lsUpdateContext(data.context);
+          lsRenderElementList(data.elements || []);
+          statusEl.innerHTML = `<span style="color:var(--circuit);">✓ step ${i + 1}: ${escapeHtml(data.result.detail)}</span>`;
+        } catch (e) {
+          statusEl.innerHTML = `<span style="color:var(--alert);">step ${i + 1} failed: ${escapeHtml(e.message)}</span>`;
+        }
       });
     });
     listEl.querySelectorAll('[data-step-description]').forEach(input => {
