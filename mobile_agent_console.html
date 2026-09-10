@@ -796,72 +796,12 @@
           </div>
           <div id="lsLoadStatus" style="font-size:12px; margin-top:8px;"></div>
 
-          <div style="display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap;">
-            <select id="lsSwitchAppPreset" style="flex-shrink:0; width:auto;">
-              <option value="com.apple.Health">Apple Health</option>
-              <option value="com.apple.Preferences">Settings</option>
-              <option value="__custom__">Custom bundle id…</option>
-            </select>
-            <input id="lsSwitchAppCustom" placeholder="com.example.app" style="display:none; flex:1; min-width:160px;">
-            <button class="copy" id="lsSwitchAppBtn" style="flex-shrink:0;">Switch app</button>
-            <button class="copy" id="lsBackToAppBtn" style="flex-shrink:0; background:var(--ink-line); color:var(--paper);">Back to app under test</button>
-          </div>
-          <div id="lsSwitchAppStatus" style="font-size:12px; margin-top:6px;"></div>
-
           <div style="display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap;" title="Compares values captured earlier via 'capture value (parse_label)' on any element - including ones on a different app you switched to and back from.">
             <input id="lsAssertExprInput" placeholder="e.g. health_steps == app_steps" style="flex:1; min-width:220px;">
             <button class="copy" id="lsAssertExprBtn" style="flex-shrink:0;">Compare captured values</button>
           </div>
           <div id="lsContextHint" style="font-size:11px; color:var(--paper-dim); margin-top:4px;">Nothing captured yet - use "capture value (parse_label)" on an element above to save one.</div>
           <div id="lsAssertExprStatus" style="font-size:12px; margin-top:6px;"></div>
-
-          <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--ink-line);">
-            <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Build &amp; test a locator</div>
-            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-              <select id="lsLabStrategy" style="width:auto; flex:0 0 165px;">
-                <option value="accessibility id">accessibility id</option>
-                <option value="xpath">xpath</option>
-                <option value="class name">class name</option>
-                <option value="-ios predicate string">-ios predicate string</option>
-                <option value="-ios class chain">-ios class chain</option>
-                <option value="id">id</option>
-              </select>
-              <input id="lsLabValue" placeholder='e.g. //XCUIElementTypeStaticText[@name=&quot;{{stepsFromApple}} steps&quot;]' style="flex:1; min-width:220px; font-family:var(--mono); font-size:11.5px;" title="{{expr}} tokens get substituted with a value captured earlier via parse_label (see 'Captured so far' above) before this locator is tested or acted on.">
-              <button class="copy" id="lsLabTestBtn" style="flex-shrink:0;">Test locator</button>
-            </div>
-            <div id="lsLabTestStatus" style="font-size:12px; margin-top:6px;"></div>
-
-            <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:10px;">
-              <select id="lsLabActType" style="width:auto; flex:0 0 130px;">
-                <option value="tap">tap</option>
-                <option value="type_text">type_text</option>
-                <option value="clear">clear</option>
-                <option value="swipe">swipe</option>
-                <option value="wait">wait</option>
-                <option value="assert_visible">assert_visible</option>
-                <option value="assert_value">assert_value</option>
-                <option value="parse_label">capture value (parse_label)</option>
-              </select>
-              <input id="lsLabActText" placeholder="text to type" style="display:none; width:auto; flex:1; min-width:120px;">
-              <select id="lsLabActDirection" style="display:none; width:auto; flex:0 0 100px;">
-                <option value="up">up</option><option value="down">down</option><option value="left">left</option><option value="right">right</option>
-              </select>
-              <input id="lsLabActSeconds" type="number" step="0.5" placeholder="seconds" style="display:none; width:auto; flex:0 0 90px;">
-              <select id="lsLabActExtract" style="display:none; width:auto; flex:0 0 130px;">
-                <option value="text">text</option><option value="number">number</option><option value="duration_seconds">duration_seconds</option>
-              </select>
-              <select id="lsLabActCompare" style="display:none; width:auto; flex:0 0 150px;">
-                <option value="equals">equals</option><option value="not_equals">not_equals</option><option value="contains">contains</option>
-                <option value="greater_than">greater_than</option><option value="less_than">less_than</option>
-                <option value="greater_than_or_equal">greater_than_or_equal</option><option value="less_than_or_equal">less_than_or_equal</option>
-                <option value="matches">matches</option>
-              </select>
-              <input id="lsLabActExpected" placeholder="expected value" style="display:none; width:auto; flex:1; min-width:100px;">
-              <input id="lsLabActSaveAs" placeholder="save as (e.g. stepsFromApp)" style="display:none; width:auto; flex:1; min-width:140px;">
-              <button class="copy" id="lsLabActRunBtn" style="flex-shrink:0;">Do it + Record</button>
-            </div>
-            <div id="lsLabActStatus" style="font-size:12px; margin-top:6px;"></div>
-          </div>
 
           <div id="lsElementListWrap" style="margin-top:14px; display:none;"></div>
         </div>
@@ -911,6 +851,73 @@
         <span style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600;">Captured steps</span>
         <span class="hint" id="lsCapturedCount" style="font-size:11px;">0 step(s)</span>
       </div>
+
+      <!-- Flow-scoped tools: switching the foreground app and hand-testing a
+           locator both only make sense as a step of THIS flow you're
+           building/editing - not as generic controls floating above whatever
+           happens to be on screen, which is why they live here rather than in
+           the always-visible "Connected" card above. -->
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <select id="lsSwitchAppPreset" style="flex-shrink:0; width:auto;">
+          <option value="com.apple.Health">Apple Health</option>
+          <option value="com.apple.Preferences">Settings</option>
+          <option value="__custom__">Custom bundle id…</option>
+        </select>
+        <input id="lsSwitchAppCustom" placeholder="com.example.app" style="display:none; flex:1; min-width:160px;">
+        <button class="copy" id="lsSwitchAppBtn" style="flex-shrink:0;">Switch app</button>
+        <button class="copy" id="lsBackToAppBtn" style="flex-shrink:0; background:var(--ink-line); color:var(--paper);">Back to app under test</button>
+      </div>
+      <div id="lsSwitchAppStatus" style="font-size:12px; margin-top:6px;"></div>
+
+      <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--ink-line);">
+        <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Build &amp; test a locator</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <select id="lsLabStrategy" style="width:auto; flex:0 0 165px;">
+            <option value="accessibility id">accessibility id</option>
+            <option value="xpath">xpath</option>
+            <option value="class name">class name</option>
+            <option value="-ios predicate string">-ios predicate string</option>
+            <option value="-ios class chain">-ios class chain</option>
+            <option value="id">id</option>
+          </select>
+          <input id="lsLabValue" placeholder='e.g. //XCUIElementTypeStaticText[@name=&quot;{{stepsFromApple}} steps&quot;]' style="flex:1; min-width:220px; font-family:var(--mono); font-size:11.5px;" title="{{expr}} tokens get substituted with a value captured earlier via parse_label (see 'Captured so far' above) before this locator is tested or acted on.">
+          <button class="copy" id="lsLabTestBtn" style="flex-shrink:0;">Test locator</button>
+        </div>
+        <div id="lsLabTestStatus" style="font-size:12px; margin-top:6px;"></div>
+
+        <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:10px;">
+          <select id="lsLabActType" style="width:auto; flex:0 0 130px;">
+            <option value="tap">tap</option>
+            <option value="type_text">type_text</option>
+            <option value="clear">clear</option>
+            <option value="swipe">swipe</option>
+            <option value="wait">wait</option>
+            <option value="assert_visible">assert_visible</option>
+            <option value="assert_value">assert_value</option>
+            <option value="parse_label">capture value (parse_label)</option>
+          </select>
+          <input id="lsLabActText" placeholder="text to type" style="display:none; width:auto; flex:1; min-width:120px;">
+          <select id="lsLabActDirection" style="display:none; width:auto; flex:0 0 100px;">
+            <option value="up">up</option><option value="down">down</option><option value="left">left</option><option value="right">right</option>
+          </select>
+          <input id="lsLabActSeconds" type="number" step="0.5" placeholder="seconds" style="display:none; width:auto; flex:0 0 90px;">
+          <select id="lsLabActExtract" style="display:none; width:auto; flex:0 0 130px;">
+            <option value="text">text</option><option value="number">number</option><option value="duration_seconds">duration_seconds</option>
+          </select>
+          <select id="lsLabActCompare" style="display:none; width:auto; flex:0 0 150px;">
+            <option value="equals">equals</option><option value="not_equals">not_equals</option><option value="contains">contains</option>
+            <option value="greater_than">greater_than</option><option value="less_than">less_than</option>
+            <option value="greater_than_or_equal">greater_than_or_equal</option><option value="less_than_or_equal">less_than_or_equal</option>
+            <option value="matches">matches</option>
+          </select>
+          <input id="lsLabActExpected" placeholder="expected value" style="display:none; width:auto; flex:1; min-width:100px;">
+          <input id="lsLabActSaveAs" placeholder="save as (e.g. stepsFromApp)" style="display:none; width:auto; flex:1; min-width:140px;">
+          <button class="copy" id="lsLabActRunBtn" style="flex-shrink:0;">Do it + Record</button>
+        </div>
+        <div id="lsLabActStatus" style="font-size:12px; margin-top:6px;"></div>
+      </div>
+
+      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--ink-line);"></div>
       <div id="lsCapturedList" class="empty-hint">Click <b>Act</b> on an element above, run an action, and it'll show up here.</div>
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
         <button class="copy" id="lsClearCapturedBtn" style="background:var(--ink-line); color:var(--paper); padding:6px 10px; font-size:11.5px;">Clear all</button>
@@ -3603,10 +3610,12 @@ ${containerEl.innerHTML}
   function lsActionAccent(action) { return LS_ACTION_ACCENTS[action] || LS_ACTION_ACCENT_DEFAULT; }
 
   function renderLsCapturedSteps() {
-    const card = document.getElementById('lsCapturedCard');
+    // Card visibility is owned by the connect/disconnect handlers now (it's
+    // where switch_app/the locator lab live, so it needs to be reachable
+    // from the moment you connect, before any step exists) - this function
+    // only ever fills in its *contents*.
     const countEl = document.getElementById('lsCapturedCount');
     const listEl = document.getElementById('lsCapturedList');
-    card.style.display = lsCapturedSteps.length ? 'block' : 'none';
     countEl.textContent = `${lsCapturedSteps.length} step(s)`;
     if (!lsCapturedSteps.length) {
       listEl.className = 'empty-hint';
@@ -4241,6 +4250,14 @@ ${containerEl.innerHTML}
       document.getElementById('lsConnectCard').style.display = 'none';
       document.getElementById('lsActiveCard').style.display = 'block';
       document.getElementById('lsEditFlowCard').style.display = 'block';
+      // Shown from the moment you connect, not just after the first
+      // recorded step - switch_app/the locator lab live inside this card
+      // now (see the "flow-scoped tools" comment above them), and both
+      // need to be reachable even for the very first step of a brand-new
+      // flow. renderLsCapturedSteps() only ever touches its *contents*
+      // (the 0-steps empty-hint vs the real list) from here on, never this
+      // visibility.
+      document.getElementById('lsCapturedCard').style.display = 'block';
       populateLsEditTargetSelect();
     } catch (e) {
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
@@ -4471,6 +4488,13 @@ ${containerEl.innerHTML}
     lsScreenshotWindowSize = null;
     lsScreenshotPoint = null;
     document.getElementById('lsEditFlowCard').style.display = 'none';
+    // Keep the Captured Steps card (and whatever's already recorded in it)
+    // visible across a disconnect - only hide it back if nothing was ever
+    // captured this session, matching what it did before switch_app/the
+    // locator lab moved in (no in-progress flow to preserve, nothing to show).
+    if (!lsCapturedSteps.length) {
+      document.getElementById('lsCapturedCard').style.display = 'none';
+    }
   });
 
   // ---------- "tap anywhere" screenshot fallback (no accessibility node needed at all) ----------
