@@ -266,6 +266,23 @@
   button.copy.copied { background: var(--circuit); color: #ffffff; }
   button.copy:disabled { opacity: 0.55; cursor: default; filter: none; box-shadow: none; }
 
+  /* Quiet icon-only button for inline row actions (captured-steps edit/
+     export/remove) - deliberately NOT button.copy's bold amber CTA style,
+     since a row of these next to each recorded step should read as small
+     utility controls, not a wall of primary buttons competing for
+     attention. --ls-icon-hover (set per-button) tints both the icon and
+     the hover wash to match what the action means (teal=export, red=
+     remove), rather than every icon looking identical regardless of what
+     it does. */
+  .ls-icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; padding: 0; border-radius: 6px;
+    background: none; border: 1px solid transparent; color: var(--paper-dim);
+    cursor: pointer; transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+  .ls-icon-btn:hover { background: color-mix(in srgb, var(--ls-icon-hover, var(--paper)) 12%, transparent); color: var(--ls-icon-hover, var(--paper)); border-color: color-mix(in srgb, var(--ls-icon-hover, var(--paper)) 30%, transparent); }
+  .ls-icon-btn:active { transform: translateY(1px); }
+
   .note {
     font-size: 12px;
     color: var(--paper-dim);
@@ -3505,6 +3522,38 @@ ${containerEl.innerHTML}
     });
   }
 
+  // Small inline-SVG icon set (Feather-style line icons, MIT-licensed
+  // shapes hand-copied so the console stays a single offline file with no
+  // CDN dependency) - swapped in for the old plain-unicode glyphs (⠿ ✎ ⬇ ✕)
+  // which rendered inconsistently across platforms/fonts and read as an
+  // afterthought rather than a deliberately designed control.
+  const LS_ICON_GRIP = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3" r="1.3"/><circle cx="11" cy="3" r="1.3"/><circle cx="5" cy="8" r="1.3"/><circle cx="11" cy="8" r="1.3"/><circle cx="5" cy="13" r="1.3"/><circle cx="11" cy="13" r="1.3"/></svg>`;
+  const LS_ICON_EDIT = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>`;
+  const LS_ICON_EXPORT = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+  const LS_ICON_TRASH = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
+
+  // One accent hue per action family - a flow reads as a sequence of
+  // colored beats (typing is violet, taps are blue, assertions are teal,
+  // ...) instead of a wall of identical gray pills, which is most of what
+  // made the list feel flat rather than a difference in information
+  // density.
+  const LS_ACTION_ACCENTS = {
+    tap: {fg: '#1D4ED8', bg: '#DBEAFE'},
+    type_text: {fg: '#6D28D9', bg: '#EDE9FE'},
+    clear: {fg: '#6D28D9', bg: '#EDE9FE'},
+    swipe: {fg: '#0E7490', bg: '#CFFAFE'},
+    wait: {fg: '#57606A', bg: '#F1F2F4'},
+    back: {fg: '#57606A', bg: '#F1F2F4'},
+    assert_visible: {fg: '#0D9488', bg: '#CCFBF1'},
+    assert_value: {fg: '#0D9488', bg: '#CCFBF1'},
+    assert_expr: {fg: '#0D9488', bg: '#CCFBF1'},
+    parse_label: {fg: '#4338CA', bg: '#E0E7FF'},
+    compute: {fg: '#4338CA', bg: '#E0E7FF'},
+    switch_app: {fg: '#B45309', bg: '#FDE9C8'},
+  };
+  const LS_ACTION_ACCENT_DEFAULT = {fg: '#57606A', bg: '#F1F2F4'};
+  function lsActionAccent(action) { return LS_ACTION_ACCENTS[action] || LS_ACTION_ACCENT_DEFAULT; }
+
   function renderLsCapturedSteps() {
     const card = document.getElementById('lsCapturedCard');
     const countEl = document.getElementById('lsCapturedCount');
@@ -3576,27 +3625,26 @@ ${containerEl.innerHTML}
       // toggle below, instead of every step permanently taking 6-8 rows of
       // mostly-empty inputs whether or not there's anything to edit on it.
       const statusTags = [
-        s.optional ? `<span title="Optional - won't fail the test if this element isn't present" style="font-size:10px; color:var(--paper-dim); border:1px solid var(--ink-line); border-radius:8px; padding:0 6px;">optional</span>` : '',
+        s.optional ? `<span title="Optional - won't fail the test if this element isn't present" style="font-size:10px; font-weight:600; color:var(--signal); border:1px solid var(--signal); border-radius:8px; padding:0 6px;">optional</span>` : '',
         (s.splitBefore && i > 0) ? `<span title="${escapeHtml(splitLabel)}" style="font-size:10px; color:var(--circuit); border:1px solid var(--circuit); border-radius:8px; padding:0 6px;">✂ split</span>` : '',
         s.description ? `<span title="${escapeHtml(s.description)}" style="font-size:10px; color:var(--paper-dim);">📝</span>` : '',
       ].filter(Boolean).join(' ');
+      const accent = lsActionAccent(s.action);
       return `
         ${insertDivider(i)}
-        <div class="ls-step-row" data-step-idx="${i}" style="padding:7px 10px; border:1px solid var(--ink-line); ${(s.splitBefore && i > 0) ? 'border-top:2px solid var(--circuit);' : ''} border-radius:7px; margin:4px 0;">
+        <div class="ls-step-row" data-step-idx="${i}" style="padding:8px 10px; border:1px solid var(--ink-line); border-left:3px solid ${accent.fg}; ${(s.splitBefore && i > 0) ? 'border-top:2px solid var(--circuit);' : ''} border-radius:7px; margin:4px 0; background:var(--ink-raised); box-shadow:0 1px 2px rgba(16,20,28,0.04); transition:box-shadow .15s ease;">
           <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
             <span style="display:flex; align-items:center; gap:7px; min-width:0; flex:1; font-size:12.5px;">
-              <span class="ls-step-drag-handle" data-step-idx="${i}" draggable="true" title="Drag to reorder" style="cursor:grab; color:var(--paper-dim); user-select:none; flex-shrink:0;">⠿</span>
+              <span class="ls-step-drag-handle" data-step-idx="${i}" draggable="true" title="Drag to reorder" style="display:flex; cursor:grab; color:var(--paper-dim); user-select:none; flex-shrink:0;">${LS_ICON_GRIP}</span>
               <span style="color:var(--paper-dim); flex-shrink:0;">${i + 1}.</span>
-              <span style="font-family:var(--mono); font-size:11px; background:var(--ink-line); color:var(--paper); padding:2px 7px; border-radius:4px; flex-shrink:0;">${escapeHtml(s.action)}</span>
+              <span style="font-family:var(--mono); font-size:10.5px; font-weight:600; background:${accent.bg}; color:${accent.fg}; padding:2px 7px; border-radius:4px; flex-shrink:0;">${escapeHtml(s.action)}</span>
               <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(s.label || '')}">${escapeHtml(s.label || '(no label)')}</span>
               ${statusTags ? `<span style="display:flex; gap:4px; flex-shrink:0;">${statusTags}</span>` : ''}
             </span>
-            <div style="display:flex; gap:4px; flex-shrink:0;">
-              <button class="copy ls-step-edit-toggle" data-step-idx="${i}" title="Edit locator, note, optional/split" style="background:var(--ink-line); color:var(--paper); padding:4px 8px; font-size:11px;">✎</button>
-              <button class="copy" data-move-step-up="${i}" ${i === 0 ? 'disabled' : ''} title="Move up" style="background:var(--ink-line); color:var(--paper); padding:4px 8px; font-size:11px;">↑</button>
-              <button class="copy" data-move-step-down="${i}" ${i === lsCapturedSteps.length - 1 ? 'disabled' : ''} title="Move down" style="background:var(--ink-line); color:var(--paper); padding:4px 8px; font-size:11px;">↓</button>
-              ${canExport ? `<button class="copy" data-export-step="${i}" title="Copy this to Selected for export" style="background:var(--ink-line); color:var(--paper); padding:4px 8px; font-size:11px;">⬇</button>` : ''}
-              <button class="copy" data-remove-step="${i}" title="Remove" style="background:var(--ink-line); color:var(--paper); padding:4px 8px; font-size:11px;">✕</button>
+            <div style="display:flex; gap:2px; flex-shrink:0;">
+              <button class="ls-icon-btn ls-step-edit-toggle" data-step-idx="${i}" title="Edit locator, note, optional/split" style="--ls-icon-hover:var(--paper);">${LS_ICON_EDIT}</button>
+              ${canExport ? `<button class="ls-icon-btn" data-export-step="${i}" title="Copy this to Selected for export" style="--ls-icon-hover:var(--circuit);">${LS_ICON_EXPORT}</button>` : ''}
+              <button class="ls-icon-btn" data-remove-step="${i}" title="Remove" style="--ls-icon-hover:var(--alert);">${LS_ICON_TRASH}</button>
             </div>
           </div>
           ${detail ? `<div style="margin-left:23px; font-size:11px; color:var(--paper-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(detail)}">${escapeHtml(detail)}</div>` : ''}
@@ -3676,20 +3724,6 @@ ${containerEl.innerHTML}
     listEl.querySelectorAll('[data-remove-step]').forEach(btn => {
       btn.addEventListener('click', () => {
         lsCapturedSteps.splice(Number(btn.dataset.removeStep), 1);
-        renderLsCapturedSteps();
-      });
-    });
-    listEl.querySelectorAll('[data-move-step-up]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const i = Number(btn.dataset.moveStepUp);
-        [lsCapturedSteps[i - 1], lsCapturedSteps[i]] = [lsCapturedSteps[i], lsCapturedSteps[i - 1]];
-        renderLsCapturedSteps();
-      });
-    });
-    listEl.querySelectorAll('[data-move-step-down]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const i = Number(btn.dataset.moveStepDown);
-        [lsCapturedSteps[i], lsCapturedSteps[i + 1]] = [lsCapturedSteps[i + 1], lsCapturedSteps[i]];
         renderLsCapturedSteps();
       });
     });
