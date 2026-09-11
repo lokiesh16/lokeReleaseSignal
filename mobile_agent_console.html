@@ -820,7 +820,7 @@
       <div style="flex:1; min-width:0;">
         <div class="card" id="lsBugScanResultsCard" style="display:none;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
-            <span style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600;">Bug scanner <span id="lsBugScanCount" style="color:var(--paper-dim); font-weight:400; text-transform:none; letter-spacing:0;"></span></span>
+            <span style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600;">Bug scanner</span>
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="copy" id="lsBugScanClearBtn" style="display:none; background:var(--ink-line); color:var(--paper); padding:5px 12px; font-size:11.5px; flex-shrink:0;" title="Starts a fresh multi-screen report - use this when beginning a new goal/flow so old screens don't linger in the same report">Clear</button>
               <button class="copy" id="lsBugScanExportBtn" style="display:none; background:var(--ink-line); color:var(--paper); padding:5px 12px; font-size:11.5px; flex-shrink:0;">Export report (.html)</button>
@@ -829,6 +829,11 @@
           </div>
           <div id="lsBugScanScanStatus" style="font-size:12px; margin-bottom:8px;"></div>
           <div id="lsBugScanPublishStatus" style="font-size:12px; margin-bottom:8px;"></div>
+          <div style="display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:10px;">
+            <button class="copy" id="lsBugScanPrevBtn" style="padding:6px 16px; font-size:13px; background:var(--ink-line); color:var(--paper);">◀</button>
+            <span id="lsBugScanNavLabel" style="font-size:12.5px; font-weight:600; color:var(--paper-dim); min-width:64px; text-align:center;"></span>
+            <button class="copy" id="lsBugScanNextBtn" style="padding:6px 16px; font-size:13px; background:var(--ink-line); color:var(--paper);">▶</button>
+          </div>
           <div id="lsBugScanResults"></div>
         </div>
 
@@ -4987,10 +4992,65 @@ ${containerEl.innerHTML}
   // lsCapturedSteps itself doesn't distinguish where a step came from
   // either. "Clear" is the only thing that resets it - starting a new
   // goal/flow doesn't, since a human decides when one flow's report ends
-  // and the next begins.
+  // and the next begins. Browsed as a carousel (one screen at a time,
+  // "N of M" + prev/next/swipe) rather than an endless vertical scroll -
+  // a "Summary" slide (total taps + aggregate feedback) is always the
+  // last one, past every scanned screen.
   let lsBugScanHistory = [];
+  let lsBugScanIndex = 0; // which slide is showing - 0..history.length-1 are screens, history.length is Summary
 
-  function lsRenderBugScanEntry(data, screenNum) {
+  const LS_BUG_SCAN_INTERACTION_ACTIONS = new Set(['tap', 'type_text', 'clear', 'swipe', 'back']);
+
+  function lsBugScanTotalSlides() {
+    return lsBugScanHistory.length ? lsBugScanHistory.length + 1 : 0;
+  }
+
+  function lsRenderBugScanSummarySlide() {
+    const totalTaps = lsCapturedSteps.filter(s => LS_BUG_SCAN_INTERACTION_ACTIONS.has(s.action)).length;
+    const last = lsBugScanHistory[lsBugScanHistory.length - 1] || {};
+    const fe = last.flow_efficiency;
+    const goal = (lsBugScanHistory[0] && lsBugScanHistory[0].scanGoal) || '';
+    const avgScore = lsBugScanHistory.length
+      ? Math.round(lsBugScanHistory.reduce((sum, d) => sum + (d.overall_score || 0), 0) / lsBugScanHistory.length)
+      : null;
+    const sevCounts = {high: 0, medium: 0, low: 0};
+    lsBugScanHistory.forEach(d => (d.issues || []).forEach(iss => {
+      if (sevCounts[iss.severity] !== undefined) sevCounts[iss.severity]++;
+    }));
+
+    return `
+      <div style="padding:10px 4px 4px; text-align:center;">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--paper-dim); margin-bottom:16px;">Summary</div>
+        ${goal ? `<div style="font-size:14px; font-weight:600; margin-bottom:20px;">${escapeHtml(goal)}</div>` : ''}
+        <div style="display:flex; justify-content:center; gap:32px; margin-bottom:20px; flex-wrap:wrap;">
+          <div>
+            <div style="font-size:30px; font-weight:800; color:${fe ? (LS_FLOW_VERDICT_COLOR[fe.verdict] || 'var(--paper-dim)') : 'var(--paper-dim)'};">${totalTaps}</div>
+            <div style="font-size:9.5px; color:var(--paper-dim); text-transform:uppercase; letter-spacing:0.03em;">total taps</div>
+          </div>
+          <div>
+            <div style="font-size:30px; font-weight:800; color:${lsScoreColor(avgScore)};">${avgScore ?? '—'}</div>
+            <div style="font-size:9.5px; color:var(--paper-dim); text-transform:uppercase; letter-spacing:0.03em;">avg score</div>
+          </div>
+          <div>
+            <div style="font-size:30px; font-weight:800; color:var(--paper);">${lsBugScanHistory.length}</div>
+            <div style="font-size:9.5px; color:var(--paper-dim); text-transform:uppercase; letter-spacing:0.03em;">screens</div>
+          </div>
+        </div>
+        ${fe ? `
+          <div style="max-width:460px; margin:0 auto 16px; text-align:left; border:1px solid var(--ink-line); border-radius:8px; padding:12px;">
+            <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:${LS_FLOW_VERDICT_COLOR[fe.verdict] || 'var(--paper-dim)'}; margin-bottom:4px;">${escapeHtml(fe.verdict || '')} — took ${totalTaps} tap${totalTaps === 1 ? '' : 's'} to reach the goal</div>
+            <div style="font-size:13px; color:var(--paper);">${escapeHtml(fe.feedback || '')}</div>
+          </div>` : ''}
+        <div style="font-size:12.5px; color:var(--paper-dim);">${sevCounts.high} high · ${sevCounts.medium} medium · ${sevCounts.low} low severity issue(s) found across ${lsBugScanHistory.length} screen${lsBugScanHistory.length === 1 ? '' : 's'}</div>
+      </div>`;
+  }
+
+  function lsRenderBugScanEntry(data, screenNum, isFirst) {
+    const goalHeadline = isFirst && data.scanGoal ? `
+      <div style="text-align:center; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid var(--ink-line);">
+        <div style="font-size:9.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); margin-bottom:4px;">Goal</div>
+        <div style="font-size:15px; font-weight:700; color:var(--paper);">${escapeHtml(data.scanGoal)}</div>
+      </div>` : '';
     const scores = data.scores || {};
     const scoreBadges = ['visual_design', 'usability', 'accessibility', 'consistency'].map(key => `
       <div style="text-align:center;">
@@ -5033,7 +5093,8 @@ ${containerEl.innerHTML}
       : '';
 
     return `
-      <div style="border:1px solid var(--ink-line); border-radius:10px; padding:14px; margin-bottom:14px;">
+      <div style="border:1px solid var(--ink-line); border-radius:10px; padding:14px;">
+        ${goalHeadline}
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
           <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:var(--paper-dim);">Screen ${screenNum}</span>
           <span style="font-size:10.5px; color:var(--paper-dim);">${new Date().toLocaleTimeString()}</span>
@@ -5056,29 +5117,72 @@ ${containerEl.innerHTML}
       </div>`;
   }
 
-  function lsAppendBugScanEntry(data) {
+  function lsRenderBugScanCurrentSlide() {
+    const total = lsBugScanTotalSlides();
+    const slideEl = document.getElementById('lsBugScanResults');
+    if (!total) {
+      slideEl.innerHTML = '';
+      return;
+    }
+    slideEl.innerHTML = lsBugScanIndex < lsBugScanHistory.length
+      ? lsRenderBugScanEntry(lsBugScanHistory[lsBugScanIndex], lsBugScanIndex + 1, lsBugScanIndex === 0)
+      : lsRenderBugScanSummarySlide();
+    document.getElementById('lsBugScanNavLabel').textContent = `${lsBugScanIndex + 1} of ${total}`;
+    document.getElementById('lsBugScanPrevBtn').disabled = lsBugScanIndex === 0;
+    document.getElementById('lsBugScanNextBtn').disabled = lsBugScanIndex === total - 1;
+  }
+
+  function lsAppendBugScanEntry(data, goalUsed) {
+    const prevTotal = lsBugScanTotalSlides();
+    // "Following live": was already viewing the last screen or the
+    // Summary slide - jump to the new Summary position so watching an AI
+    // run auto-advances. Someone paused on an earlier screen stays put;
+    // the nav label's "of M" still updates either way.
+    const wasFollowingLive = prevTotal === 0 || lsBugScanIndex >= prevTotal - 2;
+    data.scanGoal = goalUsed || '';
     lsBugScanHistory.push(data);
+    if (wasFollowingLive) lsBugScanIndex = lsBugScanHistory.length; // the new Summary slide
     document.getElementById('lsBugScanResultsCard').style.display = 'block';
-    document.getElementById('lsBugScanCount').textContent =
-      `— ${lsBugScanHistory.length} screen${lsBugScanHistory.length === 1 ? '' : 's'}`;
     document.getElementById('lsBugScanClearBtn').style.display = 'block';
     document.getElementById('lsBugScanExportBtn').style.display = 'block';
     document.getElementById('lsBugScanPublishBtn').style.display = 'block';
     document.getElementById('lsBugScanPublishStatus').textContent = '';
-    document.getElementById('lsBugScanResults')
-      .insertAdjacentHTML('beforeend', lsRenderBugScanEntry(data, lsBugScanHistory.length));
+    lsRenderBugScanCurrentSlide();
   }
 
   document.getElementById('lsBugScanClearBtn').addEventListener('click', () => {
     lsBugScanHistory = [];
+    lsBugScanIndex = 0;
     document.getElementById('lsBugScanResults').innerHTML = '';
+    document.getElementById('lsBugScanNavLabel').textContent = '';
     document.getElementById('lsBugScanResultsCard').style.display = 'none';
-    document.getElementById('lsBugScanCount').textContent = '';
     document.getElementById('lsBugScanClearBtn').style.display = 'none';
     document.getElementById('lsBugScanExportBtn').style.display = 'none';
     document.getElementById('lsBugScanPublishBtn').style.display = 'none';
     document.getElementById('lsBugScanPublishStatus').textContent = '';
   });
+
+  document.getElementById('lsBugScanPrevBtn').addEventListener('click', () => {
+    if (lsBugScanIndex > 0) { lsBugScanIndex--; lsRenderBugScanCurrentSlide(); }
+  });
+  document.getElementById('lsBugScanNextBtn').addEventListener('click', () => {
+    if (lsBugScanIndex < lsBugScanTotalSlides() - 1) { lsBugScanIndex++; lsRenderBugScanCurrentSlide(); }
+  });
+  // Real swipe, not just the prev/next buttons - a left swipe reads as
+  // "go forward" (same direction as swiping through photos), a right
+  // swipe goes back. 40px is enough to not fire on an accidental drag.
+  (function() {
+    let startX = null;
+    const slideEl = document.getElementById('lsBugScanResults');
+    slideEl.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; });
+    slideEl.addEventListener('touchend', (e) => {
+      if (startX == null) return;
+      const dx = e.changedTouches[0].clientX - startX;
+      startX = null;
+      if (Math.abs(dx) < 40) return;
+      document.getElementById(dx < 0 ? 'lsBugScanNextBtn' : 'lsBugScanPrevBtn').click();
+    });
+  })();
 
   // Calls /bug_scan for whatever's on screen right now and appends the
   // result to the running history - the one thing every trigger path
@@ -5095,18 +5199,30 @@ ${containerEl.innerHTML}
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'scan failed');
-    lsAppendBugScanEntry(data);
+    lsAppendBugScanEntry(data, goal);
   }
 
-  // Bundles every accumulated screen's write-up (reusing exactly what's
-  // already rendered in lsBugScanResults - same per-entry markup, no
-  // reformatting, screenshot embedded inline in each entry) into one
-  // self-contained .html string - so a report always carries the whole
-  // journey, not just the last screen. Shared by the local download AND
+  // Bundles every accumulated screen's write-up (reusing exactly what the
+  // live carousel already renders per-slide - lsRenderBugScanEntry/
+  // lsRenderBugScanSummarySlide, no reformatting, screenshot embedded
+  // inline in each screen) into one self-contained .html document with
+  // its OWN small inline carousel (prev/next + swipe + "N of M") - the
+  // exported/published file has no access to this console's JS, so the
+  // slide-switching script bundled in is plain, self-sufficient DOM code,
+  // not a call back into anything here. Shared by the local download AND
   // the publish button below - both need the exact same document, just
   // delivered differently.
   function lsBuildBugScanReportHtml() {
     const generatedAt = new Date().toLocaleString();
+    const total = lsBugScanTotalSlides();
+    const slidesHtml = lsBugScanHistory.map((data, i) => `
+      <div class="scan-slide" data-slide="${i}" style="display:${i === 0 ? 'block' : 'none'};">
+        ${lsRenderBugScanEntry(data, i + 1, i === 0)}
+      </div>`).join('') + `
+      <div class="scan-slide" data-slide="${lsBugScanHistory.length}" style="display:none;">
+        ${lsRenderBugScanSummarySlide()}
+      </div>`;
+
     return `<!doctype html>
 <html><head><meta charset="utf-8"><title>UI/UX scan report</title>
 <style>
@@ -5118,12 +5234,50 @@ ${containerEl.innerHTML}
          margin: 40px auto; padding: 0 20px; color: var(--paper); }
   .empty-hint { color: var(--paper-dim); font-size: 13px; text-align: center; padding: 20px 0; }
   h1 { font-size: 20px; margin-bottom: 4px; }
-  .meta { color: var(--paper-dim); font-size: 12.5px; margin-bottom: 24px; }
+  .meta { color: var(--paper-dim); font-size: 12.5px; margin-bottom: 20px; }
+  .nav { display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:14px; }
+  .nav button { padding:6px 16px; font-size:13px; border:none; border-radius:6px; background:var(--ink-line);
+                color:var(--paper); cursor:pointer; }
+  .nav button:disabled { opacity:0.4; cursor:default; }
+  .nav span { font-size:12.5px; font-weight:600; color:var(--paper-dim); min-width:64px; text-align:center; }
 </style></head>
 <body>
   <h1>UI/UX scan report</h1>
   <div class="meta">Generated ${escapeHtml(generatedAt)} — mobile_agent Bug Scanner (vision-only, no locators) — ${lsBugScanHistory.length} screen${lsBugScanHistory.length === 1 ? '' : 's'}</div>
-  ${document.getElementById('lsBugScanResults').innerHTML}
+  <div class="nav">
+    <button id="prevBtn">◀</button>
+    <span id="navLabel">1 of ${total}</span>
+    <button id="nextBtn">▶</button>
+  </div>
+  <div id="slideWrap">${slidesHtml}</div>
+  <script>
+    (function() {
+      var idx = 0;
+      var total = ${total};
+      var slides = document.querySelectorAll('#slideWrap .scan-slide');
+      var prevBtn = document.getElementById('prevBtn');
+      var nextBtn = document.getElementById('nextBtn');
+      function render() {
+        for (var i = 0; i < slides.length; i++) slides[i].style.display = (i === idx) ? 'block' : 'none';
+        document.getElementById('navLabel').textContent = (idx + 1) + ' of ' + total;
+        prevBtn.disabled = idx === 0;
+        nextBtn.disabled = idx === total - 1;
+      }
+      prevBtn.addEventListener('click', function() { if (idx > 0) { idx--; render(); } });
+      nextBtn.addEventListener('click', function() { if (idx < total - 1) { idx++; render(); } });
+      var startX = null;
+      var wrap = document.getElementById('slideWrap');
+      wrap.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; });
+      wrap.addEventListener('touchend', function(e) {
+        if (startX == null) return;
+        var dx = e.changedTouches[0].clientX - startX;
+        startX = null;
+        if (Math.abs(dx) < 40) return;
+        (dx < 0 ? nextBtn : prevBtn).click();
+      });
+      render();
+    })();
+  </scr${''}ipt>
 </body></html>`;
   }
 
