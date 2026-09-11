@@ -1122,6 +1122,7 @@
           </div>
 
           <div style="border-top:1px solid var(--ink-line); margin-top:16px; padding-top:14px;">
+            <input id="lsBugScanGoalInput" placeholder="What are you trying to do? (optional — grounds the efficiency verdict instead of guessing it)" style="width:100%; margin-bottom:8px; box-sizing:border-box;">
             <button class="copy" id="lsBugScanBtn" style="width:100%; padding:10px 12px; font-size:12.5px; background:var(--ink-line); color:var(--paper);">Scan this screen for UI/UX issues</button>
           </div>
         </div>
@@ -5002,6 +5003,7 @@ ${containerEl.innerHTML}
         <div style="flex:1; min-width:200px;">
           <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:${LS_FLOW_VERDICT_COLOR[fe.verdict] || 'var(--paper-dim)'}; margin-bottom:2px;">${escapeHtml(fe.verdict || '')}</div>
           <div style="font-size:12.5px; color:var(--paper);">${escapeHtml(fe.feedback || '')}</div>
+          ${fe.goal ? `<div style="font-size:11px; color:var(--paper-dim); margin-top:4px;">Judged against: “${escapeHtml(fe.goal)}”</div>` : ''}
         </div>
       </div>` : '';
 
@@ -5107,10 +5109,11 @@ ${containerEl.innerHTML}
       // the server's flow-efficiency prompt actually reads are sent, not
       // the full locator/strategy detail each step also carries.
       const steps = lsCapturedSteps.map(s => ({action: s.action, label: s.label, text: s.text}));
+      const goal = document.getElementById('lsBugScanGoalInput').value.trim();
       const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/bug_scan', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({steps}),
+        body: JSON.stringify({steps, goal}),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'scan failed');
