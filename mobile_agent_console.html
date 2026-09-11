@@ -1052,6 +1052,14 @@
             screenshot instead. Requires connecting above first, same session either mode uses.
           </div>
           <div class="field full">
+            <label>Load test cases from CSV <span class="opt">optional — columns: description (or steps/goal) + optional id. Fills Goal below with one combined multi-case description.</span></label>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="file" id="lsAiCsvFileInput" accept=".csv" style="flex:1;">
+              <button class="copy" id="lsAiCsvLoadBtn" style="flex-shrink:0;">Load CSV</button>
+            </div>
+            <div id="lsAiCsvStatus" style="font-size:12px; margin-top:6px;"></div>
+          </div>
+          <div class="field full">
             <label>Goal <span class="opt">plain-English test case</span></label>
             <textarea id="lsAiGoal" placeholder="Log a meal of '2 fried eggs' and verify the calorie total isn't doubled"></textarea>
           </div>
@@ -1267,6 +1275,41 @@
     }
     return payload;
   }
+
+  // Reuses the exact same /api/parse-csv the Run in Browser tab's CSV
+  // loader already calls - it just fills lsAiGoal instead of rGoal.
+  // parse_csv_to_goal already combines every row into one "Test case1:
+  // ...\nTest case2: ..." goal string, and the /plan endpoint's prompt
+  // takes whatever's in GOAL as-is, so a multi-case goal here plans/
+  // executes across screens exactly like a single hand-typed one does -
+  // no server change needed for this.
+  document.getElementById('lsAiCsvLoadBtn').addEventListener('click', async () => {
+    const fileInput = document.getElementById('lsAiCsvFileInput');
+    const statusEl = document.getElementById('lsAiCsvStatus');
+    const file = fileInput.files[0];
+    if (!file) {
+      statusEl.innerHTML = '<span style="color:var(--signal);">Choose a .csv file first</span>';
+      return;
+    }
+
+    const csvText = await file.text();
+    statusEl.textContent = 'Parsing…';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/parse-csv', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({csv_text: csvText}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to parse CSV');
+
+      document.getElementById('lsAiGoal').value = data.goal;
+      const caseCount = (data.goal.match(/Test case\d+:/g) || []).length;
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Loaded ${caseCount} test case(s) into Goal below</span>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    }
+  });
 
   document.getElementById('lsAiRunBtn').addEventListener('click', async () => {
     const goal = document.getElementById('lsAiGoal').value.trim();
