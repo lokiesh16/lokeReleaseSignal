@@ -819,10 +819,14 @@
     <div style="display:flex; gap:20px; align-items:flex-start;">
       <div style="flex:1; min-width:0;">
         <div class="card" id="lsBugScanResultsCard" style="display:none;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
             <span style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600;">Bug scanner</span>
-            <button class="copy" id="lsBugScanExportBtn" style="display:none; background:var(--ink-line); color:var(--paper); padding:5px 12px; font-size:11.5px; flex-shrink:0;">Export report (.html)</button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="copy" id="lsBugScanExportBtn" style="display:none; background:var(--ink-line); color:var(--paper); padding:5px 12px; font-size:11.5px; flex-shrink:0;">Export report (.html)</button>
+              <button class="copy" id="lsBugScanPublishBtn" style="display:none; padding:5px 12px; font-size:11.5px; flex-shrink:0;" title="Publishes to lokeReleaseSignal (GitHub Pages) so it renders correctly when shared - unlike a downloaded .html file, which most phones open as raw source">Publish &amp; get shareable link</button>
+            </div>
           </div>
+          <div id="lsBugScanPublishStatus" style="font-size:12px; margin-bottom:8px;"></div>
           <div id="lsBugScanResults"></div>
         </div>
 
@@ -4970,6 +4974,8 @@ ${containerEl.innerHTML}
     const resultsEl = document.getElementById('lsBugScanResults');
     resultsCard.style.display = 'block';
     document.getElementById('lsBugScanExportBtn').style.display = data.screenshot_b64 ? 'block' : 'none';
+    document.getElementById('lsBugScanPublishBtn').style.display = data.screenshot_b64 ? 'block' : 'none';
+    document.getElementById('lsBugScanPublishStatus').textContent = '';
     const scores = data.scores || {};
     const scoreBadges = ['visual_design', 'usability', 'accessibility', 'consistency'].map(key => `
       <div style="text-align:center;">
@@ -5025,14 +5031,12 @@ ${containerEl.innerHTML}
   // Bundles the scan's write-up (reusing exactly what's already rendered
   // in lsBugScanResults - same scores/summary/issues markup, no
   // reformatting) together with the screenshot it was judged from into one
-  // self-contained .html file - so "export" always carries both halves of
-  // the finding (what's wrong + a picture of the actual screen), not just
-  // text that requires cross-referencing a screenshot taken separately.
-  // A single offline HTML file (like this console itself) needs no server
-  // round-trip to produce and opens anywhere, in or out of this app.
-  function lsExportBugScanReport() {
-    const data = lsBugScanLastResult;
-    if (!data) return;
+  // self-contained .html string - so a report always carries both halves
+  // of the finding (what's wrong + a picture of the actual screen), not
+  // just text that requires cross-referencing a screenshot taken
+  // separately. Shared by the local download AND the publish button
+  // below - both need the exact same document, just delivered differently.
+  function lsBuildBugScanReportHtml(data) {
     const generatedAt = new Date().toLocaleString();
     // Side-by-side, screenshot on the right. The <img> only ever gets a
     // width constraint (never an explicit height, never object-fit) - a
@@ -5041,7 +5045,7 @@ ${containerEl.innerHTML}
     // ratio, just the resolution), so leaving height unset is what keeps
     // it looking like the actual physical screen instead of a stretched
     // or cropped box.
-    const html = `<!doctype html>
+    return `<!doctype html>
 <html><head><meta charset="utf-8"><title>UI/UX scan report</title>
 <style>
   :root {
@@ -5073,7 +5077,12 @@ ${containerEl.innerHTML}
     </div>
   </div>
 </body></html>`;
+  }
 
+  function lsExportBugScanReport() {
+    const data = lsBugScanLastResult;
+    if (!data) return;
+    const html = lsBuildBugScanReportHtml(data);
     const blob = new Blob([html], {type: 'text/html'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -5086,6 +5095,40 @@ ${containerEl.innerHTML}
   }
 
   document.getElementById('lsBugScanExportBtn').addEventListener('click', lsExportBugScanReport);
+
+  // Publishes the exact same document to lokeReleaseSignal (GitHub Pages
+  // enabled on its main branch root - see report_publish.py) instead of
+  // downloading it locally - the resulting URL renders correctly when
+  // opened on any device, unlike a downloaded .html file, which most
+  // phones' mail/chat apps preview as raw source instead of handing it to
+  // a real browser.
+  document.getElementById('lsBugScanPublishBtn').addEventListener('click', async () => {
+    const data = lsBugScanLastResult;
+    if (!data) return;
+    const btn = document.getElementById('lsBugScanPublishBtn');
+    const statusEl = document.getElementById('lsBugScanPublishStatus');
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Publishing…';
+    statusEl.textContent = '';
+    try {
+      const html = lsBuildBugScanReportHtml(data);
+      const filename = `ui-ux-scan-${Date.now()}.html`;
+      const res = await fetch(BRIDGE_URL + '/api/publish-report', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename, html}),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'publish failed');
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Published: <a href="${result.url}" target="_blank">${escapeHtml(result.url)}</a></span>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
 
   // Shared by both trigger buttons (AI mode's "Watching live" panel and
   // Human mode's "Tap anywhere" panel) - either one scans whatever's
