@@ -151,6 +151,9 @@
   .panel { display: none; }
   .panel.active { display: block; }
 
+  .mode-toggle-opt { border: 1.5px solid var(--ink-line); transition: border-color 0.15s, background 0.15s; }
+  .mode-toggle-opt.on { border-color: var(--circuit); background: rgba(13,148,136,0.08); }
+
   .card {
     background: var(--ink-raised);
     border: 1px solid var(--ink-line);
@@ -486,6 +489,23 @@
   <!-- ============ RUN IN BROWSER TAB ============ -->
   <div class="panel active" id="panel-run">
 
+    <div class="card mode-toggle-card" style="padding:10px; display:flex; gap:8px;">
+      <label class="mode-toggle-opt" data-mode="human" style="flex:1; display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:8px; cursor:pointer;">
+        <input type="radio" name="runMode" value="human" style="width:auto;">
+        <span>
+          <span style="font-weight:600; font-size:13px;">Human mode</span><br>
+          <span style="font-size:11px; color:var(--paper-dim);">You drive the app, tap-by-tap capture</span>
+        </span>
+      </label>
+      <label class="mode-toggle-opt on" data-mode="ai" style="flex:1; display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:8px; cursor:pointer;">
+        <input type="radio" name="runMode" value="ai" checked style="width:auto;">
+        <span>
+          <span style="font-weight:600; font-size:13px;">AI mode</span><br>
+          <span style="font-size:11px; color:var(--paper-dim);">Give it a test case in plain English below, it explores &amp; builds the workflow</span>
+        </span>
+      </label>
+    </div>
+
     <div class="card" id="bridgeStatusCard">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
@@ -747,6 +767,23 @@
 
   <!-- ============ LOCATOR SCRAPER TAB ============ -->
   <div class="panel" id="panel-scraper">
+
+    <div class="card mode-toggle-card" style="padding:10px; display:flex; gap:8px;">
+      <label class="mode-toggle-opt on" data-mode="human" style="flex:1; display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:8px; cursor:pointer;">
+        <input type="radio" name="scraperMode" value="human" checked style="width:auto;">
+        <span>
+          <span style="font-weight:600; font-size:13px;">Human mode</span><br>
+          <span style="font-size:11px; color:var(--paper-dim);">You drive the app, tap-by-tap capture below</span>
+        </span>
+      </label>
+      <label class="mode-toggle-opt" data-mode="ai" style="flex:1; display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:8px; cursor:pointer;">
+        <input type="radio" name="scraperMode" value="ai" style="width:auto;">
+        <span>
+          <span style="font-weight:600; font-size:13px;">AI mode</span><br>
+          <span style="font-size:11px; color:var(--paper-dim);">Give it a test case in plain English, it explores &amp; builds the workflow</span>
+        </span>
+      </label>
+    </div>
     <div class="card" id="lsConnectCard">
       <p style="font-size:13.5px; color:var(--paper-dim); margin:0 0 14px;">
         No LLM, no agent loop — connect once, then either drive the app yourself
@@ -1174,6 +1211,29 @@
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // ---------- Human mode / AI mode toggle ----------
+  // "Human mode" = Inspector & Recorder (tap-by-tap, no LLM). "AI mode" =
+  // Run in Browser (give it a goal in plain English, it explores and
+  // builds the flow itself). Both are just entry points into tabs that
+  // already exist and are already fully wired - the toggle only decides
+  // which one you land on, so it reuses the existing tab-click handler
+  // above instead of duplicating any run/capture logic.
+  document.querySelectorAll('.mode-toggle-opt').forEach(opt => {
+    const input = opt.querySelector('input[type="radio"]');
+    input.addEventListener('change', () => {
+      const mode = opt.dataset.mode;
+      // both toggle cards (Inspector & Recorder's and Run in Browser's)
+      // reflect the same chosen mode, not just the one clicked in.
+      document.querySelectorAll('.mode-toggle-opt').forEach(o => {
+        o.classList.toggle('on', o.dataset.mode === mode);
+        o.querySelector('input[type="radio"]').checked = o.dataset.mode === mode;
+      });
+      const targetTab = mode === 'ai' ? 'run' : 'scraper';
+      const tabBtn = document.querySelector(`.tab[data-tab="${targetTab}"]`);
+      if (tabBtn && !tabBtn.classList.contains('active')) tabBtn.click();
     });
   });
 
