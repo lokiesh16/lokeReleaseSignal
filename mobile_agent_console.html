@@ -1074,24 +1074,15 @@
       </div>
 
       <div style="width:380px; flex-shrink:0; position:sticky; top:20px;">
-        <div class="card ai-mode-only" id="lsAiScreenshotCard">
-          <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Watching live</div>
-          <div class="hint" style="font-size:11.5px; margin-bottom:10px; line-height:1.5;">
-            Updates after every step the agent takes — this is what it's looking at right now, not a recording.
-          </div>
-          <img id="lsAiScreenshotImg" style="max-width:100%; display:none; border:1px solid var(--ink-line); border-radius:6px;">
-          <div id="lsAiScreenshotEmpty" class="empty-hint">Run the agent to see it drive the app here.</div>
-          <div id="lsAiScreenshotCaption" style="font-size:12px; color:var(--paper-dim); margin-top:8px;"></div>
-          <button class="copy" id="lsAiBugScanBtn" style="width:100%; padding:8px 12px; font-size:11.5px; margin-top:10px; background:var(--ink-line); color:var(--paper);">Scan this screen for UI/UX issues</button>
-        </div>
-
-        <div class="card human-mode-only" id="lsScreenshotCard" style="display:none;">
+        <div class="card" id="lsScreenshotCard" style="display:none;">
           <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Tap anywhere on screenshot</div>
           <div class="hint" style="font-size:11.5px; margin-bottom:10px; line-height:1.5;">
-            For an element with no label or value at all - it never shows up in the list because the
-            accessibility tree itself has nothing to key it by. Click the exact spot on the picture
-            below; it's converted straight to a screen-point tap, no locator involved.
+            Always shows what's actually on screen right now, in either mode - updated after every AI-planned
+            step, or on demand below. For an element with no label or value at all - it never shows up in the
+            list because the accessibility tree itself has nothing to key it by. Click the exact spot on the
+            picture below; it's converted straight to a screen-point tap, no locator involved.
           </div>
+          <div id="lsScreenshotAiCaption" style="font-size:12px; color:var(--paper-dim); margin-bottom:8px; display:none;"></div>
           <div style="display:flex; gap:14px; align-items:center; margin-bottom:10px; font-size:11.5px;">
             <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
               <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeTap" value="tap" checked style="width:auto;"> Tap point
@@ -1262,6 +1253,14 @@
         o.classList.toggle('on', o.dataset.mode === mode);
       });
       scraperPanel.classList.toggle('ai-mode-active', mode === 'ai');
+      // AI mode has no "Tap anywhere" button of its own to trigger the
+      // very first screenshot load (that button lives in lsActiveCard,
+      // which is human-mode-only) - so switching into AI mode while
+      // already connected loads it automatically instead of leaving the
+      // panel blank until a run starts.
+      if (mode === 'ai' && lsSessionId && document.getElementById('lsScreenshotCard').style.display === 'none') {
+        loadScreenshot();
+      }
     });
   });
 
@@ -1325,9 +1324,9 @@
     const goal = document.getElementById('lsAiGoal').value.trim();
     const btn = document.getElementById('lsAiRunBtn');
     const statusEl = document.getElementById('lsAiStatus');
-    const shotImg = document.getElementById('lsAiScreenshotImg');
-    const shotEmpty = document.getElementById('lsAiScreenshotEmpty');
-    const shotCaption = document.getElementById('lsAiScreenshotCaption');
+    const shotCard = document.getElementById('lsScreenshotCard');
+    const shotImg = document.getElementById('lsScreenshotImg');
+    const shotCaption = document.getElementById('lsScreenshotAiCaption');
 
     if (lsAiRunning) {
       // Second click while running = stop: the running loop checks
@@ -1377,12 +1376,16 @@
 
         // The plan call captured a fresh screenshot + locator list purely to
         // plan from - showing both here doubles as the "interactive
-        // screenshot updating" view and keeps the Locator Lab/element list
-        // in sync in case a human wants to step in between screens.
+        // screenshot updating" view and keeps the Locator Lab/element list,
+        // and this same panel's own tap-anywhere hit-testing, in sync in
+        // case a human wants to step in between screens (hence also
+        // updating lsScreenshotWindowSize/lsLastElements, exactly like a
+        // manual loadScreenshot() call would).
         lsRenderElementList(plan.elements || []);
+        lsScreenshotWindowSize = {width: plan.window_width, height: plan.window_height};
+        shotCard.style.display = 'block';
         shotImg.src = 'data:image/png;base64,' + plan.screenshot_b64;
-        shotImg.style.display = 'block';
-        shotEmpty.style.display = 'none';
+        shotCaption.style.display = plan.reasoning ? 'block' : 'none';
         shotCaption.textContent = plan.reasoning || '';
 
         const actions = plan.actions || [];
@@ -4682,6 +4685,12 @@ ${containerEl.innerHTML}
       // visibility.
       document.getElementById('lsCapturedCard').style.display = 'block';
       populateLsEditTargetSelect();
+      // Same reasoning as the mode-toggle handler: if AI mode was already
+      // selected before connecting, there's no human-mode "Tap anywhere"
+      // button to trigger the first load, so do it here instead.
+      if (scraperPanel.classList.contains('ai-mode-active')) {
+        loadScreenshot();
+      }
     } catch (e) {
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
     } finally {
@@ -5019,7 +5028,6 @@ ${containerEl.innerHTML}
   }
 
   document.getElementById('lsBugScanBtn').addEventListener('click', (e) => lsRunBugScan(e.currentTarget));
-  document.getElementById('lsAiBugScanBtn').addEventListener('click', (e) => lsRunBugScan(e.currentTarget));
 
   // ---------- "tap anywhere" screenshot fallback (no accessibility node needed at all) ----------
   let lsScreenshotWindowSize = null;  // {width, height} in the same POINTS units driver.tap() expects
