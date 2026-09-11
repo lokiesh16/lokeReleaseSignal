@@ -153,6 +153,8 @@
 
   .mode-toggle-opt { border: 1.5px solid var(--ink-line); transition: border-color 0.15s, background 0.15s; }
   .mode-toggle-opt.on { border-color: var(--circuit); background: rgba(13,148,136,0.08); }
+  #panel-scraper.ai-mode-active .human-mode-only { display: none !important; }
+  #panel-scraper:not(.ai-mode-active) .ai-mode-only { display: none !important; }
 
   .card {
     background: var(--ink-raised);
@@ -489,23 +491,6 @@
   <!-- ============ RUN IN BROWSER TAB ============ -->
   <div class="panel active" id="panel-run">
 
-    <div class="card mode-toggle-card" style="padding:10px; display:flex; gap:8px;">
-      <label class="mode-toggle-opt" data-mode="human" style="flex:1; display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:8px; cursor:pointer;">
-        <input type="radio" name="runMode" value="human" style="width:auto;">
-        <span>
-          <span style="font-weight:600; font-size:13px;">Human mode</span><br>
-          <span style="font-size:11px; color:var(--paper-dim);">You drive the app, tap-by-tap capture</span>
-        </span>
-      </label>
-      <label class="mode-toggle-opt on" data-mode="ai" style="flex:1; display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:8px; cursor:pointer;">
-        <input type="radio" name="runMode" value="ai" checked style="width:auto;">
-        <span>
-          <span style="font-weight:600; font-size:13px;">AI mode</span><br>
-          <span style="font-size:11px; color:var(--paper-dim);">Give it a test case in plain English below, it explores &amp; builds the workflow</span>
-        </span>
-      </label>
-    </div>
-
     <div class="card" id="bridgeStatusCard">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
@@ -833,7 +818,7 @@
 
     <div style="display:flex; gap:20px; align-items:flex-start;">
       <div style="flex:1; min-width:0;">
-        <div class="card" id="lsActiveCard" style="display:none;">
+        <div class="card human-mode-only" id="lsActiveCard" style="display:none;">
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
             <span class="dot" style="background:var(--circuit); box-shadow:0 0 8px var(--circuit);"></span>
             <span style="font-size:13.5px;">Connected — drive the app, then load locators any time.</span>
@@ -847,7 +832,7 @@
           <div id="lsElementListWrap" style="margin-top:14px; display:none;"></div>
         </div>
 
-        <div class="card" id="lsExportCard" style="display:none;">
+        <div class="card human-mode-only" id="lsExportCard" style="display:none;">
           <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Selected for export</div>
           <div id="lsSelectedList" style="max-height:200px; overflow-y:auto; font-size:12.5px;"></div>
           <div class="field full" style="margin-top:12px;">
@@ -864,7 +849,7 @@
       </div>
     </div>
 
-    <div class="card" id="lsEditFlowCard" style="display:none;">
+    <div class="card human-mode-only" id="lsEditFlowCard" style="display:none;">
       <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Edit an existing flow or precondition</div>
       <div class="hint" style="font-size:11.5px; margin-bottom:10px; line-height:1.5;">
         Load one test case from an already-saved flow/precondition back into Captured steps below -
@@ -1056,10 +1041,37 @@
         <div id="lsCapturedPytestStatus" style="font-size:12px; margin-top:6px;"></div>
       </div>
     </div>
+
+        <div class="card ai-mode-only" id="lsAiCard">
+          <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">AI mode — describe the test case</div>
+          <div class="hint" style="font-size:11.5px; margin-bottom:10px; line-height:1.5;">
+            Give it a goal in plain English below. For each screen: one screenshot, one locator load,
+            one LLM call plans the whole batch of actions for that screen — then it executes them
+            through the exact same Act path a manual step would use, straight into Captured steps
+            below. No locator on an element? It falls back to a raw tap/swipe point from the
+            screenshot instead. Requires connecting above first, same session either mode uses.
+          </div>
+          <div class="field full">
+            <label>Goal <span class="opt">plain-English test case</span></label>
+            <textarea id="lsAiGoal" placeholder="Log a meal of '2 fried eggs' and verify the calorie total isn't doubled"></textarea>
+          </div>
+          <button class="copy" id="lsAiRunBtn" style="width:100%; padding:12px; font-size:14px; margin-top:10px;">Run AI agent</button>
+          <div id="lsAiStatus" style="font-size:12px; margin-top:8px;"></div>
+        </div>
       </div>
 
       <div style="width:380px; flex-shrink:0; position:sticky; top:20px;">
-        <div class="card" id="lsScreenshotCard" style="display:none;">
+        <div class="card ai-mode-only" id="lsAiScreenshotCard">
+          <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Watching live</div>
+          <div class="hint" style="font-size:11.5px; margin-bottom:10px; line-height:1.5;">
+            Updates after every step the agent takes — this is what it's looking at right now, not a recording.
+          </div>
+          <img id="lsAiScreenshotImg" style="max-width:100%; display:none; border:1px solid var(--ink-line); border-radius:6px;">
+          <div id="lsAiScreenshotEmpty" class="empty-hint">Run the agent to see it drive the app here.</div>
+          <div id="lsAiScreenshotCaption" style="font-size:12px; color:var(--paper-dim); margin-top:8px;"></div>
+        </div>
+
+        <div class="card human-mode-only" id="lsScreenshotCard" style="display:none;">
           <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Tap anywhere on screenshot</div>
           <div class="hint" style="font-size:11.5px; margin-bottom:10px; line-height:1.5;">
             For an element with no label or value at all - it never shows up in the list because the
@@ -1214,27 +1226,179 @@
     });
   });
 
-  // ---------- Human mode / AI mode toggle ----------
-  // "Human mode" = Inspector & Recorder (tap-by-tap, no LLM). "AI mode" =
-  // Run in Browser (give it a goal in plain English, it explores and
-  // builds the flow itself). Both are just entry points into tabs that
-  // already exist and are already fully wired - the toggle only decides
-  // which one you land on, so it reuses the existing tab-click handler
-  // above instead of duplicating any run/capture logic.
-  document.querySelectorAll('.mode-toggle-opt').forEach(opt => {
+  // ---------- Human mode / AI mode toggle (Inspector & Recorder only) ----------
+  // "Human mode" = the existing tap-by-tap capture UI (no LLM calls).
+  // "AI mode" = give it a goal in plain English right here and watch it
+  // drive the app itself, live - same screenshot pane, updating step by
+  // step, instead of navigating away to a different tab. Toggling just
+  // flips a class on the panel; .human-mode-only/.ai-mode-only elements
+  // (see CSS) show/hide off that, so this never fights with any of those
+  // elements' own display logic (e.g. lsActiveCard appearing after a real
+  // connect) - it only gates the group as a whole.
+  const scraperPanel = document.getElementById('panel-scraper');
+  document.querySelectorAll('#panel-scraper .mode-toggle-opt').forEach(opt => {
     const input = opt.querySelector('input[type="radio"]');
     input.addEventListener('change', () => {
       const mode = opt.dataset.mode;
-      // both toggle cards (Inspector & Recorder's and Run in Browser's)
-      // reflect the same chosen mode, not just the one clicked in.
-      document.querySelectorAll('.mode-toggle-opt').forEach(o => {
+      document.querySelectorAll('#panel-scraper .mode-toggle-opt').forEach(o => {
         o.classList.toggle('on', o.dataset.mode === mode);
-        o.querySelector('input[type="radio"]').checked = o.dataset.mode === mode;
       });
-      const targetTab = mode === 'ai' ? 'run' : 'scraper';
-      const tabBtn = document.querySelector(`.tab[data-tab="${targetTab}"]`);
-      if (tabBtn && !tabBtn.classList.contains('active')) tabBtn.click();
+      scraperPanel.classList.toggle('ai-mode-active', mode === 'ai');
     });
+  });
+
+  // ---------- AI mode: batch-plan a whole screen at a time, inline in Inspector & Recorder ----------
+  // One /plan call per SCREEN (not per action) - it captures a fresh
+  // screenshot + full locator list server-side, one LLM vision call plans
+  // every action that screen's visible content supports, and the console
+  // just executes that batch through the exact same /act endpoint a
+  // human's "Act"/"Tap anywhere" click already uses - so every AI-planned
+  // step lands in the SAME lsCapturedSteps list (and Save-as-Flow/
+  // Precondition/pytest UI) a manual recording would. Only once the batch
+  // finishes (or a "done"/"stuck" verdict ends it) does the next /plan
+  // call happen, against whatever screen is showing by then.
+  let lsAiRunning = false;
+
+  function lsActPayloadFromPlanAction(a) {
+    const payload = {action: a.type};
+    if (a.strategy && a.value) { payload.strategy = a.strategy; payload.value = a.value; }
+    for (const k of ['x', 'y', 'x2', 'y2', 'text', 'direction', 'seconds', 'attribute', 'extract', 'compare', 'expected']) {
+      if (a[k] !== undefined && a[k] !== null) payload[k] = a[k];
+    }
+    return payload;
+  }
+
+  document.getElementById('lsAiRunBtn').addEventListener('click', async () => {
+    const goal = document.getElementById('lsAiGoal').value.trim();
+    const btn = document.getElementById('lsAiRunBtn');
+    const statusEl = document.getElementById('lsAiStatus');
+    const shotImg = document.getElementById('lsAiScreenshotImg');
+    const shotEmpty = document.getElementById('lsAiScreenshotEmpty');
+    const shotCaption = document.getElementById('lsAiScreenshotCaption');
+
+    if (lsAiRunning) {
+      // Second click while running = stop: the running loop checks
+      // lsAiRunning between every screen and every single action, so this
+      // takes effect at the next check rather than killing anything mid-call.
+      lsAiRunning = false;
+      btn.textContent = 'Stopping…';
+      return;
+    }
+
+    if (!lsSessionId) {
+      statusEl.innerHTML = '<span style="color:var(--signal);">Connect above first (Human mode and AI mode share the same connected session)</span>';
+      return;
+    }
+    if (!goal) {
+      statusEl.innerHTML = '<span style="color:var(--signal);">Describe what you want tested first</span>';
+      return;
+    }
+
+    lsAiRunning = true;
+    btn.textContent = 'Stop';
+    statusEl.innerHTML = '<span style="color:var(--paper-dim);">Loading screen…</span>';
+
+    const history = [];
+    const MAX_SCREENS = 12;
+    let finalVerdict = null;
+    let stopReason = null; // 'planning_error' | 'no_actions' | 'user_stop' | null (already reported inline)
+
+    try {
+      for (let screenNum = 1; screenNum <= MAX_SCREENS && lsAiRunning; screenNum++) {
+        statusEl.innerHTML = `<span style="color:var(--paper-dim);">Planning screen ${screenNum}…</span>`;
+
+        let plan;
+        try {
+          const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/plan', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({goal, history}),
+          });
+          plan = await res.json();
+          if (!res.ok) throw new Error(plan.error || 'planning failed');
+        } catch (e) {
+          statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+          stopReason = 'planning_error';
+          break;
+        }
+
+        // The plan call captured a fresh screenshot + locator list purely to
+        // plan from - showing both here doubles as the "interactive
+        // screenshot updating" view and keeps the Locator Lab/element list
+        // in sync in case a human wants to step in between screens.
+        lsRenderElementList(plan.elements || []);
+        shotImg.src = 'data:image/png;base64,' + plan.screenshot_b64;
+        shotImg.style.display = 'block';
+        shotEmpty.style.display = 'none';
+        shotCaption.textContent = plan.reasoning || '';
+
+        const actions = plan.actions || [];
+        if (!actions.length) {
+          statusEl.innerHTML = '<span style="color:var(--signal);">No further actions planned, and no done/stuck verdict - stopping.</span>';
+          stopReason = 'no_actions';
+          break;
+        }
+
+        let stoppedEarly = false;
+        for (const a of actions) {
+          if (!lsAiRunning) { stoppedEarly = true; stopReason = 'user_stop'; break; }
+
+          if (a.type === 'done' || a.type === 'stuck') {
+            finalVerdict = a;
+            break;
+          }
+
+          statusEl.innerHTML = `<span style="color:var(--paper-dim);">Screen ${screenNum}: ${escapeHtml(a.type)}${a.label ? ' → ' + escapeHtml(a.label) : ''}…</span>`;
+          try {
+            const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify(lsActPayloadFromPlanAction(a)),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'action failed');
+
+            const step = {action: a.type, label: a.label};
+            for (const k of ['x', 'y', 'x2', 'y2', 'text', 'direction', 'strategy', 'value', 'attribute', 'extract', 'compare', 'expected']) {
+              if (a[k] !== undefined) step[k] = a[k];
+            }
+            lsCapturedSteps.push(step);
+            renderLsCapturedSteps();
+            lsRenderElementList(data.elements || []);
+            lsUpdateContext(data.context);
+            history.push({action: a.type, label: a.label, result: 'ok'});
+          } catch (e) {
+            // Stop the whole batch on the first failure rather than
+            // continuing against a screen state the plan no longer
+            // matches - the next loop iteration re-plans from whatever's
+            // actually on screen now, with this failure in HISTORY.
+            history.push({action: a.type, label: a.label, result: `error: ${e.message}`});
+            statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(a.type)}${a.label ? ' on ' + escapeHtml(a.label) : ''} failed: ${escapeHtml(e.message)} - replanning…</span>`;
+            stoppedEarly = true;
+            break;
+          }
+        }
+
+        if (finalVerdict) break;
+        if (!stoppedEarly && actions.length && !history.length) break; // safety: nothing executed, nothing to learn from
+      }
+      if (!finalVerdict && !lsAiRunning && stopReason === null) stopReason = 'user_stop';
+    } finally {
+      lsAiRunning = false;
+      btn.textContent = 'Run AI agent';
+    }
+
+    if (finalVerdict) {
+      const passed = (finalVerdict.type === 'done') && /^pass/i.test(finalVerdict.verdict || '');
+      const color = finalVerdict.type === 'stuck' ? 'var(--signal)' : (passed ? 'var(--circuit)' : 'var(--alert)');
+      statusEl.innerHTML = `<span style="color:${color}; font-weight:600;">${escapeHtml(finalVerdict.type)}</span>` +
+        (finalVerdict.verdict ? `<span style="color:var(--paper-dim);"> — ${escapeHtml(finalVerdict.verdict)}</span>` : '');
+    } else if (stopReason === 'user_stop') {
+      statusEl.innerHTML = '<span style="color:var(--signal);">Stopped.</span>';
+    } else if (stopReason === null) {
+      statusEl.innerHTML = `<span style="color:var(--signal);">Stopped after ${MAX_SCREENS} screens without a done/stuck verdict.</span>`;
+    }
+    // 'planning_error' and 'no_actions' already left their own message in statusEl above.
   });
 
   // ---------- command builder ----------
@@ -1706,8 +1870,8 @@
     });
   }
 
-  function renderLocatorPrompt(runId, context, onResumed) {
-    const resultEl = document.getElementById('runResultCard');
+  function renderLocatorPrompt(runId, context, onResumed, targetEl) {
+    const resultEl = targetEl || document.getElementById('runResultCard');
     const candidates = context.candidates || [];
 
     const firstUniqueIndex = candidates.findIndex(c => c.unique);
@@ -1766,8 +1930,8 @@
     });
   }
 
-  function renderJudgeFlagPrompt(runId, context, onResumed) {
-    const resultEl = document.getElementById('runResultCard');
+  function renderJudgeFlagPrompt(runId, context, onResumed, targetEl) {
+    const resultEl = targetEl || document.getElementById('runResultCard');
     const elements = context.elements || [];
     const last = context.last_action || {};
 
@@ -1826,8 +1990,8 @@
     });
   }
 
-  function renderCopilotPrompt(runId, context, onResumed) {
-    const resultEl = document.getElementById('runResultCard');
+  function renderCopilotPrompt(runId, context, onResumed, targetEl) {
+    const resultEl = targetEl || document.getElementById('runResultCard');
     const elements = context.elements || [];
     const s = context.suggested || {};
     const ACTION_TYPES = ['tap', 'type_text', 'swipe', 'back', 'wait'];
@@ -3064,9 +3228,10 @@ ${containerEl.innerHTML}
     await runTestTarget(runBtn.dataset.path, runBtn.dataset.slug, runBtn);
   });
 
-  async function saveFlow(nameInputId, statusElId, btnId, getReportData, endpoint, btnLabel) {
+  async function saveFlow(nameInputId, statusElId, btnId, getReportData, endpoint, btnLabel, appiumBuilderFn) {
     endpoint = endpoint || '/api/flows';
     btnLabel = btnLabel || 'Save as flow';
+    appiumBuilderFn = appiumBuilderFn || buildAppiumPayloadFromRunForm;
     const isPrecondition = endpoint === '/api/preconditions';
     const btn = document.getElementById(btnId);
     const statusEl = document.getElementById(statusElId);
@@ -3092,7 +3257,7 @@ ${containerEl.innerHTML}
         body: JSON.stringify({
           name,
           report: reportData,
-          appium: buildAppiumPayloadFromRunForm(),
+          appium: appiumBuilderFn(),
         }),
       });
       const data = await res.json();
