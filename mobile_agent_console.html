@@ -4960,6 +4960,7 @@ ${containerEl.innerHTML}
     visual_design: 'Visual design', usability: 'Usability',
     accessibility: 'Accessibility', consistency: 'Consistency',
   };
+  const LS_FLOW_VERDICT_COLOR = {efficient: 'var(--circuit)', reasonable: 'var(--signal)', excessive: 'var(--alert)'};
   let lsBugScanLastResult = null; // {overall_score, scores, summary, issues, screenshot_b64} - last render, for Export
 
   function renderLsBugScanResults(data) {
@@ -4987,6 +4988,23 @@ ${containerEl.innerHTML}
         </div>`).join('')
       : '<div class="empty-hint">No notable issues found.</div>';
 
+    // Only present when Captured Steps had something in it at scan time
+    // (see lsRunBugScan) - a manual tap-through, an AI-mode run, or both
+    // mixed together all count the same way, since lsCapturedSteps
+    // doesn't distinguish where a step came from.
+    const fe = data.flow_efficiency;
+    const flowEfficiencyHtml = fe ? `
+      <div style="border:1px solid var(--ink-line); border-radius:8px; padding:10px 12px; margin-bottom:14px; display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+        <div style="text-align:center; flex-shrink:0;">
+          <div style="font-size:22px; font-weight:800; color:${LS_FLOW_VERDICT_COLOR[fe.verdict] || 'var(--paper-dim)'};">${fe.step_count ?? '—'}</div>
+          <div style="font-size:10px; color:var(--paper-dim); text-transform:uppercase; letter-spacing:0.04em;">taps</div>
+        </div>
+        <div style="flex:1; min-width:200px;">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:${LS_FLOW_VERDICT_COLOR[fe.verdict] || 'var(--paper-dim)'}; margin-bottom:2px;">${escapeHtml(fe.verdict || '')}</div>
+          <div style="font-size:12.5px; color:var(--paper);">${escapeHtml(fe.feedback || '')}</div>
+        </div>
+      </div>` : '';
+
     resultsEl.innerHTML = `
       <div style="display:flex; align-items:center; gap:20px; margin-bottom:14px; flex-wrap:wrap;">
         <div style="text-align:center;">
@@ -4995,6 +5013,7 @@ ${containerEl.innerHTML}
         </div>
         <div style="display:flex; gap:18px; flex-wrap:wrap;">${scoreBadges}</div>
       </div>
+      ${flowEfficiencyHtml}
       <div style="font-size:13px; line-height:1.5; margin-bottom:14px; color:var(--paper);">${escapeHtml(data.summary || '')}</div>
       <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Issues &amp; suggestions</div>
       ${issuesHtml}
@@ -5082,10 +5101,16 @@ ${containerEl.innerHTML}
     resultsEl.innerHTML = '<div class="empty-hint">Analyzing screen…</div>';
     resultsCard.scrollIntoView({behavior: 'smooth', block: 'start'});
     try {
+      // lsCapturedSteps doesn't care whether a step came from a manual
+      // tap or an AI-planned one, so this "how many taps did this take"
+      // judgment covers either mode (or both, mixed) - only the fields
+      // the server's flow-efficiency prompt actually reads are sent, not
+      // the full locator/strategy detail each step also carries.
+      const steps = lsCapturedSteps.map(s => ({action: s.action, label: s.label, text: s.text}));
       const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/bug_scan', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({}),
+        body: JSON.stringify({steps}),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'scan failed');
