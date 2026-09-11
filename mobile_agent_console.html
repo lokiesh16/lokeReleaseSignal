@@ -816,25 +816,13 @@
       <div id="lsConnectStatus" style="font-size:12px; margin-top:8px;"></div>
     </div>
 
-    <div class="card" id="lsBugScanCard" style="display:none;">
-      <div style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;">
-        <div style="flex:0 0 200px;">
-          <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Bug scanner</div>
-          <div class="hint" style="font-size:11.5px; margin-bottom:10px; line-height:1.5;">
-            One screenshot, one vision call — scores this exact screen on visual design, usability,
-            accessibility, and consistency, with plain-English issues and fixes. No locators, no
-            interaction, works in either mode.
-          </div>
-          <button class="copy" id="lsBugScanBtn" style="width:100%; padding:10px 12px; font-size:13px;">Scan this screen</button>
-        </div>
-        <div style="flex:1; min-width:260px;" id="lsBugScanResults">
-          <div class="empty-hint">Run a scan to see scores and feedback here.</div>
-        </div>
-      </div>
-    </div>
-
     <div style="display:flex; gap:20px; align-items:flex-start;">
       <div style="flex:1; min-width:0;">
+        <div class="card" id="lsBugScanResultsCard" style="display:none;">
+          <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Bug scanner</div>
+          <div id="lsBugScanResults"></div>
+        </div>
+
         <div class="card human-mode-only" id="lsActiveCard" style="display:none;">
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
             <span class="dot" style="background:var(--circuit); box-shadow:0 0 8px var(--circuit);"></span>
@@ -1094,6 +1082,7 @@
           <img id="lsAiScreenshotImg" style="max-width:100%; display:none; border:1px solid var(--ink-line); border-radius:6px;">
           <div id="lsAiScreenshotEmpty" class="empty-hint">Run the agent to see it drive the app here.</div>
           <div id="lsAiScreenshotCaption" style="font-size:12px; color:var(--paper-dim); margin-top:8px;"></div>
+          <button class="copy" id="lsAiBugScanBtn" style="width:100%; padding:8px 12px; font-size:11.5px; margin-top:10px; background:var(--ink-line); color:var(--paper);">Scan this screen for UI/UX issues</button>
         </div>
 
         <div class="card human-mode-only" id="lsScreenshotCard" style="display:none;">
@@ -1136,6 +1125,10 @@
             </div>
             <button class="copy" id="lsValidateScreenBtn" style="width:100%; padding:10px 12px; font-size:12.5px;">Validate everything on screen</button>
             <div id="lsValidateScreenStatus" style="font-size:12px; margin-top:8px;"></div>
+          </div>
+
+          <div style="border-top:1px solid var(--ink-line); margin-top:16px; padding-top:14px;">
+            <button class="copy" id="lsBugScanBtn" style="width:100%; padding:10px 12px; font-size:12.5px; background:var(--ink-line); color:var(--paper);">Scan this screen for UI/UX issues</button>
           </div>
         </div>
       </div>
@@ -4688,7 +4681,6 @@ ${containerEl.innerHTML}
       // (the 0-steps empty-hint vs the real list) from here on, never this
       // visibility.
       document.getElementById('lsCapturedCard').style.display = 'block';
-      document.getElementById('lsBugScanCard').style.display = 'block';
       populateLsEditTargetSelect();
     } catch (e) {
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
@@ -4931,7 +4923,7 @@ ${containerEl.innerHTML}
     lsScreenshotWindowSize = null;
     lsScreenshotPoint = null;
     document.getElementById('lsEditFlowCard').style.display = 'none';
-    document.getElementById('lsBugScanCard').style.display = 'none';
+    document.getElementById('lsBugScanResultsCard').style.display = 'none';
     // The session (and its server-side context) is gone - stop showing
     // "Captured so far" values a NEXT session won't actually have.
     lsUpdateContext({});
@@ -4958,7 +4950,9 @@ ${containerEl.innerHTML}
   };
 
   function renderLsBugScanResults(data) {
+    const resultsCard = document.getElementById('lsBugScanResultsCard');
     const resultsEl = document.getElementById('lsBugScanResults');
+    resultsCard.style.display = 'block';
     const scores = data.scores || {};
     const scoreBadges = ['visual_design', 'usability', 'accessibility', 'consistency'].map(key => `
       <div style="text-align:center;">
@@ -4992,13 +4986,21 @@ ${containerEl.innerHTML}
     `;
   }
 
-  document.getElementById('lsBugScanBtn').addEventListener('click', async () => {
+  // Shared by both trigger buttons (AI mode's "Watching live" panel and
+  // Human mode's "Tap anywhere" panel) - either one scans whatever's
+  // actually on screen right now via the same connected session, and
+  // both write into the SAME results card at the top of the left column
+  // (see lsBugScanResultsCard) rather than each getting their own copy.
+  async function lsRunBugScan(btn) {
     if (!lsSessionId) return;
-    const btn = document.getElementById('lsBugScanBtn');
+    const resultsCard = document.getElementById('lsBugScanResultsCard');
     const resultsEl = document.getElementById('lsBugScanResults');
+    const originalLabel = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Scanning…';
+    resultsCard.style.display = 'block';
     resultsEl.innerHTML = '<div class="empty-hint">Analyzing screen…</div>';
+    resultsCard.scrollIntoView({behavior: 'smooth', block: 'start'});
     try {
       const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/bug_scan', {
         method: 'POST',
@@ -5012,9 +5014,12 @@ ${containerEl.innerHTML}
       resultsEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Scan this screen';
+      btn.textContent = originalLabel;
     }
-  });
+  }
+
+  document.getElementById('lsBugScanBtn').addEventListener('click', (e) => lsRunBugScan(e.currentTarget));
+  document.getElementById('lsAiBugScanBtn').addEventListener('click', (e) => lsRunBugScan(e.currentTarget));
 
   // ---------- "tap anywhere" screenshot fallback (no accessibility node needed at all) ----------
   let lsScreenshotWindowSize = null;  // {width, height} in the same POINTS units driver.tap() expects
