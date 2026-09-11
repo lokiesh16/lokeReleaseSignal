@@ -2130,30 +2130,42 @@ ${containerEl.innerHTML}
     const start = (savedFlowsPage - 1) * SAVED_FLOWS_PAGE_SIZE;
     const pageItems = flows.slice(start, start + SAVED_FLOWS_PAGE_SIZE);
 
-    listEl.innerHTML = pageItems.map(f => {
+    // A small rotating accent per card (not tied to any status) - purely
+    // to break up what was a flat wall of identical gray boxes; picked
+    // from the app's own existing palette so nothing new needs inventing.
+    const ACCENTS = ['var(--circuit)', 'var(--signal)', '#6D28D9', '#2563EB'];
+
+    listEl.innerHTML = pageItems.map((f, i) => {
       const state = flowRunState[f.slug];
       const selected = f.slug === selectedFlowSlug;
+      const accent = ACCENTS[i % ACCENTS.length];
       return `
       <div class="flow-list-item" data-slug="${escapeHtml(f.slug)}"
-           style="padding:9px 10px; border-radius:8px; cursor:pointer; margin-bottom:6px; border:1px solid ${selected ? 'var(--signal)' : 'var(--ink-line)'}; background:${selected ? 'var(--signal-dim)' : 'var(--ink)'};">
+           style="padding:9px 10px 9px 9px; border-radius:8px; cursor:pointer; margin-bottom:6px;
+                  border:1px solid ${selected ? 'var(--signal)' : 'var(--ink-line)'};
+                  border-left:3px solid ${selected ? 'var(--signal)' : accent};
+                  background:${selected ? 'var(--signal-dim)' : 'var(--ink)'};">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
           <span style="font-weight:600; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(f.name)}</span>
           <span class="status-badge flow-sidebar-badge ${state ? state.badgeClass : ''}" data-sidebar-status-for="${escapeHtml(f.slug)}"
                 style="flex-shrink:0; font-size:9px; padding:1px 5px; ${state && state.badgeText ? '' : 'display:none;'}">${state ? escapeHtml(state.badgeText || '') : ''}</span>
         </div>
-        <div class="hint" style="font-size:10.5px;">${f.test_count} test(s)</div>
+        <div style="font-size:10.5px; color:${accent}; font-weight:600; margin-top:1px;">${f.test_count} test(s)</div>
       </div>`;
     }).join('');
     listEl.querySelectorAll('.flow-list-item').forEach(item => {
       item.addEventListener('click', () => selectFlow(item.dataset.slug));
     });
 
-    pagerEl.style.display = 'flex';
+    // Stacked, not one cramped row - "N flows · page X of Y" plus two full-
+    // width Prev/Next buttons never fit on one line in a 250px sidebar
+    // (it wrapped mid-phrase); a label row above a button row always fits.
+    pagerEl.style.cssText = 'display:flex; flex-direction:column; gap:6px; margin-top:8px; font-size:11px;';
     pagerEl.innerHTML = `
-      <span class="hint">${flows.length} flow(s) — page ${savedFlowsPage} of ${totalPages}</span>
+      <span class="hint">${flows.length} flow${flows.length === 1 ? '' : 's'} · page ${savedFlowsPage} of ${totalPages}</span>
       <div style="display:flex; gap:6px;">
-        <button class="copy" id="savedFlowsPrevBtn" style="padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);" ${savedFlowsPage <= 1 ? 'disabled' : ''}>Prev</button>
-        <button class="copy" id="savedFlowsNextBtn" style="padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);" ${savedFlowsPage >= totalPages ? 'disabled' : ''}>Next</button>
+        <button class="copy" id="savedFlowsPrevBtn" style="flex:1; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);" ${savedFlowsPage <= 1 ? 'disabled' : ''}>Prev</button>
+        <button class="copy" id="savedFlowsNextBtn" style="flex:1; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);" ${savedFlowsPage >= totalPages ? 'disabled' : ''}>Next</button>
       </div>`;
     document.getElementById('savedFlowsPrevBtn').addEventListener('click', () => { savedFlowsPage -= 1; renderFlowsSidebarPage(); });
     document.getElementById('savedFlowsNextBtn').addEventListener('click', () => { savedFlowsPage += 1; renderFlowsSidebarPage(); });
