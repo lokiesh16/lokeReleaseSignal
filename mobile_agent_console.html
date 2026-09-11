@@ -5088,8 +5088,16 @@ ${containerEl.innerHTML}
         </div>
       </div>` : '';
 
+    // 220px, not the old 96px - that size was sized for a STACKED list of
+    // several screens sharing the page at once; now that only one screen
+    // shows at a time (carousel), there's no reason to keep it that
+    // small. Clickable through to the actual full-resolution image (same
+    // data URI, just opened directly) for zooming into whatever detail
+    // the write-up is pointing at.
     const thumb = data.screenshot_b64
-      ? `<img src="data:image/png;base64,${data.screenshot_b64}" alt="Screen ${screenNum}" style="width:96px; height:auto; flex-shrink:0; border:1px solid var(--ink-line); border-radius:6px; display:block;">`
+      ? `<a href="data:image/png;base64,${data.screenshot_b64}" target="_blank" title="Open full-size" style="flex-shrink:0;">
+          <img src="data:image/png;base64,${data.screenshot_b64}" alt="Screen ${screenNum}" style="width:220px; max-width:100%; height:auto; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+        </a>`
       : '';
 
     return `
