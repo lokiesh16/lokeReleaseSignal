@@ -1033,9 +1033,13 @@
         <div id="lsCasesCsvStatus" style="font-size:12px; margin-top:6px;"></div>
       </div>
       <div class="field full" style="margin-top:14px;">
-        <label>Description <span class="opt">optional — what THIS chunk does, e.g. "log in as staging test user"</span></label>
+        <label>Description <span class="opt">what the CURRENT test case does — pick a loaded case above, or type your own</span></label>
         <select id="lsCapturedDescriptionPicker" style="margin-bottom:6px; display:none;"></select>
-        <input id="lsCapturedDescription" placeholder="e.g. Log in as staging test user">
+        <div style="display:flex; gap:8px;">
+          <input id="lsCapturedDescription" placeholder="e.g. Log in as staging test user" style="flex:1;">
+          <button class="copy" id="lsSplitHereBtn" disabled title="Locks in the description above for the steps captured so far, then starts a new test case from the NEXT step you record — pick or type the next one below." style="flex-shrink:0; background:var(--ink-line); color:var(--paper);">✂ Split — next test case</button>
+        </div>
+        <div id="lsSplitStatus" style="font-size:11.5px; margin-top:5px;"></div>
       </div>
       <div class="field full" style="margin-top:10px;">
         <label>Save as a Saved Flow <span class="opt">appears in Test Library, ready to run — no LLM calls</span></label>
@@ -3568,6 +3572,39 @@ ${containerEl.innerHTML}
   let lsCapturedSteps = [];
   let lsDragFromIndex = null;
 
+  // Forward-looking split: click "Split here" and the CURRENT Description
+  // field's value is locked in for the steps captured so far, then the
+  // NEXT step recorded (via Act, tap-anywhere, anything that pushes into
+  // lsCapturedSteps) becomes the start of a new test case - no need to
+  // go back and manually check a box on a specific step afterward (that
+  // per-step "Split here" checkbox in each step's own edit panel still
+  // works too, for retroactively fixing/moving a split point).
+  // lsFirstGroupDescription freezes test case 1's description the moment
+  // the FIRST split happens - saveCapturedSteps reads the live field
+  // only until then, since after that the field gets reused as scratch
+  // space for whichever test case is currently being recorded.
+  let lsFirstGroupDescription = null;
+  let lsPendingSplit = null; // {atIndex, description} - applied to lsCapturedSteps[atIndex] once it exists
+
+  function lsResetSplitState() {
+    lsFirstGroupDescription = null;
+    lsPendingSplit = null;
+  }
+
+  function lsApplyPendingSplit() {
+    if (!lsPendingSplit) return;
+    if (lsCapturedSteps.length > lsPendingSplit.atIndex) {
+      const step = lsCapturedSteps[lsPendingSplit.atIndex];
+      step.splitBefore = true;
+      // Read fresh, not from whenever "Split here" was clicked - the
+      // whole point is picking/typing the next test case's description
+      // happens AFTER that click, in the gap before this qualifying step
+      // actually arrives.
+      step.description = document.getElementById('lsCapturedDescription').value.trim();
+      lsPendingSplit = null;
+    }
+  }
+
   // Set while a test case loaded via "Edit an existing flow or
   // precondition" is being worked on - {kind: 'flows'|'preconditions',
   // slug, name, testIndex, totalTestCount}. When set, saving that same
@@ -4007,6 +4044,11 @@ ${containerEl.innerHTML}
   function lsActionAccent(action) { return LS_ACTION_ACCENTS[action] || LS_ACTION_ACCENT_DEFAULT; }
 
   function renderLsCapturedSteps() {
+    // Applied here (rather than at each of the many lsCapturedSteps.push
+    // call sites) since every one of them already calls this right
+    // after pushing - one place to catch "the step I was waiting for
+    // just showed up" regardless of which action produced it.
+    lsApplyPendingSplit();
     // Card visibility is owned by the connect/disconnect handlers now (it's
     // where switch_app/the locator lab live, so it needs to be reachable
     // from the moment you connect, before any step exists) - this function
@@ -4014,6 +4056,7 @@ ${containerEl.innerHTML}
     const countEl = document.getElementById('lsCapturedCount');
     const listEl = document.getElementById('lsCapturedList');
     countEl.textContent = `${lsCapturedSteps.length} step(s)`;
+    document.getElementById('lsSplitHereBtn').disabled = lsCapturedSteps.length === 0;
     if (!lsCapturedSteps.length) {
       listEl.className = 'empty-hint';
       listEl.innerHTML = `Click <b>Act</b> on an element above, run an action, and it'll show up here.`;
@@ -4323,6 +4366,7 @@ ${containerEl.innerHTML}
 
   document.getElementById('lsClearCapturedBtn').addEventListener('click', () => {
     lsCapturedSteps = [];
+    lsResetSplitState();
     renderLsCapturedSteps();
   });
 
@@ -4401,9 +4445,11 @@ ${containerEl.innerHTML}
   function cancelEditAndStartNewFlow() {
     stopEditingFlow();
     lsCapturedSteps = [];
+    lsResetSplitState();
     renderLsCapturedSteps();
     document.getElementById('lsCapturedDescription').value = '';
     document.getElementById('lsCapturedDescriptionPicker').value = '';
+    document.getElementById('lsSplitStatus').textContent = '';
     document.getElementById('lsCapturedFlowStatus').textContent = '';
     document.getElementById('lsCapturedPreconditionStatus').textContent = '';
   }
@@ -4418,6 +4464,7 @@ ${containerEl.innerHTML}
     // Deep copy - editing this buffer must never mutate the cached
     // original, since "Stop editing" without saving should discard changes.
     lsCapturedSteps = JSON.parse(JSON.stringify(test.steps || []));
+    lsResetSplitState();
     document.getElementById('lsCapturedDescription').value = test.description || '';
     const nameFieldId = lsEditFlowCache.kind === 'preconditions' ? 'lsCapturedPreconditionName' : 'lsCapturedFlowName';
     document.getElementById(nameFieldId).value = lsEditFlowCache.name;
@@ -4480,6 +4527,18 @@ ${containerEl.innerHTML}
   // [23..26] as a second one whose description comes from step 23's own
   // note. This is what makes "these later steps belong inside a separate,
   // named test case, not tacked onto the end of a giant one" possible in a
+  // Test case 1's description: once "Split here" has been clicked at
+  // least once, the live field has been repurposed as scratch space for
+  // whichever test case is CURRENTLY being recorded, so it can no longer
+  // be trusted to still hold test case 1's own text - lsFirstGroupDescription
+  // is what got frozen at that first split instead. Before any split, the
+  // field is still exactly test case 1's description, live.
+  function lsFirstGroupDescriptionValue() {
+    return lsFirstGroupDescription !== null
+      ? lsFirstGroupDescription
+      : document.getElementById('lsCapturedDescription').value.trim();
+  }
+
   // single save, instead of manually removing/re-recording/re-saving twice.
   function lsGroupCapturedStepsIntoTests(overallDescription) {
     const groups = [{description: overallDescription, steps: []}];
@@ -4546,6 +4605,40 @@ ${containerEl.innerHTML}
     document.getElementById('lsCapturedDescription').value = lsLoadedCases[e.target.value].description;
   });
 
+  document.getElementById('lsSplitHereBtn').addEventListener('click', () => {
+    if (!lsCapturedSteps.length) return;
+    const descEl = document.getElementById('lsCapturedDescription');
+    const pickerEl = document.getElementById('lsCapturedDescriptionPicker');
+    const description = descEl.value.trim();
+
+    // First split ever: freeze what's in the field right now as test
+    // case 1's description - from this point on the field gets reused
+    // for whichever test case is currently being recorded, so it can no
+    // longer be trusted to still hold test case 1's text by the time
+    // Save actually runs.
+    const isFirstSplit = !lsCapturedSteps.some(s => s.splitBefore);
+    if (isFirstSplit) lsFirstGroupDescription = description;
+
+    // No description stored here - lsApplyPendingSplit reads the field
+    // FRESH at the moment the qualifying step actually arrives, since the
+    // whole point is picking/typing the next test case's description
+    // happens AFTER this click, in between it and the next Act. Storing
+    // it now would just re-capture the OLD (about-to-be-cleared) text.
+    lsPendingSplit = {atIndex: lsCapturedSteps.length};
+
+    // Whichever loaded case the field's current text came from is spoken
+    // for now - mark it ✓ same as a real save would, since this chunk's
+    // description is genuinely locked in at this point.
+    if (pickerEl.value !== '' && lsLoadedCases[pickerEl.value]) {
+      lsLoadedCases[pickerEl.value].used = true;
+    }
+    pickerEl.value = '';
+    lsRenderCasePicker();
+    descEl.value = '';
+    document.getElementById('lsSplitStatus').innerHTML =
+      `<span style="color:var(--circuit);">✓ Locked in "${escapeHtml(description || '(no description)')}" for the ${lsCapturedSteps.length} step(s) so far. Pick or type the next test case's description, then keep capturing.</span>`;
+  });
+
   async function saveCapturedSteps(endpoint, nameInputId, statusElId, btnId) {
     const btn = document.getElementById(btnId);
     const statusEl = document.getElementById(statusElId);
@@ -4566,7 +4659,7 @@ ${containerEl.innerHTML}
     btn.textContent = editing ? 'Updating…' : 'Saving…';
     statusEl.textContent = '';
     try {
-      const description = document.getElementById('lsCapturedDescription').value.trim();
+      const description = lsFirstGroupDescriptionValue();
       let res, data;
       if (editing) {
         const hasSplits = lsCapturedSteps.some(s => s.splitBefore);
@@ -4615,6 +4708,7 @@ ${containerEl.innerHTML}
         // same name appends it as another test case instead of duplicating
         // what's already saved.
         lsCapturedSteps = [];
+        lsResetSplitState();
         document.getElementById('lsCapturedDescription').value = '';
         // Whichever loaded case was picked for THIS chunk is spoken for -
         // mark it ✓ and reset the picker to its placeholder so the next
@@ -4683,7 +4777,7 @@ ${containerEl.innerHTML}
     btn.textContent = 'Generating…';
     statusEl.textContent = '';
     try {
-      const description = document.getElementById('lsCapturedDescription').value.trim();
+      const description = lsFirstGroupDescriptionValue();
       const tests = lsGroupCapturedStepsIntoTests(description || className);
       const res = await fetch(BRIDGE_URL + '/api/generate-page-test-from-tests', {
         method: 'POST',
@@ -4719,7 +4813,7 @@ ${containerEl.innerHTML}
     btn.textContent = 'Saving…';
     statusEl.textContent = '';
     try {
-      const description = document.getElementById('lsCapturedDescription').value.trim();
+      const description = lsFirstGroupDescriptionValue();
       const tests = lsGroupCapturedStepsIntoTests(description || className);
       const res = await fetch(BRIDGE_URL + '/api/save-to-project', {
         method: 'POST',
