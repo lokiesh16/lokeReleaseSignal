@@ -1025,7 +1025,16 @@
       </div>
 
       <div class="field full" style="margin-top:14px;">
+        <label>Load test cases from CSV <span class="opt">optional — columns: description (or steps/goal) + optional id. Pick one below instead of typing a description by hand for each chunk.</span></label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="file" id="lsCasesCsvFileInput" accept=".csv" style="flex:1;">
+          <button class="copy" id="lsCasesCsvLoadBtn" style="flex-shrink:0;">Load CSV</button>
+        </div>
+        <div id="lsCasesCsvStatus" style="font-size:12px; margin-top:6px;"></div>
+      </div>
+      <div class="field full" style="margin-top:14px;">
         <label>Description <span class="opt">optional — what THIS chunk does, e.g. "log in as staging test user"</span></label>
+        <select id="lsCapturedDescriptionPicker" style="margin-bottom:6px; display:none;"></select>
         <input id="lsCapturedDescription" placeholder="e.g. Log in as staging test user">
       </div>
       <div class="field full" style="margin-top:10px;">
@@ -4394,6 +4403,7 @@ ${containerEl.innerHTML}
     lsCapturedSteps = [];
     renderLsCapturedSteps();
     document.getElementById('lsCapturedDescription').value = '';
+    document.getElementById('lsCapturedDescriptionPicker').value = '';
     document.getElementById('lsCapturedFlowStatus').textContent = '';
     document.getElementById('lsCapturedPreconditionStatus').textContent = '';
   }
@@ -4482,6 +4492,60 @@ ${containerEl.innerHTML}
     return groups;
   }
 
+  // Loaded once per CSV upload, [{id, description, used}] - "used" just
+  // tracks which ones this session has already picked into a saved chunk
+  // (marked ✓ in the picker below), so building several flows/test cases
+  // in a row from the same batch doesn't require remembering by hand
+  // which descriptions are already spoken for.
+  let lsLoadedCases = [];
+
+  function lsRenderCasePicker() {
+    const picker = document.getElementById('lsCapturedDescriptionPicker');
+    if (!lsLoadedCases.length) {
+      picker.style.display = 'none';
+      picker.innerHTML = '';
+      return;
+    }
+    picker.style.display = 'block';
+    const prevValue = picker.value;
+    picker.innerHTML = '<option value="">— pick a loaded test case —</option>' +
+      lsLoadedCases.map((c, i) =>
+        `<option value="${i}">${c.used ? '✓ ' : ''}Test case${escapeHtml(c.id)}: ${escapeHtml(c.description)}</option>`
+      ).join('');
+    if ([...picker.options].some(o => o.value === prevValue)) picker.value = prevValue;
+  }
+
+  document.getElementById('lsCasesCsvLoadBtn').addEventListener('click', async () => {
+    const fileInput = document.getElementById('lsCasesCsvFileInput');
+    const statusEl = document.getElementById('lsCasesCsvStatus');
+    const file = fileInput.files[0];
+    if (!file) {
+      statusEl.innerHTML = '<span style="color:var(--signal);">Choose a .csv file first</span>';
+      return;
+    }
+    const csvText = await file.text();
+    statusEl.textContent = 'Parsing…';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/parse-csv', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({csv_text: csvText}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to parse CSV');
+      lsLoadedCases = (data.cases || []).map(c => ({...c, used: false}));
+      lsRenderCasePicker();
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Loaded ${lsLoadedCases.length} test case(s) — pick one below instead of typing a description</span>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    }
+  });
+
+  document.getElementById('lsCapturedDescriptionPicker').addEventListener('change', (e) => {
+    if (e.target.value === '') return;
+    document.getElementById('lsCapturedDescription').value = lsLoadedCases[e.target.value].description;
+  });
+
   async function saveCapturedSteps(endpoint, nameInputId, statusElId, btnId) {
     const btn = document.getElementById(btnId);
     const statusEl = document.getElementById(statusElId);
@@ -4552,6 +4616,16 @@ ${containerEl.innerHTML}
         // what's already saved.
         lsCapturedSteps = [];
         document.getElementById('lsCapturedDescription').value = '';
+        // Whichever loaded case was picked for THIS chunk is spoken for -
+        // mark it ✓ and reset the picker to its placeholder so the next
+        // chunk starts from "pick a case" again instead of still showing
+        // the one just used as selected.
+        const picker = document.getElementById('lsCapturedDescriptionPicker');
+        if (picker.value !== '' && lsLoadedCases[picker.value]) {
+          lsLoadedCases[picker.value].used = true;
+          picker.value = '';
+          lsRenderCasePicker();
+        }
         renderLsCapturedSteps();
         if (!isPrecondition) showCreateTestScriptBtn(data.slug, name);
       }
