@@ -1,0 +1,279 @@
+{
+  "name": "fitnessVideosPlayback",
+  "slug": "fitnessvideosplayback",
+  "goal": "Go to app, and navigate to Health app, click on Fitness Videos, and validate whether All the Fitness videos are playing across all groups and the elapsed time is increasing.",
+  "created_at": "2026-09-02T10:46:47Z",
+  "app_name": "HabitNu Staging",
+  "app_version": "5.8.0 (611)",
+  "feature_label": "Fitness Videos",
+  "publish_allure": true,
+  "appium": {
+    "platform": "iOS",
+    "device": "Lokesh's iPhone",
+    "bundle_id": "habitnu2.stag",
+    "platform_version": "18.6.2",
+    "app_version": "5.8.0 (611)",
+    "extra_caps": {
+      "appium:wdaLocalPort": 8100,
+      "appium:useNewWDA": false,
+      "appium:connectHardwareKeyboard": true,
+      "appium:settings[snapshotMaxDepth]": 70
+    }
+  },
+  "tests": [
+    {
+      "description": "Open the app and navigate to Health > Fitness Videos",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "HabitNu Staging",
+          "strategy": "accessibility id",
+          "value": "HabitNu Staging",
+          "skip": true
+        },
+        {
+          "action": "wait",
+          "seconds": 5
+        },
+        {
+          "action": "tap",
+          "label": "Health",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Health"
+        },
+        {
+          "action": "tap",
+          "label": "Fitness Videos Boost your routine with\nworkouts that fit your style Workout Now",
+          "strategy": "accessibility id",
+          "value": "Fitness Videos Boost your routine with\nworkouts that fit your style Workout Now"
+        }
+      ]
+    },
+    {
+      "for_each": {
+        "url": "https://admin-develop.habitnu.com/api/v1/video_groups/674d5d7b798332000166bcd7?page=1",
+        "headers": {
+          "authorization": "Token token={{token}}"
+        },
+        "auth": {
+          "login_url": "https://admin-develop.habitnu.com/api/v1/sessions",
+          "method": "POST",
+          "body": {
+            "email": "lokesh+habit2@habitnu.com",
+            "password": "Qwerty@123",
+            "client_id": null
+          },
+          "token_path": "token"
+        },
+        "path": "videos"
+      },
+      "description_template": "videoGroup1 (Strength Training): play '{title}', played more than 5 seconds",
+      "steps_template": [
+        {
+          "action": "tap",
+          "label": "Health",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Health"
+        },
+        {
+          "action": "tap",
+          "label": "Fitness Videos Boost your routine with\nworkouts that fit your style Workout Now",
+          "strategy": "accessibility id",
+          "value": "Fitness Videos Boost your routine with\nworkouts that fit your style Workout Now"
+        },
+        {
+          "action": "wait",
+          "seconds": 5
+        },
+        {
+          "action": "tap",
+          "strategy": "accessibility id",
+          "value_template": "Strength Training View All"
+        },
+        {
+          "action": "wait",
+          "seconds": 2
+        },
+        {
+          "action": "tap",
+          "strategy": "accessibility id",
+          "value_template": "{duration} {title} {introduction}"
+        },
+        {
+          "action": "wait",
+          "seconds": 10
+        },
+        {
+          "action": "tap",
+          "x": 200,
+          "y": 213
+        },
+        {
+          "action": "wait",
+          "seconds": 2
+        },
+        {
+          "action": "assert_value",
+          "label": "Elapsed Time",
+          "strategy": "-ios class chain",
+          "value": "**/XCUIElementTypeStaticText[`name == 'Elapsed Time'`]",
+          "extract": "duration_seconds",
+          "compare": "greater_than",
+          "expected": 0
+        }
+      ]
+    },
+    {
+      "for_each": {
+        "url": "https://admin-develop.habitnu.com/api/v1/video_groups/674e7f83d8ebd30001e7664e?page=1",
+        "headers": {
+          "authorization": "Token token={{token}}"
+        },
+        "auth": {
+          "login_url": "https://admin-develop.habitnu.com/api/v1/sessions",
+          "method": "POST",
+          "body": {
+            "email": "lokesh+habit2@habitnu.com",
+            "password": "Qwerty@123",
+            "client_id": null
+          },
+          "token_path": "token"
+        },
+        "path": "videos"
+      },
+      "description_template": "videoGroup2: play '{title}', played more than 5 seconds",
+      "steps_template": [
+        {
+          "action": "tap",
+          "label": "Health",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Health"
+        },
+        {
+          "action": "tap",
+          "label": "Fitness Videos Boost your routine with\nworkouts that fit your style Workout Now",
+          "strategy": "accessibility id",
+          "value": "Fitness Videos Boost your routine with\nworkouts that fit your style Workout Now"
+        },
+        {
+          "action": "wait",
+          "seconds": 5
+        },
+        {
+          "action": "tap",
+          "strategy": "accessibility id",
+          "value_template": "Cardio View All"
+        },
+        {
+          "action": "wait",
+          "seconds": 2
+        },
+        {
+          "action": "tap",
+          "strategy": "accessibility id",
+          "value_template": "{duration} {title} {introduction}"
+        },
+        {
+          "action": "wait",
+          "seconds": 10
+        },
+        {
+          "action": "tap",
+          "x": 200,
+          "y": 213
+        },
+        {
+          "action": "wait",
+          "seconds": 2
+        },
+        {
+          "action": "assert_value",
+          "label": "Elapsed Time",
+          "strategy": "-ios class chain",
+          "value": "**/XCUIElementTypeStaticText[`name == 'Elapsed Time'`]",
+          "extract": "duration_seconds",
+          "compare": "greater_than",
+          "expected": 0
+        }
+      ]
+    },
+    {
+      "for_each": {
+        "url": "https://admin-develop.habitnu.com/api/v1/video_groups/68d2e417d692b800018d9888?page=1",
+        "headers": {
+          "authorization": "Token token={{token}}"
+        },
+        "auth": {
+          "login_url": "https://admin-develop.habitnu.com/api/v1/sessions",
+          "method": "POST",
+          "body": {
+            "email": "lokesh+habit2@habitnu.com",
+            "password": "Qwerty@123",
+            "client_id": null
+          },
+          "token_path": "token"
+        },
+        "path": "videos"
+      },
+      "description_template": "videoGroup3: play '{title}', played more than 5 seconds",
+      "steps_template": [
+        {
+          "action": "tap",
+          "label": "Health",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Health"
+        },
+        {
+          "action": "tap",
+          "label": "Fitness Videos Boost your routine with\nworkouts that fit your style Workout Now",
+          "strategy": "accessibility id",
+          "value": "Fitness Videos Boost your routine with\nworkouts that fit your style Workout Now"
+        },
+        {
+          "action": "wait",
+          "seconds": 5
+        },
+        {
+          "action": "tap",
+          "strategy": "accessibility id",
+          "value_template": "Health View All"
+        },
+        {
+          "action": "wait",
+          "seconds": 2
+        },
+        {
+          "action": "tap",
+          "strategy": "accessibility id",
+          "value_template": "{duration} {title} {introduction}"
+        },
+        {
+          "action": "wait",
+          "seconds": 10
+        },
+        {
+          "action": "tap",
+          "x": 200,
+          "y": 213
+        },
+        {
+          "action": "wait",
+          "seconds": 2
+        },
+        {
+          "action": "assert_value",
+          "label": "Elapsed Time",
+          "strategy": "-ios class chain",
+          "value": "**/XCUIElementTypeStaticText[`name == 'Elapsed Time'`]",
+          "extract": "duration_seconds",
+          "compare": "greater_than",
+          "expected": 0
+        }
+      ]
+    }
+  ]
+}
