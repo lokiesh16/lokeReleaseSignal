@@ -1,0 +1,1306 @@
+{
+  "name": "EULA_BANNER_CHECK_FLOW_FOR_MUSC_USERS",
+  "slug": "eula_banner_check_flow",
+  "goal": "EULA_BANNER_CHECK_FLOW",
+  "app_version": "1.0.0 (111)",
+  "created_at": "2026-09-08T08:04:31Z",
+  "setup_script": "tests/temp/test_curatedRecipes.py",
+  "publish_allure": false,
+  "appium": {
+    "platform": "iOS",
+    "device": "Anand\u2019s iPhone",
+    "bundle_id": "habitnu2.musc.stag",
+    "platform_version": "26.6.1",
+    "extra_caps": {
+      "appium:wdaLocalPort": 8100,
+      "appium:useNewWDA": false,
+      "appium:connectHardwareKeyboard": true,
+      "appium:settings[snapshotMaxDepth]": 70
+    }
+  },
+  "tests": [
+    {
+      "description": "",
+      "steps": [
+        {
+          "action": "type_text",
+          "description": "Validate first_time user sees EULA banner as soon as login",
+          "label": "login_email_input",
+          "skip": false,
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeTextField",
+          "text": "lokesh+muscforautomate1@habitnu.com",
+          "value": "login_email_input"
+        },
+        {
+          "action": "type_text",
+          "label": "login_password_input",
+          "skip": false,
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeSecureTextField",
+          "text": "Qwerty@123",
+          "value": "login_password_input"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "skip": false,
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Done"
+        },
+        {
+          "action": "tap",
+          "label": "Sign in",
+          "skip": false,
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeOther",
+          "value": "login_sign_in_button"
+        },
+        {
+          "action": "tap",
+          "label": "Save",
+          "skip": false,
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Save",
+          "optional": true
+        },
+        {
+          "action": "wait",
+          "label": "wait 10s",
+          "seconds": 10
+        },
+        {
+          "action": "assert_visible",
+          "label": "MUSC Health logo with medical building icon and text Medical University of South Carolina.",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeImage",
+          "value": "MUSC Health logo with medical building icon and text Medical University of South Carolina."
+        }
+      ]
+    },
+    {
+      "description": "Validate User sees 'End User License Agreement', 'Decline', 'Accept' and others  in the first page of EULA banner",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "END USER LICENSE AGREEMENT",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "END USER LICENSE AGREEMENT",
+          "description": "Validate User sees 'End User License Agreement', 'Decline', 'Accept' and others  in the first page of EULA banner"
+        },
+        {
+          "action": "assert_visible",
+          "label": "PLEASE REVIEW THE FOLLOWING TERMS & CONDITIONS CAREFULLY BEFORE USING THIS APP",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "PLEASE REVIEW THE FOLLOWING TERMS & CONDITIONS CAREFULLY BEFORE USING THIS APP"
+        },
+        {
+          "action": "assert_visible",
+          "label": "1. Acceptance of Terms",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "1. Acceptance of Terms"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Decline",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Decline"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Accept",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Accept"
+        }
+      ]
+    },
+    {
+      "description": "Verify by default 'English' language is loaded",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "English",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "English",
+          "description": "Verify by default 'English' language is loaded"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can change the language to 'Spanish'",
+      "steps": [
+        {
+          "action": "tap",
+          "x": 357,
+          "y": 82,
+          "label": "screen point (357, 82)",
+          "description": "Validate user can change the language to 'Spanish'"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "Spanish"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Spanish",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Spanish"
+        }
+      ]
+    },
+    {
+      "description": "Validate 'End User License Agreement' is now translated to changed language 'Spanish'",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "ACUERDO DE LICENCIA DE USUARIO FINAL",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "ACUERDO DE LICENCIA DE USUARIO FINAL",
+          "description": "Validate 'End User License Agreement' is now translated to changed language 'Spanish'"
+        },
+        {
+          "action": "assert_visible",
+          "label": "LEA ATENTAMENTE LOS SIGUIENTES T\u00c9RMINOS Y CONDICIONES ANTES DE UTILIZAR ESTA APLICACI\u00d3N",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "LEA ATENTAMENTE LOS SIGUIENTES T\u00c9RMINOS Y CONDICIONES ANTES DE UTILIZAR ESTA APLICACI\u00d3N"
+        },
+        {
+          "action": "tap",
+          "x": 377,
+          "y": 83,
+          "label": "screen point (377, 83)"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "English"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "assert_visible",
+          "label": "English",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "English"
+        }
+      ]
+    },
+    {
+      "description": "Validate clicking 'Accept' button navigates to 'Let's get started!' page",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Accept",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Accept",
+          "description": "Validate clicking 'Accept' button navigates to 'Let's get started!' page"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Let's get started!",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Let's get started!"
+        }
+      ]
+    },
+    {
+      "description": "Validate 'Let's get started!' page displays 'Do Not Enroll' and 'Next' button",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "We are thrilled to be a part of your journey to better health!",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "We are thrilled to be a part of your journey to better health!",
+          "description": "Validate 'Let's get started!' page displays 'Do Not Enroll' and 'Next' button"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Do Not Enroll",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Do Not Enroll"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Next",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Next"
+        }
+      ]
+    },
+    {
+      "description": "Validate clicking 'Next' button on 'Let's get started!' page navigates to 'Build your profile'screen",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Next",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Next",
+          "description": "Validate clicking 'Next' button on 'Let's get started!' page navigates to 'Build your profile'screen"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Let's build your profile",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Let's build your profile"
+        }
+      ]
+    },
+    {
+      "description": "Validate all fields such as 'First name', 'last name', 'DOB' and others are displayed properly on 'Let's build your profile' page",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "description": "Validate all fields such as 'First name', 'last name', 'DOB' and others are displayed properly on 'Let's build your profile' page ",
+          "label": "Fill in your details to personalize your experience",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "Fill in your details to personalize your experience"
+        },
+        {
+          "action": "assert_visible",
+          "label": "First Name* ",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "First Name* "
+        },
+        {
+          "action": "assert_visible",
+          "label": "Last Name ",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "Last Name "
+        },
+        {
+          "action": "assert_visible",
+          "label": "Preferred Name ",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "Preferred Name "
+        },
+        {
+          "action": "assert_visible",
+          "label": "Date Of Birth *",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "Date Of Birth *"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Email* ",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "Email* "
+        },
+        {
+          "action": "assert_visible",
+          "label": "Sex at Birth *",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "Sex at Birth *"
+        },
+        {
+          "action": "assert_visible",
+          "label": "How do you identify? ",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "How do you identify? "
+        },
+        {
+          "action": "assert_visible",
+          "label": "Time Zone *",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeOther",
+          "value": "Time Zone *"
+        },
+        {
+          "action": "swipe",
+          "x": 179,
+          "y": 697,
+          "x2": 171,
+          "y2": 238,
+          "label": "swipe (179, 697) \u2192 (171, 238)"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Phone Number* ",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "Phone Number* "
+        },
+        {
+          "action": "assert_visible",
+          "label": "Address line 1* ",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "Address line 1* "
+        },
+        {
+          "action": "assert_visible",
+          "label": "Address line 2 ",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "Address line 2 "
+        },
+        {
+          "action": "assert_visible",
+          "label": "City* ",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "City* "
+        },
+        {
+          "action": "assert_visible",
+          "label": "State *",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "State *"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Zipcode* ",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeOther",
+          "value": "Zipcode* "
+        }
+      ]
+    },
+    {
+      "description": "Validate 'HIPAA consent' is displayed",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "//XCUIElementTypeButton[contains(@name,'I agree ')]",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "xpath",
+          "value": "//XCUIElementTypeButton[contains(@name,'I agree ')]",
+          "description": "Validate 'HIPAA consent' is displayed"
+        },
+        {
+          "action": "assert_visible",
+          "label": "HIPAA informed consent Participant Consent, Authorization & Liability Acknowledgment MUSC",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "HIPAA informed consent Participant Consent, Authorization & Liability Acknowledgment MUSC"
+        }
+      ]
+    },
+    {
+      "description": "Validate 'is required' messages when clicked 'Next' button without filling details",
+      "steps": [
+        {
+          "action": "clear",
+          "label": "XCUIElementTypeTextField",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypeTextField",
+          "value": "//XCUIElementTypeOther[@name=\"Address line 1* \"]//XCUIElementTypeTextField"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Done"
+        },
+        {
+          "action": "clear",
+          "label": "XCUIElementTypeTextField",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypeTextField",
+          "value": "//XCUIElementTypeOther[@name=\"Zipcode* \"]//XCUIElementTypeTextField"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Done"
+        },
+        {
+          "action": "clear",
+          "label": "XCUIElementTypeTextField",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypeTextField",
+          "value": "//XCUIElementTypeOther[@name=\"City* \"]//XCUIElementTypeTextField"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Done"
+        },
+        {
+          "action": "tap",
+          "description": "Validate 'is required' messages when clicked 'Next' button without filling details",
+          "label": "Next",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Next"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Address line 1 is required",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "Address line 1 is required"
+        },
+        {
+          "action": "assert_visible",
+          "label": "City is required",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "City is required"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Zip code is required",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "Zip code is required"
+        }
+      ]
+    },
+    {
+      "description": "validate 'Please review and accept the required MUSC consent forms to continue' error message",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "//XCUIElementTypeButton[contains(@name,'I agree ')]",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypeButton",
+          "value": "//XCUIElementTypeButton[contains(@name,'I agree ')]"
+        },
+        {
+          "action": "wait",
+          "seconds": 2,
+          "label": "wait 2s"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Please review and accept the required MUSC consent forms to continue.",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Please review and accept the required MUSC consent forms to continue.",
+          "description": "validate 'Please review and accept the required MUSC consent forms to continue' error message"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can select Date",
+      "steps": [
+        {
+          "action": "swipe",
+          "x": 179,
+          "y": 207,
+          "x2": 221,
+          "y2": 634,
+          "label": "swipe (179, 207) \u2192 (221, 634)"
+        },
+        {
+          "action": "tap",
+          "description": "Validate user can select Date",
+          "label": "//XCUIElementTypeOther[@name='Date Of Birth *']/following-sibling::XCUIElementTypeOther",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypeOther",
+          "value": "//XCUIElementTypeOther[@name='Date Of Birth *']/following-sibling::XCUIElementTypeOther"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypePickerWheel",
+          "text": "January",
+          "value": "(//XCUIElementTypePickerWheel)[1]"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypePickerWheel",
+          "text": "January",
+          "value": "(//XCUIElementTypePickerWheel)[1]"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypePickerWheel",
+          "text": "16",
+          "value": "(//XCUIElementTypePickerWheel)[2]"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypePickerWheel",
+          "text": "16",
+          "value": "(//XCUIElementTypePickerWheel)[2]"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypePickerWheel",
+          "text": "2000",
+          "value": "(//XCUIElementTypePickerWheel)[3]"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypePickerWheel",
+          "text": "2000",
+          "value": "(//XCUIElementTypePickerWheel)[3]"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypePickerWheel",
+          "text": "2000",
+          "value": "(//XCUIElementTypePickerWheel)[3]"
+        },
+        {
+          "action": "tap",
+          "label": "screen point (349, 532)",
+          "x": 349,
+          "y": 532
+        },
+        {
+          "action": "assert_visible",
+          "label": "01/16/2000 \ue935",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeOther",
+          "value": "01/16/2000 \ue935"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can select SEX",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "//XCUIElementTypeOther[@name='Sex at Birth *']/following-sibling::XCUIElementTypeOther",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "//XCUIElementTypeOther[@name='Sex at Birth *']/following-sibling::XCUIElementTypeOther",
+          "description": "Validate user can select SEX"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "Male"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Male",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Male"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can enter Address line 1",
+      "steps": [
+        {
+          "action": "swipe",
+          "x": 160,
+          "y": 703,
+          "x2": 181,
+          "y2": 240,
+          "label": "swipe (160, 703) \u2192 (181, 240)"
+        },
+        {
+          "action": "type_text",
+          "description": "Validate user can enter Address line 1",
+          "label": "//XCUIElementTypeOther[@name='Enter address Address line 1 is required']",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypeOther",
+          "text": "test address 1",
+          "value": "//XCUIElementTypeOther[@name='Enter address Address line 1 is required']"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Done"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can enter City",
+      "steps": [
+        {
+          "action": "type_text",
+          "label": "//XCUIElementTypeOther[@name='Enter city City is required']",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "//XCUIElementTypeOther[@name='Enter city City is required']",
+          "text": "test city",
+          "description": "Validate user can enter City"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Done"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can select State==Alabama",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "(//XCUIElementTypeOther[@name='State *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypeOther[@name='State *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "description": "Validate user can select State==Alabama"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "Alabama"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Alabama",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Alabama"
+        }
+      ]
+    },
+    {
+      "description": "Validate zipcode error message 'Zip code must be either 5 digits (XXXXX) or 9 digits (XXXXX-XXXX)'",
+      "steps": [
+        {
+          "action": "type_text",
+          "label": "//XCUIElementTypeOther[@name='Enter ZIP code Zip code is required']",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "//XCUIElementTypeOther[@name='Enter ZIP code Zip code is required']",
+          "text": "z",
+          "description": "Validate zipcode error message 'Zip code must be either 5 digits (XXXXX) or 9 digits (XXXXX-XXXX)'"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Done"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Zip code must be either 5 digits (XXXXX) or 9 digits (XXXXX-XXXX)",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Zip code must be either 5 digits (XXXXX) or 9 digits (XXXXX-XXXX)"
+        },
+        {
+          "action": "tap",
+          "label": "(//XCUIElementTypeTextField)[9]",
+          "tag": "XCUIElementTypeTextField",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypeTextField)[9]"
+        },
+        {
+          "action": "tap",
+          "label": "delete",
+          "tag": "XCUIElementTypeKey",
+          "strategy": "accessibility id",
+          "value": "delete"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Done"
+        }
+      ]
+    },
+    {
+      "description": "validate user can enter valid zipcode",
+      "steps": [
+        {
+          "action": "type_text",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "//XCUIElementTypeOther[@name='Enter ZIP code Zip code is required']",
+          "text": "78787",
+          "description": "validate user can enter valid zipcode"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Done"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can check-in hippa consent form and proceed to next screen",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "//XCUIElementTypeButton[contains(@name,'I agree ')]",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "xpath",
+          "value": "//XCUIElementTypeButton[contains(@name,'I agree ')]",
+          "description": "Validate user can check-in hippa consent form and proceed to next screen"
+        }
+      ]
+    },
+    {
+      "description": "",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Next",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Next",
+          "description": ""
+        }
+      ]
+    },
+    {
+      "description": "validate Final Step screen and elements  in EULA banner",
+      "steps": [
+        {
+          "action": "wait",
+          "seconds": 10,
+          "label": "wait 10s"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Almost done!",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Almost done!",
+          "description": "validate Final Step screen and elements  in EULA banner"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Final step! Let's wrap this up.",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Final step! Let's wrap this up."
+        },
+        {
+          "action": "assert_visible",
+          "label": "Diabetes Status *",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Diabetes Status *"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Do you have hypertension? *",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Do you have hypertension? *"
+        },
+        {
+          "action": "assert_visible",
+          "label": "What are you most interested in? (Select all that apply) *",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "What are you most interested in? (Select all that apply) *"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Are you currently taking GLP-1 medication? *",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Are you currently taking GLP-1 medication? *"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Please let us know which health plan you are covered by *",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Please let us know which health plan you are covered by *"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Height Unit *",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Height Unit *"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can select Diabetes Status==Diabetes",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "(//XCUIElementTypeStaticText[@name='Diabetes Status *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypeStaticText[@name='Diabetes Status *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "description": "Validate user can select Diabetes Status==Diabetes"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "Diabetes"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Diabetes",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Diabetes"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can select 'Do you have hypertension?==Yes",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "(//XCUIElementTypeOther[@name='Do you have hypertension? *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypeOther[@name='Do you have hypertension? *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "description": "Validate user can select 'Do you have hypertension?==Yes"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "Yes"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Yes",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Yes"
+        }
+      ]
+    },
+    {
+      "description": "validate user can answer  What are you most interested in? (Select all that apply) == Mindfulness",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "\ue835 Mindfulness",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "\ue835 Mindfulness",
+          "description": "validate user can answer  What are you most interested in? (Select all that apply) == Mindfulness"
+        }
+      ]
+    },
+    {
+      "description": "validate Are you currently taking GLP-1 medication?==No",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "(//XCUIElementTypeOther[@name='Are you currently taking GLP-1 medication? *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypeOther[@name='Are you currently taking GLP-1 medication? *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "description": "validate Are you currently taking GLP-1 medication?==No"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "No"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "assert_visible",
+          "label": "No",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "No"
+        }
+      ]
+    },
+    {
+      "description": "validate Please let us know which health plan you are covered by == Medicaid",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "(//XCUIElementTypeOther[@name='Please let us know which health plan you are covered by *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypeOther[@name='Please let us know which health plan you are covered by *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "description": "validate Please let us know which health plan you are covered by == Medicaid"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "Medicaid"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Medicaid",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Medicaid"
+        },
+        {
+          "action": "swipe",
+          "label": "Yes",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Yes",
+          "direction": "up"
+        },
+        {
+          "action": "wait",
+          "seconds": 2,
+          "label": "wait 2s"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can set Height=5feet & 7 inches",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "(//XCUIElementTypeStaticText[@name='Height *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypeStaticText[@name='Height *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "description": "Validate user can set Height=5feet & 7 inches"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "5 feet"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "assert_visible",
+          "label": "5 feet",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "5 feet"
+        },
+        {
+          "action": "tap",
+          "label": "((//XCUIElementTypeStaticText[@name='Height *'])/following-sibling::XCUIElementTypeOther/XCUIElementTypeOther)[2]",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "((//XCUIElementTypeStaticText[@name='Height *'])/following-sibling::XCUIElementTypeOther/XCUIElementTypeOther)[2]",
+          "description": "Validate user can set Height=5feet & 7 inches"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "7 inches"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "assert_visible",
+          "label": "7 inches",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "7 inches"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can set Current Weight==150 lbs",
+      "steps": [
+        {
+          "action": "type_text",
+          "label": "//XCUIElementTypeOther[@name='Current Weight *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeTextField",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "//XCUIElementTypeOther[@name='Current Weight *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeTextField",
+          "text": "150",
+          "description": "Validate user can set Current Weight==150 lbs"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Done"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can set Target weight==140lbs",
+      "steps": [
+        {
+          "action": "type_text",
+          "label": "//XCUIElementTypeOther[@name='What is your goal weight? *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeTextField",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "//XCUIElementTypeOther[@name='What is your goal weight? *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeTextField",
+          "text": "140",
+          "description": "Validate user can set Target weight==140lbs"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Done"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can set Current Physical Activity==Light",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "((//XCUIElementTypeOther[@name='Current Physical Activity *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1])",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypeOther[@name='Current Physical Activity *']/following-sibling::XCUIElementTypeOther//XCUIElementTypeOther)[1]",
+          "description": "Validate user can set Current Physical Activity==Light"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "Light"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can Submit EULA with all required details",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "Light",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Light",
+          "description": "Validate user can Submit EULA with all required details"
+        },
+        {
+          "action": "tap",
+          "label": "Submit",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Submit"
+        },
+        {
+          "action": "wait",
+          "seconds": 10,
+          "label": "wait 10s"
+        }
+      ]
+    },
+    {
+      "description": "Validate user is displayed with 'Congratulations! Your profile is complete!' message after clicking 'Submit' button",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "Congratulations! Your profile is complete!",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Congratulations! Your profile is complete!",
+          "description": "Validate user is displayed with 'Congratulations! Your profile is complete!' message after clicking 'Submit' button"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Be on the lookout for your Welcome Email",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Be on the lookout for your Welcome Email"
+        }
+      ]
+    },
+    {
+      "description": "Validate user finally lands inside app, after clicking 'Finish' button",
+      "steps": [
+        {
+          "action": "tap",
+          "description": "Validate user finally lands inside app, after clicking 'Finish' button",
+          "label": "Finish",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Finish"
+        },
+        {
+          "action": "wait",
+          "label": "wait 10s",
+          "seconds": 10
+        },
+        {
+          "action": "assert_visible",
+          "label": "QUICK LOGS",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "QUICK LOGS"
+        },
+        {
+          "action": "tap",
+          "label": "Go to profile",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Go to profile"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Sign Out",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Sign Out"
+        },
+        {
+          "action": "tap",
+          "label": "Sign Out",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Sign Out"
+        },
+        {
+          "action": "tap",
+          "label": "Ok",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Ok"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Email ",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Email "
+        }
+      ]
+    }
+  ],
+  "updated_at": "2026-09-08T16:16:01Z"
+}
