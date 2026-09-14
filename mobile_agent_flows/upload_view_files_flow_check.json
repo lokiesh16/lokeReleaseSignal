@@ -1,0 +1,538 @@
+{
+  "name": "Upload_View_files_flow_check",
+  "slug": "upload_view_files_flow_check",
+  "goal": "Upload_View_files_flow_check",
+  "created_at": "2026-09-05T16:34:27Z",
+  "publish_allure": true,
+  "appium": {
+    "platform": "iOS",
+    "device": "Lokesh's iPhone",
+    "bundle_id": "habitnu2.stag",
+    "platform_version": "18.6.2",
+    "extra_caps": {
+      "appium:wdaLocalPort": 8100,
+      "appium:useNewWDA": false,
+      "appium:connectHardwareKeyboard": true,
+      "appium:settings[snapshotMaxDepth]": 70
+    }
+  },
+  "tests": [
+    {
+      "description": "Validate Upload/View Files",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Go to profile",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Go to profile",
+          "description": "validate clicking \"Upload/View files\" takes to Upload file list page"
+        },
+        {
+          "action": "tap",
+          "label": "Upload/View Files",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Upload/View Files"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Upload file list",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Upload file list"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Profile, back",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Profile, back"
+        }
+      ]
+    },
+    {
+      "description": "Validate clicking Upload button takes to Upload files page and assert it's elements",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Upload",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Upload",
+          "description": "Validate clicking Upload button takes to Upload files page and assert it's elements"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Select file to upload",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Select file to upload"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Document name* ",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Document name* "
+        }
+      ]
+    },
+    {
+      "description": "Validate 'Max size 15MB (gif, jpg, jpeg, png, pdf)' is displayed",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "Max size 15MB (gif, jpg, jpeg, png, pdf)",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Max size 15MB (gif, jpg, jpeg, png, pdf)",
+          "description": "Validate 'Max size 15MB (gif, jpg, jpeg, png, pdf)' is displayed"
+        }
+      ]
+    },
+    {
+      "description": "Validate Document type==Insurance Card Front can be selected as Document type",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "Document type *",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Document type *",
+          "description": "Validate Document type==Insurance Card Front can be selected as Document type"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Select Document Type",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Select Document Type"
+        },
+        {
+          "action": "tap",
+          "label": "Select Document Type",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Select Document Type"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "Insurance Card Front"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Insurance Card Front",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Insurance Card Front"
+        }
+      ]
+    },
+    {
+      "description": "Validate clicking 'UPLOAD' button without giving Document name displays 'is required' message",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "UPLOAD",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "UPLOAD",
+          "description": "Validate clicking 'UPLOAD' button without giving Document name displays 'is required' message"
+        },
+        {
+          "action": "assert_visible",
+          "label": "is required",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "is required"
+        }
+      ]
+    },
+    {
+      "description": "Validate clicking 'UPLOAD' button without giving Document name and Document Type displays 'is required' message against both fields",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Insurance Card Front",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Insurance Card Front",
+          "description": "Validate clicking 'UPLOAD' button without giving Document name and Document Type displays 'is required' message against both fields"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "Select Document Type"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "tap",
+          "label": "UPLOAD",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "UPLOAD"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Select Document Type is required",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Select Document Type is required"
+        },
+        {
+          "action": "assert_visible",
+          "label": "is required",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "is required"
+        }
+      ]
+    },
+    {
+      "description": "Validate clicking 'UPLOAD' button without giving Document type displays 'is required' message",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Go back",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Go back",
+          "description": "Validate clicking 'UPLOAD' button without giving Document type displays 'is required' message"
+        },
+        {
+          "action": "tap",
+          "label": "Upload",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Upload"
+        },
+        {
+          "action": "type_text",
+          "label": "Document name* ",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Document name* ",
+          "text": "wefgwrg"
+        },
+        {
+          "action": "tap",
+          "label": "Done",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Done"
+        },
+        {
+          "action": "tap",
+          "label": "UPLOAD",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "UPLOAD"
+        },
+        {
+          "action": "assert_visible",
+          "label": "is required",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "is required"
+        }
+      ]
+    },
+    {
+      "description": "Validate user should not be able to upload files with both Document name and type, but without selecting actual file and displays 'Select a file'",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Select Document Type",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Select Document Type",
+          "description": "Validate user should not be able to upload files with both Document name and type, but without selecting actual file and displays 'Select a file'"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypePickerWheel",
+          "tag": "XCUIElementTypePickerWheel",
+          "strategy": "xpath",
+          "value": "(//XCUIElementTypePickerWheel)[1]",
+          "text": "Insurance Card Back"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "tap",
+          "label": "UPLOAD",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "UPLOAD"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Select a file",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Select a file"
+        }
+      ]
+    },
+    {
+      "description": "Validate tapping 'Camera' icon opens up camera",
+      "steps": [
+        {
+          "action": "tap",
+          "x": 26,
+          "y": 148,
+          "label": "screen point (26, 148)",
+          "description": "Validate tapping 'Camera' icon opens up camera"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Camera Mode",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Camera Mode"
+        },
+        {
+          "action": "tap",
+          "label": "Dismiss",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "DismissImagePickerButton"
+        }
+      ]
+    },
+    {
+      "description": "Validate tapping 'Documents' icon opens up Documents library",
+      "steps": [
+        {
+          "action": "tap",
+          "x": 89,
+          "y": 148,
+          "label": "screen point (89, 148)",
+          "description": "Validate tapping 'Documents' icon opens up Documents library"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Documents, Actions Menu",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Documents, Actions Menu"
+        },
+        {
+          "action": "tap",
+          "x": 302,
+          "y": 108,
+          "label": "screen point (302, 108)"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can upload files by tapping on Gallery icon",
+      "steps": [
+        {
+          "action": "tap",
+          "x": 58,
+          "y": 148,
+          "label": "screen point (58, 148)",
+          "description": "Validate user can upload files by tapping on Gallery icon"
+        },
+        {
+          "action": "tap",
+          "label": "Snap",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Snap"
+        },
+        {
+          "action": "tap",
+          "x": 61,
+          "y": 168,
+          "label": "screen point (61, 168)"
+        },
+        {
+          "action": "tap",
+          "label": "Choose",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Choose"
+        },
+        {
+          "action": "assert_visible",
+          "label": "jpg",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "jpg"
+        }
+      ]
+    },
+    {
+      "description": "Validate user should be able to upload files with all details such as name, doc type and file selected",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "UPLOAD",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "UPLOAD",
+          "description": "Validate user should be able to upload files with all details such as name, doc type and file selected"
+        },
+        {
+          "action": "wait",
+          "seconds": 2,
+          "label": "wait 2s"
+        }
+      ]
+    },
+    {
+      "description": "Validate uploaded file shows up in Upload file list with provided name ",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "wefgwrg",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "wefgwrg",
+          "description": "Validate uploaded file shows up in Upload file list with provided name "
+        }
+      ]
+    },
+    {
+      "description": "Validate uploaded file shows up in Upload file list with provided name & date on which it's uploaded",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "09/05/2026",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "09/05/2026",
+          "description": "Validate uploaded file shows up in Upload file list with provided name & date on which it's uploaded"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can download uploaded files",
+      "steps": [
+        {
+          "action": "tap",
+          "description": "Validate user can download uploaded files",
+          "label": "screen point (317, 166)",
+          "x": 317,
+          "y": 166
+        },
+        {
+          "action": "wait",
+          "seconds": 2,
+          "label": "wait 2s"
+        },
+        {
+          "action": "tap",
+          "label": "Image canvas",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Image canvas"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Markup",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeSwitch",
+          "value": "QLOverlayMarkupButtonAccessibilityIdentifier"
+        },
+        {
+          "action": "tap",
+          "label": "close",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "QLOverlayDoneButtonAccessibilityIdentifier"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can delete uploaded files",
+      "steps": [
+        {
+          "action": "tap",
+          "x": 363,
+          "y": 166,
+          "label": "screen point (363, 166)",
+          "description": "Validate user can delete uploaded files"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Delete upload",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Delete upload"
+        },
+        {
+          "action": "tap",
+          "label": "OK",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "OK"
+        },
+        {
+          "action": "tap",
+          "label": "Upload files, back",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Upload files, back"
+        },
+        {
+          "action": "tap",
+          "label": "Go back",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Go back"
+        },
+        {
+          "action": "tap",
+          "label": "Profile, back",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Profile, back"
+        },
+        {
+          "action": "tap",
+          "label": "Go back",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Go back"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Home",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Home"
+        }
+      ]
+    }
+  ],
+  "updated_at": "2026-09-05T16:38:44Z"
+}
