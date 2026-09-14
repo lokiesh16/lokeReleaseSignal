@@ -1,0 +1,498 @@
+{
+  "name": "chatbot_flow",
+  "slug": "chatbot_flow",
+  "goal": "chatbot_flow",
+  "created_at": "2026-09-06T12:09:38Z",
+  "publish_allure": true,
+  "appium": {
+    "platform": "iOS",
+    "device": "Lokesh's iPhone",
+    "bundle_id": "habitnu2.stag",
+    "platform_version": "18.6.2",
+    "extra_caps": {
+      "appium:wdaLocalPort": 8100,
+      "appium:useNewWDA": false,
+      "appium:connectHardwareKeyboard": true,
+      "appium:settings[snapshotMaxDepth]": 70
+    }
+  },
+  "tests": [
+    {
+      "description": "",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Chat and Meetings",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Chat and Meetings",
+          "description": "Validate clicking 'Chat and Meetings' displays 'Chat with Habi' option"
+        },
+        {
+          "action": "tap",
+          "x": 180,
+          "y": 646,
+          "label": "screen point (180, 646)"
+        }
+      ]
+    },
+    {
+      "description": "Validate tapping 'Chat with Habi' navigates to Chatbot page",
+      "steps": [
+        {
+          "action": "wait",
+          "seconds": 5,
+          "label": "wait 5s"
+        },
+        {
+          "action": "assert_visible",
+          "description": "Validate tapping 'Chat with Habi' navigates to Chatbot page",
+          "label": "How can I help you?",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "How can I help you?"
+        },
+        {
+          "action": "assert_visible",
+          "label": "POPULAR TOPICS",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "POPULAR TOPICS"
+        }
+      ]
+    },
+    {
+      "description": "Validate Habi logo is displayed on chatbot page",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "assets/src/assets/images/habi_chat_container.png",
+          "tag": "XCUIElementTypeImage",
+          "strategy": "accessibility id",
+          "value": "assets/src/assets/images/habi_chat_container.png",
+          "description": "Validate Habi logo is displayed on chatbot page"
+        }
+      ]
+    },
+    {
+      "description": "Validate 'Habi' word is displayed on chatbot page",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "Habi",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Habi",
+          "description": "Validate 'Habi' word is displayed on chatbot page"
+        }
+      ]
+    },
+    {
+      "description": "Validate 'Beta' word is displayed on chatbot page",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "Beta",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Beta",
+          "description": "Validate 'Beta' word is displayed on chatbot page"
+        }
+      ]
+    },
+    {
+      "description": "Validate 'Virtual Assistant' word is displayed on chatbot page",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "Virtual Assistant",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Virtual Assistant",
+          "description": "Validate 'Virtual Assistant' word is displayed on chatbot page"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can see chat history ",
+      "steps": [
+        {
+          "action": "tap",
+          "x": 352,
+          "y": 104,
+          "label": "screen point (352, 104)",
+          "description": "Validate user can see chat history "
+        },
+        {
+          "action": "assert_visible",
+          "label": "Active Chat",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Active Chat"
+        }
+      ]
+    },
+    {
+      "description": "Verify chat history page elements/labels such as 'Active chat', 'History', 'Clear All', 'New Chat' button",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "label": "History",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "History",
+          "description": "Verify chat history page elements/labels such as 'Active chat', 'History', 'Clear All', 'New Chat' button"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Clear All",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Clear All"
+        },
+        {
+          "action": "assert_visible",
+          "label": "New Chat",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "New Chat"
+        }
+      ]
+    },
+    {
+      "description": "Verify when tapped on 'timer' (chat history) button, hides history page.",
+      "steps": [
+        {
+          "action": "tap",
+          "x": 349,
+          "y": 104,
+          "label": "screen point (349, 104)",
+          "description": "Verify when tapped on 'timer' (chat history) button, hides history page."
+        },
+        {
+          "action": "assert_visible",
+          "label": "POPULAR TOPICS",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "POPULAR TOPICS"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Type here...",
+          "tag": "XCUIElementTypeTextView",
+          "strategy": "accessibility id",
+          "value": "Type here..."
+        }
+      ]
+    },
+    {
+      "description": "validate user can send 'hi' to chatbot and expects response back",
+      "steps": [
+        {
+          "action": "type_text",
+          "label": "Type here...",
+          "tag": "XCUIElementTypeTextView",
+          "strategy": "accessibility id",
+          "value": "Type here...",
+          "text": "hi",
+          "description": "validate user can send 'hi' to chatbot and expects response back"
+        },
+        {
+          "action": "wait",
+          "seconds": 5,
+          "label": "wait 5s"
+        },
+        {
+          "action": "tap",
+          "x": 357,
+          "y": 512,
+          "label": "screen point (357, 512)"
+        },
+        {
+          "action": "wait",
+          "seconds": 15,
+          "label": "wait 15s"
+        },
+        {
+          "action": "tap",
+          "x": 343,
+          "y": 286,
+          "label": "screen point (343, 286)"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can edit sent request",
+      "steps": [
+        {
+          "action": "wait",
+          "seconds": 5,
+          "label": "wait 5s"
+        },
+        {
+          "action": "tap",
+          "description": "Validate user can edit sent request",
+          "label": "screen point (294, 432)",
+          "x": 294,
+          "y": 432
+        },
+        {
+          "action": "wait",
+          "seconds": 5,
+          "label": "wait 5s"
+        },
+        {
+          "action": "type_text",
+          "label": "XCUIElementTypeTextView",
+          "strategy": "xpath",
+          "tag": "XCUIElementTypeTextView",
+          "text": "hi hello",
+          "value": "(//XCUIElementTypeTextView)[1]"
+        },
+        {
+          "action": "wait",
+          "seconds": 5,
+          "label": "wait 5s"
+        },
+        {
+          "action": "tap",
+          "label": "screen point (351, 511)",
+          "x": 351,
+          "y": 511
+        },
+        {
+          "action": "wait",
+          "label": "wait 5s",
+          "seconds": 5
+        },
+        {
+          "action": "tap",
+          "label": "screen point (352, 273)",
+          "x": 352,
+          "y": 273
+        },
+        {
+          "action": "wait",
+          "seconds": 5,
+          "label": "wait 5s"
+        }
+      ]
+    },
+    {
+      "description": "validate in chat history, Active chat loads 'hi hello'",
+      "steps": [
+        {
+          "action": "tap",
+          "x": 348,
+          "y": 105,
+          "label": "screen point (348, 105)",
+          "description": "validate in chat history, Active chat loads 'hi hello'"
+        },
+        {
+          "action": "assert_visible",
+          "label": "hi hello",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "hi"
+        }
+      ]
+    },
+    {
+      "description": "Validate tapping 'New Chat' loads new chat tray",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "New Chat",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "New Chat",
+          "description": "Validate tapping 'New Chat' loads new chat tray"
+        },
+        {
+          "action": "assert_visible",
+          "label": "POPULAR TOPICS",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "POPULAR TOPICS"
+        }
+      ]
+    },
+    {
+      "description": "Verify chat history loads previous chats",
+      "steps": [
+        {
+          "action": "tap",
+          "x": 353,
+          "y": 104,
+          "label": "screen point (353, 104)",
+          "description": "Verify chat history loads previous chats"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Habis Chat",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Habis Chat"
+        },
+        {
+          "action": "assert_visible",
+          "label": "hi hello",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "hi"
+        },
+        {
+          "action": "tap",
+          "label": "Clear All",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Clear All"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Confirm",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Confirm"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Are you sure you want to clear all  \"History\"? This action cannot be undone.",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Are you sure you want to clear all  \"History\"? This action cannot be undone."
+        },
+        {
+          "action": "tap",
+          "label": "Yes",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Yes"
+        },
+        {
+          "action": "tap",
+          "x": 352,
+          "y": 103,
+          "label": "screen point (352, 103)"
+        },
+        {
+          "action": "assert_visible",
+          "label": "POPULAR TOPICS",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "POPULAR TOPICS"
+        }
+      ]
+    },
+    {
+      "description": "Validate 'Popular topics' are interactable",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Healthy Meal Ideas Fresh, nutritious recipes tailored to your goals.",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Healthy Meal Ideas Fresh, nutritious recipes tailored to your goals.",
+          "description": "Validate 'Popular topics' are interactable"
+        },
+        {
+          "action": "wait",
+          "seconds": 10,
+          "label": "wait 10s"
+        },
+        {
+          "action": "tap",
+          "x": 352,
+          "y": 102,
+          "label": "screen point (352, 102)"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Healthy Meal Ideas",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Healthy Meal Ideas"
+        }
+      ]
+    },
+    {
+      "description": "Validate user can use predefined prompts such as 'Log Food' etc are working as expected",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "New Chat",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "New Chat",
+          "description": "Validate user can use predefined prompts such as 'Log Food' etc are working as expected"
+        },
+        {
+          "action": "tap",
+          "label": "Log Food",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Log Food"
+        },
+        {
+          "action": "wait",
+          "seconds": 10,
+          "label": "wait 10s"
+        },
+        {
+          "action": "tap",
+          "x": 349,
+          "y": 105,
+          "label": "screen point (349, 105)"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Log a meal",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Log a meal"
+        },
+        {
+          "action": "tap",
+          "label": "New Chat",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "New Chat"
+        },
+        {
+          "action": "tap",
+          "x": 348,
+          "y": 105,
+          "label": "screen point (348, 105)"
+        },
+        {
+          "action": "tap",
+          "label": "Clear All",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Clear All"
+        },
+        {
+          "action": "tap",
+          "label": "Yes",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Yes"
+        },
+        {
+          "action": "tap",
+          "x": 34,
+          "y": 104,
+          "label": "screen point (34, 104)"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Home",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Home"
+        }
+      ]
+    }
+  ],
+  "updated_at": "2026-09-06T12:14:46Z"
+}
