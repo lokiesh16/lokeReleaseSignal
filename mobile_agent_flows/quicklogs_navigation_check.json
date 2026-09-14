@@ -1,0 +1,351 @@
+{
+  "name": "QuickLogs_navigation_check",
+  "slug": "quicklogs_navigation_check",
+  "goal": "QuickLogs_navigation_check",
+  "created_at": "2026-09-05T15:41:44Z",
+  "publish_allure": true,
+  "appium": {
+    "platform": "iOS",
+    "device": "Lokesh's iPhone",
+    "bundle_id": "habitnu2.stag",
+    "platform_version": "18.6.2",
+    "extra_caps": {
+      "appium:wdaLocalPort": 8100,
+      "appium:useNewWDA": false,
+      "appium:connectHardwareKeyboard": true,
+      "appium:settings[snapshotMaxDepth]": 70
+    }
+  },
+  "tests": [
+    {
+      "description": "",
+      "steps": [
+        {
+          "action": "assert_visible",
+          "description": "Validate Quick Log items",
+          "label": "QUICK LOGS",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "QUICK LOGS"
+        },
+        {
+          "action": "swipe",
+          "direction": "right",
+          "label": "Snap Moods Mindful Weight Scale Exercise Hydration Barcode Vertical scroll bar, 2 pages",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeOther",
+          "value": "Snap Moods Mindful Weight Scale Exercise Hydration Barcode Vertical scroll bar, 2 pages"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Snap",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Snap"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Moods",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Moods"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Mindful",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Mindful"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Weight",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Weight"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Scale",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Scale"
+        },
+        {
+          "action": "swipe",
+          "direction": "left",
+          "label": "Snap Moods Mindful Weight Scale Exercise Hydration Barcode Vertical scroll bar, 2 pages",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeOther",
+          "value": "Snap Moods Mindful Weight Scale Exercise Hydration Barcode Vertical scroll bar, 2 pages"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Exercise",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Exercise"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Hydration",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Hydration"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Barcode",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Barcode"
+        },
+        {
+          "action": "swipe",
+          "label": "Snap Moods Mindful Weight Scale Exercise Hydration Barcode Vertical scroll bar, 2 pages",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Snap Moods Mindful Weight Scale Exercise Hydration Barcode Vertical scroll bar, 2 pages",
+          "direction": "right"
+        }
+      ]
+    },
+    {
+      "description": "validate QUICK LOGS navigation for 'Snap'",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Snap",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Snap",
+          "description": "validate QUICK LOGS navigation for 'Snap'"
+        },
+        {
+          "action": "tap",
+          "x": 67,
+          "y": 762,
+          "label": "screen point (67, 762)"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Photos",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Photos"
+        },
+        {
+          "action": "tap",
+          "label": "Cancel",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Cancel"
+        },
+        {
+          "action": "tap",
+          "x": 47,
+          "y": 92,
+          "label": "screen point (47, 92)"
+        },
+        {
+          "action": "assert_visible",
+          "label": "QUICK LOGS",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "QUICK LOGS"
+        }
+      ]
+    },
+    {
+      "description": "validate QUICK LOGS navigation for 'Moods'",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Moods",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Moods",
+          "description": "validate QUICK LOGS navigation for 'Moods'"
+        },
+        {
+          "action": "tap",
+          "x": 193,
+          "y": 437,
+          "label": "screen point (193, 437)"
+        }
+      ]
+    },
+    {
+      "description": "validate QUICK LOGS navigation for 'Mindful'",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Mindful",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Mindful",
+          "description": "validate QUICK LOGS navigation for 'Mindful'"
+        },
+        {
+          "action": "tap",
+          "x": 203,
+          "y": 255,
+          "label": "screen point (203, 255)"
+        }
+      ]
+    },
+    {
+      "description": "validate QUICK LOGS navigation for 'Weight'",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Weight",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Weight",
+          "description": "validate QUICK LOGS navigation for 'Weight'"
+        },
+        {
+          "action": "tap",
+          "x": 198,
+          "y": 319,
+          "label": "screen point (198, 319)"
+        }
+      ]
+    },
+    {
+      "description": "validate QUICK LOGS navigation for 'Scale'",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Scale",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Scale",
+          "description": "validate QUICK LOGS navigation for 'Scale'"
+        },
+        {
+          "action": "tap",
+          "x": 193,
+          "y": 377,
+          "label": "screen point (193, 377)"
+        }
+      ]
+    },
+    {
+      "description": "validate QUICK LOGS navigation for 'Exercise'",
+      "steps": [
+        {
+          "action": "swipe",
+          "label": "Snap Moods Mindful Weight Scale Exercise Hydration Barcode Vertical scroll bar, 2 pages",
+          "tag": "XCUIElementTypeOther",
+          "strategy": "accessibility id",
+          "value": "Snap Moods Mindful Weight Scale Exercise Hydration Barcode Vertical scroll bar, 2 pages",
+          "direction": "left",
+          "description": "validate QUICK LOGS navigation for 'Exercise'"
+        },
+        {
+          "action": "tap",
+          "label": "Exercise",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Exercise"
+        },
+        {
+          "action": "tap",
+          "x": 183,
+          "y": 168,
+          "label": "screen point (183, 168)"
+        }
+      ]
+    },
+    {
+      "description": "validate QUICK LOGS navigation for 'Hydration'",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Hydration",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Hydration",
+          "description": "validate QUICK LOGS navigation for 'Hydration'"
+        },
+        {
+          "action": "tap",
+          "x": 197,
+          "y": 367,
+          "label": "screen point (197, 367)"
+        }
+      ]
+    },
+    {
+      "description": "validate QUICK LOGS navigation for 'Barcode'",
+      "steps": [
+        {
+          "action": "tap",
+          "description": "validate QUICK LOGS navigation for 'Barcode'",
+          "label": "Barcode",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Barcode"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Barcode scanner",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeOther",
+          "value": "Barcode scanner"
+        },
+        {
+          "action": "tap",
+          "label": "Go back",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeButton",
+          "value": "Go back"
+        },
+        {
+          "action": "assert_visible",
+          "label": "QUICK LOGS",
+          "strategy": "accessibility id",
+          "tag": "XCUIElementTypeStaticText",
+          "value": "QUICK LOGS"
+        }
+      ]
+    },
+    {
+      "description": "Validate Set Targets which is inline with Quick Logs navigates to Set Targets page",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Set Targets",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Set Targets",
+          "description": "Validate Set Targets which is inline with Quick Logs navigates to Set Targets page"
+        },
+        {
+          "action": "assert_visible",
+          "label": "Set Your Target",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "Set Your Target"
+        },
+        {
+          "action": "tap",
+          "label": "Go back",
+          "tag": "XCUIElementTypeButton",
+          "strategy": "accessibility id",
+          "value": "Go back"
+        },
+        {
+          "action": "assert_visible",
+          "label": "QUICK LOGS",
+          "tag": "XCUIElementTypeStaticText",
+          "strategy": "accessibility id",
+          "value": "QUICK LOGS"
+        }
+      ]
+    }
+  ],
+  "updated_at": "2026-09-05T15:48:39Z"
+}
