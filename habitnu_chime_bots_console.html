@@ -158,6 +158,15 @@
   </div>
 
   <label style="margin-top: 1.3rem;">Test users <span class="hint" style="text-transform: none; font-weight: 400;">— one bot joins per user below</span></label>
+  <div class="row" style="align-items: center; margin-top: 0.3rem;">
+    <input type="file" id="cfgUsersCsvFile" accept=".csv" style="margin-top: 0;">
+    <button id="cfgUsersCsvLoad" style="flex-shrink: 0;">Load users from CSV</button>
+  </div>
+  <p class="hint" style="margin-top: 0.3rem;">
+    Columns: <code>email</code>, <code>password</code> (header row optional — with no header, first
+    column is treated as email, second as password). Replaces the list below.
+  </p>
+  <p class="hint" id="cfgUsersCsvStatus"></p>
   <div id="cfgUsers"></div>
   <button id="cfgAddUser" style="margin-top: 0.6rem;">+ Add user</button>
 
@@ -265,6 +274,73 @@ async function loadMeta() {
 
 // ---------- Test accounts (config.json) ----------
 let cfgUsers = []; // [{email, password}] - mirrors config.json's "users" array while the form is open
+
+// A proper CSV parser (quoted fields, embedded commas/quotes, CRLF or LF)
+// rather than a plain text.split(',') - a password containing a comma
+// would otherwise silently split into the wrong column.
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === ',') {
+      row.push(field); field = '';
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      if (row.length > 1 || row[0] !== '') rows.push(row);
+      row = [];
+    } else {
+      field += c;
+    }
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+// Header row is optional - if neither of the first two columns looks
+// like an email/password header, this is treated as data starting at
+// row 1 (email, password in that column order).
+function parseUsersCsv(text) {
+  const rows = parseCsv(text).filter((r) => r.some((c) => c.trim() !== ''));
+  if (!rows.length) throw new Error('CSV is empty');
+
+  const header = rows[0].map((h) => h.trim().toLowerCase());
+  const emailIdx = header.findIndex((h) => ['email', 'user', 'username'].includes(h));
+  const passwordIdx = header.findIndex((h) => ['password', 'pass', 'pwd'].includes(h));
+  const hasHeader = emailIdx !== -1;
+  const eCol = hasHeader ? emailIdx : 0;
+  const pCol = hasHeader ? (passwordIdx === -1 ? 1 : passwordIdx) : 1;
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+
+  const users = dataRows
+    .map((r) => ({ email: (r[eCol] || '').trim(), password: (r[pCol] || '').trim() }))
+    .filter((u) => u.email);
+  if (!users.length) throw new Error('No rows with a usable email were found');
+  return users;
+}
+
+$('cfgUsersCsvLoad').addEventListener('click', async () => {
+  const fileInput = $('cfgUsersCsvFile');
+  const statusEl = $('cfgUsersCsvStatus');
+  const file = fileInput.files[0];
+  if (!file) { statusEl.textContent = 'Choose a .csv file first.'; return; }
+  try {
+    const users = parseUsersCsv(await file.text());
+    cfgUsers = users;
+    renderCfgUsers();
+    statusEl.innerHTML = `<span style="color: var(--success);">✓ Loaded ${users.length} user(s) from CSV — replaced the list below. Click "Save test accounts" to write it to config.json.</span>`;
+  } catch (e) {
+    statusEl.innerHTML = `<span style="color: #b02a2f;">${e.message}</span>`;
+  }
+});
 
 function renderCfgUsers() {
   const wrap = $('cfgUsers');
