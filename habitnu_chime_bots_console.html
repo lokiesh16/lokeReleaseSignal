@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chime Bot Test Runner</title>
+<style>
+  :root {
+    --bg: #f4f5f9;
+    --surface: #ffffff;
+    --border: #e3e5ec;
+    --text: #1c1f2b;
+    --text-dim: #6b7080;
+    --accent: #4f5bd5;
+    --accent-dim: #eef0fd;
+    --accent-hover: #3f4ac4;
+    --danger: #e5484d;
+    --danger-dim: #fdecec;
+    --success: #1e9e6b;
+    --success-dim: #e7f8f1;
+    --warn: #b8860b;
+    --warn-dim: #fbf3e2;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(20, 22, 40, 0.04), 0 4px 16px rgba(20, 22, 40, 0.04);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 2.2rem 1.25rem 4rem;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.45;
+  }
+
+  h1 { font-size: 1.5rem; margin: 0 0 0.3rem; letter-spacing: -0.01em; }
+  h1::before { content: "🐝 "; }
+  h2 { font-size: 1rem; font-weight: 650; margin: 2.2rem 0 0.7rem; color: var(--text); letter-spacing: -0.01em; }
+  h3 { font-size: 0.95rem; margin: 0 0 0.8rem; font-family: ui-monospace, monospace; color: var(--text-dim); }
+
+  .hint { font-size: 0.82rem; color: var(--text-dim); margin: 0.15rem 0; }
+  code { background: var(--accent-dim); color: var(--accent-hover); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.85em; }
+
+  section.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.1rem 1.3rem 1.3rem;
+  }
+
+  label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.02em; margin-top: 0.9rem; }
+  input, select {
+    width: 100%; box-sizing: border-box; padding: 0.5rem 0.6rem; font-size: 0.92rem;
+    margin-top: 0.3rem; border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--text);
+    font-family: inherit; transition: border-color 0.15s;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  input[type="checkbox"] { width: auto; margin-top: 0; accent-color: var(--accent); }
+
+  button {
+    padding: 0.5rem 1.1rem; font-size: 0.87rem; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--border); border-radius: 7px; background: #fff; color: var(--text);
+    transition: background 0.12s, border-color 0.12s, transform 0.05s;
+  }
+  button:hover { background: #f7f8fb; border-color: #ccd0dc; }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  button.danger { background: var(--danger-dim); border-color: #f3c9ca; color: #b02a2f; }
+  button.danger:hover { background: #fbdbdc; }
+
+  .row { display: flex; gap: 0.8rem; align-items: flex-start; }
+  .row > label { flex: 1; margin-top: 0.9rem; }
+  .cfg-user-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
+  .cfg-user-row input { margin-top: 0; }
+  .cfg-user-row button { flex-shrink: 0; padding: 0.5rem 0.7rem; }
+  .checkbox-row { display: flex; align-items: center; gap: 0.4rem; margin-top: 1.5rem; }
+  .checkbox-row label { margin: 0; text-transform: none; font-weight: 500; color: var(--text); font-size: 0.85rem; }
+
+  .error { color: #b02a2f; font-size: 0.82rem; margin-top: 0.6rem; min-height: 1em; }
+
+  table { border-collapse: collapse; width: 100%; }
+  #jobs { margin-top: 0.4rem; }
+  #jobs th {
+    text-align: left; padding: 0.5rem 0.7rem; font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 0.03em; color: var(--text-dim); border-bottom: 1px solid var(--border);
+  }
+  #jobs td { padding: 0.55rem 0.7rem; border-bottom: 1px solid #eef0f4; font-size: 0.87rem; }
+  #jobs tbody tr:hover { background: #fafbfd; }
+  #jobs a { color: var(--accent); text-decoration: none; font-family: ui-monospace, monospace; font-size: 0.83rem; }
+  #jobs a:hover { text-decoration: underline; }
+
+  .badge {
+    display: inline-block; padding: 0.15rem 0.55rem; border-radius: 20px;
+    font-size: 0.74rem; font-weight: 650; text-transform: capitalize;
+  }
+  .badge.status-running { background: var(--warn-dim); color: var(--warn); }
+  .badge.status-completed { background: var(--success-dim); color: var(--success); }
+  .badge.status-ended { background: #eee; color: #666; }
+  .badge.status-failed { background: var(--danger-dim); color: #b02a2f; }
+
+  #detail { margin-top: 1.2rem; display: none; }
+  #detail .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; }
+
+  #log {
+    background: #14161f; color: #d7dae4; font-family: ui-monospace, "SF Mono", monospace;
+    font-size: 0.76rem; white-space: pre-wrap; max-height: 320px; overflow-y: auto;
+    padding: 0.9rem 1rem; border-radius: 8px; line-height: 1.5;
+  }
+
+  #reactAllPanel { display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem; padding: 0.6rem 0.8rem; background: var(--accent-dim); border-radius: 8px; }
+  #reactAllPanel .label { font-size: 0.78rem; font-weight: 650; color: var(--accent-hover); text-transform: uppercase; letter-spacing: 0.02em; margin-right: 0.2rem; }
+  #reactAllPanel button { font-size: 1.15rem; padding: 0.3rem 0.55rem; line-height: 1; background: #fff; }
+  #botsPanel { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.7rem; margin-top: 1rem; }
+  .bot-card { border: 1px solid var(--border); border-radius: 8px; padding: 0.7rem 0.85rem; background: #fbfbfd; }
+  .bot-card .who { font-size: 0.83rem; margin-bottom: 0.5rem; }
+  .bot-card .who strong { color: var(--accent); font-family: ui-monospace, monospace; margin-right: 0.3rem; }
+  .bot-card .btns { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .bot-card .btns button { margin: 0; font-size: 0.76rem; padding: 0.3rem 0.55rem; font-weight: 500; }
+  .bot-card .btns.reactions { margin-top: 0.35rem; }
+  .bot-card .btns.reactions button { font-size: 1rem; padding: 0.2rem 0.4rem; line-height: 1; }
+
+  #cmdBox { display: flex; gap: 0.5rem; margin-top: 1rem; }
+  #cmdBox input { flex: 1; font-family: ui-monospace, monospace; margin-top: 0; }
+
+  #shots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 1rem; }
+  #shots img {
+    width: 150px; border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  #shots img:hover { transform: scale(1.03); box-shadow: var(--shadow); }
+</style>
+</head>
+<body>
+<h1>Chime Bot Test Runner</h1>
+<!-- <p class="hint">Runs entirely on this machine (<code>node server.js</code>) — no hosting, no auth needed. Configured accounts come from this folder's <code>config.json</code>.</p> -->
+<p class="hint" id="meta"></p>
+
+<h2>Test accounts <span class="hint">— coach + meeting settings, saved straight into this machine's config.json</span></h2>
+<section class="card">
+  <label>Admin base URL <input id="cfgAdminBaseUrl" placeholder="https://admin-develop.habitnu.com"></label>
+  <div class="row">
+    <label>Cohort <input id="cfgCohort" placeholder="DailyStandUp_Cohort"></label>
+    <label>Meeting title prefix <input id="cfgMeetingTitlePrefix" placeholder="QA Chime Bot Test"></label>
+  </div>
+  <div class="row">
+    <label>Meeting duration (min) <input id="cfgMeetingDurationMinutes" type="number" value="15"></label>
+    <label>Start in (min) <input id="cfgStartInMinutes" type="number" value="2"></label>
+  </div>
+
+  <label style="margin-top: 1.3rem;">Coach account</label>
+  <div class="row">
+    <input id="cfgCoachEmail" placeholder="coach email" style="margin-top: 0.3rem;">
+    <input id="cfgCoachPassword" type="password" placeholder="coach password" style="margin-top: 0.3rem;">
+  </div>
+
+  <label style="margin-top: 1.3rem;">Test users <span class="hint" style="text-transform: none; font-weight: 400;">— one bot joins per user below</span></label>
+  <div id="cfgUsers"></div>
+  <button id="cfgAddUser" style="margin-top: 0.6rem;">+ Add user</button>
+
+  <div class="row" style="margin-top: 1.1rem; align-items: center;">
+    <button class="primary" id="cfgSave">Save test accounts</button>
+    <span id="cfgStatus" class="hint" style="margin-top: 0;"></span>
+  </div>
+</section>
+
+<h2>Scripted run</h2>
+<section class="card">
+  <label>Script
+    <select id="script">
+      <option value="run-bots">run-bots (raw Chime SDK join, lightweight)</option>
+      <option value="test-member-features">test-member-features (real webapp UI: mic/video/raise-hand, fixed sequence)</option>
+    </select>
+  </label>
+  <label>Meeting ID <input id="rMeetingId" placeholder="e.g. 621115"></label>
+  <div class="row">
+    <label>Duration (s) <input id="rDuration" type="number" value="30"></label>
+    <label>Mute duration (s) <input id="rMuteDuration" type="number" value="15"></label>
+    <label>Stagger (ms) <input id="rStagger" type="number" value="1500"></label>
+  </div>
+  <label>Audio input <select id="rAudio"></select></label>
+  <div class="checkbox-row"><input type="checkbox" id="rMuted"><label for="rMuted">Join muted <span class="hint">(run-bots only)</span></label></div>
+  <button class="primary" id="startRun" style="margin-top: 1.1rem;">Start scripted run</button>
+  <div id="runError" class="error"></div>
+</section>
+
+<h2>Interactive session <span class="hint">— mic / video / raise hand / leave / join, on demand</span></h2>
+<section class="card">
+  <label>Meeting ID <input id="sMeetingId" placeholder="e.g. 621115"></label>
+  <div class="row" style="align-items: center;">
+    <label style="flex:1">Stagger (ms) <input id="sStagger" type="number" value="1500"></label>
+    <div class="checkbox-row"><input type="checkbox" id="sHeadless"><label for="sHeadless">Headless</label></div>
+  </div>
+  <label>Audio input <select id="sAudio"></select></label>
+  <button class="primary" id="startSession" style="margin-top: 1.1rem;">Start interactive session</button>
+  <div id="sessionError" class="error"></div>
+</section>
+
+<h2>Jobs</h2>
+<section class="card">
+  <table id="jobs">
+    <thead><tr><th>ID</th><th>Kind</th><th>Meeting</th><th>Status</th><th>Started</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+
+<div id="detail">
+  <section class="card">
+    <div class="top-row">
+      <h3 id="detailTitle"></h3>
+      <div class="row" style="margin-top: 0;">
+        <a id="exportBtn" href="#" target="_blank" style="text-decoration: none;"><button>Export log</button></a>
+        <button class="danger" id="stopBtn">Stop / end job</button>
+      </div>
+    </div>
+    <div id="log"></div>
+
+    <div id="reactAllPanel"></div>
+    <div id="botsPanel"></div>
+    <div id="cmdBox">
+      <input id="cmdInput" placeholder='raw command, e.g. "mic 1 off", "hand all on", "list"'>
+      <button class="primary" id="cmdSend">Send</button>
+    </div>
+    <p class="hint">Commands: <code>list</code>, <code>mic|video|hand|cc &lt;i|all&gt; [on|off]</code>, <code>react &lt;i|all&gt; &lt;reaction&gt;</code>, <code>chat &lt;i|all&gt; &lt;message&gt;</code>, <code>leave &lt;i|all&gt;</code>, <code>join &lt;i|all&gt;</code>, <code>screenshot &lt;i|all&gt;</code></p>
+
+    <div id="shots"></div>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+// This copy is meant to be hosted elsewhere (pushed to GitHub, fetched by
+// val.town) rather than served BY server.js itself, unlike
+// dashboard/index.html - so every API call needs to be pointed at the
+// LOCAL dashboard explicitly instead of a same-origin relative path.
+// server.js's own CORS headers are what make a cross-origin fetch from
+// wherever this page actually loads from allowed to reach it at all.
+const BRIDGE_URL = 'http://localhost:3000';
+
+async function api(path, opts) {
+  const res = await fetch(BRIDGE_URL + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function audioLabel(f) {
+  const name = f.replace(/^media\//, '').replace(/\.wav$/, '');
+  return name === 'fake-mic' ? `${name} (plain tone)` : name.includes('speech') ? `${name} (spoken words — for transcription checks)` : name;
+}
+
+async function loadMeta() {
+  try {
+    const meta = await api('/api/meta');
+    $('meta').textContent = `Meeting attendees: ${meta.userEmails.join(', ') || '(none)'} — max ${meta.maxConcurrent} concurrent job(s).`;
+    const optionsHtml = meta.audioFiles.map((f) => `<option value="${f}">${audioLabel(f)}</option>`).join('');
+    $('rAudio').innerHTML = optionsHtml;
+    $('sAudio').innerHTML = optionsHtml;
+  } catch (_) { /* server not up yet */ }
+}
+
+// ---------- Test accounts (config.json) ----------
+let cfgUsers = []; // [{email, password}] - mirrors config.json's "users" array while the form is open
+
+function renderCfgUsers() {
+  const wrap = $('cfgUsers');
+  wrap.innerHTML = cfgUsers.map((u, i) => `
+    <div class="cfg-user-row">
+      <input data-cfg-user-email="${i}" placeholder="user email" value="${u.email.replace(/"/g, '&quot;')}">
+      <input data-cfg-user-password="${i}" type="password" placeholder="user password" value="${u.password.replace(/"/g, '&quot;')}">
+      <button data-cfg-user-remove="${i}" title="Remove this user">✕</button>
+    </div>
+  `).join('') || '<p class="hint">No users yet — add at least one below.</p>';
+
+  wrap.querySelectorAll('[data-cfg-user-email]').forEach((el) => {
+    el.addEventListener('input', () => { cfgUsers[el.dataset.cfgUserEmail].email = el.value; });
+  });
+  wrap.querySelectorAll('[data-cfg-user-password]').forEach((el) => {
+    el.addEventListener('input', () => { cfgUsers[el.dataset.cfgUserPassword].password = el.value; });
+  });
+  wrap.querySelectorAll('[data-cfg-user-remove]').forEach((btn) => {
+    btn.addEventListener('click', () => { cfgUsers.splice(Number(btn.dataset.cfgUserRemove), 1); renderCfgUsers(); });
+  });
+}
+
+$('cfgAddUser').addEventListener('click', () => {
+  cfgUsers.push({ email: '', password: '' });
+  renderCfgUsers();
+});
+
+async function loadConfig() {
+  try {
+    const cfg = await api('/api/config');
+    $('cfgAdminBaseUrl').value = cfg.adminBaseUrl || '';
+    $('cfgCohort').value = cfg.cohort || '';
+    $('cfgMeetingTitlePrefix').value = cfg.meetingTitlePrefix || '';
+    $('cfgMeetingDurationMinutes').value = cfg.meetingDurationMinutes || 15;
+    $('cfgStartInMinutes').value = cfg.startInMinutes || 2;
+    $('cfgCoachEmail').value = (cfg.coach && cfg.coach.email) || '';
+    $('cfgCoachPassword').value = (cfg.coach && cfg.coach.password) || '';
+    cfgUsers = (cfg.users || []).map((u) => ({ email: u.email || '', password: u.password || '' }));
+    renderCfgUsers();
+  } catch (_) { /* server not up yet */ }
+}
+
+$('cfgSave').addEventListener('click', async () => {
+  const statusEl = $('cfgStatus');
+  statusEl.textContent = 'Saving…';
+  try {
+    await api('/api/config', { method: 'POST', body: JSON.stringify({
+      adminBaseUrl: $('cfgAdminBaseUrl').value.trim(),
+      cohort: $('cfgCohort').value.trim(),
+      meetingTitlePrefix: $('cfgMeetingTitlePrefix').value.trim(),
+      meetingDurationMinutes: Number($('cfgMeetingDurationMinutes').value) || 15,
+      startInMinutes: Number($('cfgStartInMinutes').value) || 2,
+      coach: { email: $('cfgCoachEmail').value.trim(), password: $('cfgCoachPassword').value },
+      users: cfgUsers,
+    })});
+    statusEl.textContent = '✓ Saved to config.json';
+    loadMeta(); // "Meeting attendees: ..." line reflects the saved user list right away
+  } catch (e) {
+    statusEl.textContent = e.message;
+  }
+});
+
+let activeDetailId = null;
+let pollTimer = null;
+
+async function refreshJobs() {
+  const jobs = await api('/api/jobs');
+  const tbody = document.querySelector('#jobs tbody');
+  tbody.innerHTML = '';
+  for (const job of jobs) {
+    const tr = document.createElement('tr');
+    const started = new Date(job.startedAt).toLocaleTimeString();
+    tr.innerHTML = `<td><a href="#" data-id="${job.id}">${job.id}</a></td><td>${job.kind}</td><td>${job.meetingId}</td><td><span class="badge status-${job.status}">${job.status}</span></td><td>${started}</td>`;
+    tr.querySelector('a').addEventListener('click', (e) => { e.preventDefault(); showDetail(job.id); });
+    tbody.appendChild(tr);
+  }
+}
+
+const REACTIONS = { thumbsup: '👍', heart: '❤️', laugh: '😂', clap: '👏', party: '🎉', fire: '🔥' };
+
+function renderBots(job) {
+  const panel = $('botsPanel');
+  if (job.kind !== 'session' || !job.bots.length) { panel.innerHTML = ''; return; }
+  panel.innerHTML = job.bots.map((b) => `
+    <div class="bot-card">
+      <div class="who"><strong>${b.index}</strong>${b.tag}</div>
+      <div class="btns">
+        <button data-cmd="mic ${b.index}">Toggle mic</button>
+        <button data-cmd="video ${b.index}">Toggle video</button>
+        <button data-cmd="hand ${b.index}">Toggle hand</button>
+        <button data-cmd="cc ${b.index}">Toggle CC</button>
+        <button data-cmd="leave ${b.index}">Leave</button>
+        <button data-cmd="join ${b.index}">Join</button>
+        <button data-cmd="screenshot ${b.index}">Screenshot</button>
+      </div>
+      <div class="btns reactions">
+        ${Object.entries(REACTIONS).map(([name, emoji]) => `<button data-cmd="react ${b.index} ${name}" title="${name}">${emoji}</button>`).join('')}
+      </div>
+    </div>
+  `).join('');
+  panel.querySelectorAll('button[data-cmd]').forEach((btn) => {
+    btn.addEventListener('click', () => sendCommand(btn.getAttribute('data-cmd')));
+  });
+}
+
+function renderReactAll(job) {
+  const panel = $('reactAllPanel');
+  if (job.kind !== 'session' || !job.bots.length) { panel.innerHTML = ''; return; }
+  panel.innerHTML = `
+    <span class="label">React all</span>
+    ${Object.entries(REACTIONS).map(([name, emoji]) => `<button data-cmd="react all ${name}" title="${name} — every bot at once">${emoji}</button>`).join('')}
+  `;
+  panel.querySelectorAll('button[data-cmd]').forEach((btn) => {
+    btn.addEventListener('click', () => sendCommand(btn.getAttribute('data-cmd')));
+  });
+}
+
+async function sendCommand(command) {
+  if (!activeDetailId) return;
+  await api(`/api/sessions/${activeDetailId}/command`, { method: 'POST', body: JSON.stringify({ command }) });
+  setTimeout(() => showDetail(activeDetailId), 800);
+}
+
+async function showDetail(id) {
+  activeDetailId = id;
+  $('detail').style.display = 'block';
+  const job = await api(`/api/jobs/${id}`);
+  $('detailTitle').textContent = `${job.id} — ${job.kind} — meeting ${job.meetingId} — ${job.status}`;
+  $('exportBtn').href = `${BRIDGE_URL}/api/jobs/${job.id}/export`;
+  $('log').textContent = job.log || '(no output yet)';
+  $('log').scrollTop = $('log').scrollHeight;
+  $('cmdBox').style.display = job.kind === 'session' ? 'flex' : 'none';
+  renderReactAll(job);
+  renderBots(job);
+  $('shots').innerHTML = job.screenshots.map((f) =>
+    `<img src="${BRIDGE_URL}/screenshots/${job.id}/${f}" title="${f}" onclick="window.open(this.src)">`
+  ).join('');
+
+  clearTimeout(pollTimer);
+  if (job.status === 'running' && activeDetailId === id) {
+    pollTimer = setTimeout(() => showDetail(id), 2000);
+  }
+}
+
+$('startRun').addEventListener('click', async () => {
+  $('runError').textContent = '';
+  try {
+    const job = await api('/api/runs', { method: 'POST', body: JSON.stringify({
+      script: $('script').value,
+      meetingId: $('rMeetingId').value.trim(),
+      duration: Number($('rDuration').value) || undefined,
+      muteDuration: Number($('rMuteDuration').value) || undefined,
+      stagger: Number($('rStagger').value) || undefined,
+      audioFile: $('rAudio').value || undefined,
+      muted: $('rMuted').checked,
+    })});
+    await refreshJobs();
+    showDetail(job.id);
+  } catch (e) { $('runError').textContent = e.message; }
+});
+
+$('startSession').addEventListener('click', async () => {
+  $('sessionError').textContent = '';
+  try {
+    const job = await api('/api/sessions', { method: 'POST', body: JSON.stringify({
+      meetingId: $('sMeetingId').value.trim(),
+      stagger: Number($('sStagger').value) || undefined,
+      headless: $('sHeadless').checked,
+      audioFile: $('sAudio').value || undefined,
+    })});
+    await refreshJobs();
+    showDetail(job.id);
+  } catch (e) { $('sessionError').textContent = e.message; }
+});
+
+$('cmdSend').addEventListener('click', () => {
+  const val = $('cmdInput').value.trim();
+  if (val) { sendCommand(val); $('cmdInput').value = ''; }
+});
+$('cmdInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('cmdSend').click(); });
+
+$('stopBtn').addEventListener('click', async () => {
+  if (!activeDetailId) return;
+  await api(`/api/jobs/${activeDetailId}/stop`, { method: 'POST' });
+  setTimeout(() => showDetail(activeDetailId), 800);
+});
+
+loadMeta();
+loadConfig();
+refreshJobs();
+setInterval(refreshJobs, 4000);
+</script>
+</body>
+</html>
