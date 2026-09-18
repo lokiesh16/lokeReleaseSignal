@@ -1,0 +1,58 @@
+{
+  "name": "thripthi",
+  "slug": "thripthi",
+  "goal": "thripthi",
+  "created_at": "2026-09-18T10:24:06Z",
+  "appium": {
+    "platform": "Android",
+    "device": "CPH2971",
+    "bundle_id": "com.habitnu.musc",
+    "platform_version": "16",
+    "extra_caps": {}
+  },
+  "tests": [
+    {
+      "description": "Validate tapping MOOD quick log opens Daily check-in bottom sheet",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Mood",
+          "tag": "android.widget.Button",
+          "strategy": "accessibility id",
+          "value": "Mood"
+        },
+        {
+          "action": "wait",
+          "seconds": 5,
+          "label": "wait 5s"
+        },
+        {
+          "action": "assert_visible",
+          "label": "DAILY CHECK-IN",
+          "tag": "android.widget.TextView",
+          "strategy": "accessibility id",
+          "value": "DAILY CHECK-IN"
+        }
+      ]
+    },
+    {
+      "description": "",
+      "steps": [
+        {
+          "action": "tap",
+          "label": "Drained",
+          "tag": "android.view.ViewGroup",
+          "strategy": "accessibility id",
+          "value": "Drained",
+          "description": ""
+        },
+        {
+          "action": "tap",
+          "x": 366,
+          "y": 659,
+          "label": "screen point (366, 659)"
+        }
+      ]
+    }
+  ]
+}
