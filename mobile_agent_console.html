@@ -2050,7 +2050,7 @@
     const firstUniqueIndex = candidates.findIndex(c => c.unique);
 
     const candidateRows = candidates.map((c, i) => `
-      <label style="display:flex; align-items:flex-start; gap:10px; padding:10px; border:1px solid var(--ink-line); border-radius:6px; margin-bottom:6px; cursor:pointer;">
+      <label style="display:flex; align-items:flex-start; gap:10px; padding:10px; border:1px solid var(--ink-line); border-radius:6px; margin-bottom:6px; cursor:pointer; text-transform:none;">
         <input type="radio" name="locatorChoice" value="${i}" ${i === firstUniqueIndex ? 'checked' : ''} style="width:auto; flex-shrink:0; margin-top:3px;">
         <span style="flex:1;">
           <span style="font-family:var(--mono); font-size:12.5px; color:${c.unique ? 'var(--circuit)' : 'var(--signal)'};">${escapeHtml(c.strategy_display)}</span>
@@ -3972,7 +3972,7 @@ ${containerEl.innerHTML}
       const searchText = `${el.element_id} ${el.tag || ''} ${el.label || ''}`.toLowerCase();
       return `
         <div class="ls-element-row" data-search="${escapeHtml(searchText)}" style="padding:8px 10px; border:1px solid var(--ink-line); border-radius:6px; margin-bottom:4px;">
-          <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer;">
+          <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; text-transform:none;">
             <input type="checkbox" class="ls-check" data-key="${escapeHtml(key)}" data-index="${i}" ${checked ? 'checked' : ''} style="width:auto; flex-shrink:0; margin-top:4px;">
             <span style="flex:1; min-width:0;">
               <span style="font-family:var(--mono); font-size:12px; color:var(--circuit);">${escapeHtml(el.element_id)}</span>
