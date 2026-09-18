@@ -1990,9 +1990,11 @@
   // id, class chain, or name-based predicate/xpath, just position xpath).
   function renderFindByRows(el) {
     const rows = [
+      ['id (resource-id)', el.resource_id],
       ['accessibility id', el.accessibility_id],
       ['-ios class chain', el.ios_class_chain],
       ['-ios predicate string', el.ios_predicate_string],
+      ['-android uiautomator', el.android_uiautomator],
       ['xpath', el.xpath],
     ].filter(([, v]) => v);
     if (!rows.length) {
@@ -3693,7 +3695,8 @@ ${containerEl.innerHTML}
       ? 'Captured so far: ' + keys.map(k => `${k}=${JSON.stringify(lsContext[k])}`).join(', ')
       : 'Nothing captured yet - use "capture value (parse_label)" on an element above to save one.';
   }
-  // key -> {_key, name, tag, label, accessibility_id, ios_class_chain, ios_predicate_string, xpath}
+  // key -> {_key, name, tag, label, resource_id, accessibility_id, ios_class_chain,
+  //         ios_predicate_string, android_uiautomator, xpath}
   // Keyed by tag+label rather than the snapshot-local element_id, since
   // that id isn't stable across a fresh "Load locators" call (a new
   // screen, or even the same screen re-captured, gets renumbered) - two
@@ -3798,9 +3801,11 @@ ${containerEl.innerHTML}
   // rather than asking the human to also choose a strategy on top of an
   // action and its params.
   function lsBestLocator(el) {
+    if (el.resource_id) return {strategy: 'id', value: el.resource_id};
     if (el.accessibility_id) return {strategy: 'accessibility id', value: el.accessibility_id};
     if (el.ios_predicate_string) return {strategy: '-ios predicate string', value: el.ios_predicate_string};
     if (el.ios_class_chain) return {strategy: '-ios class chain', value: el.ios_class_chain};
+    if (el.android_uiautomator) return {strategy: '-android uiautomator', value: el.android_uiautomator};
     if (el.xpath) return {strategy: 'xpath', value: el.xpath};
     return null;
   }
@@ -3857,7 +3862,7 @@ ${containerEl.innerHTML}
         <span style="min-width:0;">
           <span style="font-family:var(--mono); color:var(--circuit);">${escapeHtml(item.name)}</span>
           <span style="color:var(--paper-dim); margin-left:8px;">${escapeHtml(item.tag || '')}</span>
-          <span style="display:block; font-size:11.5px; color:var(--paper-dim); word-break:break-all;">${escapeHtml(item.accessibility_id || item.xpath || ((item.x != null && item.y != null) ? `position (${item.x}, ${item.y}) — no locator` : ''))}</span>
+          <span style="display:block; font-size:11.5px; color:var(--paper-dim); word-break:break-all;">${escapeHtml(item.resource_id || item.accessibility_id || item.android_uiautomator || item.xpath || ((item.x != null && item.y != null) ? `position (${item.x}, ${item.y}) — no locator` : ''))}</span>
         </span>
         <button class="copy" data-remove-key="${escapeHtml(item._key)}" style="background:var(--ink-line); color:var(--paper); padding:4px 8px; font-size:11px; flex-shrink:0;">Remove</button>
       </div>`).join('');
@@ -4008,8 +4013,9 @@ ${containerEl.innerHTML}
         if (cb.checked) {
           const item = {
             _key: key, name: lsAutoName(el), tag: el.tag, label: el.label,
-            accessibility_id: el.accessibility_id, ios_class_chain: el.ios_class_chain,
-            ios_predicate_string: el.ios_predicate_string, xpath: el.xpath,
+            resource_id: el.resource_id, accessibility_id: el.accessibility_id,
+            ios_class_chain: el.ios_class_chain, ios_predicate_string: el.ios_predicate_string,
+            android_uiautomator: el.android_uiautomator, xpath: el.xpath,
           };
           // No locator at all for this element - fall back to its
           // on-screen position, same as the captured-steps export path,
@@ -4473,9 +4479,11 @@ ${containerEl.innerHTML}
   // download expect (see lsBestLocator for the same strategy names in the
   // other direction).
   const _LS_STRATEGY_TO_FIELD = {
+    'id': 'resource_id',
     'accessibility id': 'accessibility_id',
     '-ios predicate string': 'ios_predicate_string',
     '-ios class chain': 'ios_class_chain',
+    '-android uiautomator': 'android_uiautomator',
     'xpath': 'xpath',
   };
 
@@ -5970,7 +5978,7 @@ ${containerEl.innerHTML}
   document.getElementById('lsExportBtn').addEventListener('click', () => {
     const items = Array.from(lsSelected.values());
     if (!items.length) return;
-    const headers = ['name', 'label', 'tag', 'accessibility_id', 'ios_class_chain', 'ios_predicate_string', 'xpath', 'x', 'y'];
+    const headers = ['name', 'label', 'tag', 'resource_id', 'accessibility_id', 'ios_class_chain', 'ios_predicate_string', 'android_uiautomator', 'xpath', 'x', 'y'];
     const csvEscape = (v) => {
       const s = String(v == null ? '' : v);
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -6000,13 +6008,17 @@ ${containerEl.innerHTML}
     return candidate;
   }
 
-  // Priority mirrors locator_scanner.py's: accessibility id > -ios
-  // predicate string > -ios class chain > xpath - falls through only when
-  // a higher-priority strategy wasn't available for that element.
+  // Priority mirrors each platforms/*/locators.py's own _STRATEGY_PRIORITY:
+  // iOS is accessibility id > -ios predicate string > -ios class chain >
+  // xpath; Android is id (resource-id) > accessibility id (content-desc) >
+  // -android uiautomator > xpath. Falls through only when a higher-
+  // priority strategy wasn't available for that element.
   function lsLocatorExpr(item) {
+    if (item.resource_id) return `(AppiumBy.ID, '${lsPyEscape(item.resource_id)}')`;
     if (item.accessibility_id) return `(AppiumBy.ACCESSIBILITY_ID, '${lsPyEscape(item.accessibility_id)}')`;
     if (item.ios_predicate_string) return `(AppiumBy.IOS_PREDICATE, '${lsPyEscape(item.ios_predicate_string)}')`;
     if (item.ios_class_chain) return `(AppiumBy.IOS_CLASS_CHAIN, '${lsPyEscape(item.ios_class_chain)}')`;
+    if (item.android_uiautomator) return `(AppiumBy.ANDROID_UIAUTOMATOR, '${lsPyEscape(item.android_uiautomator)}')`;
     if (item.xpath) return `(AppiumBy.XPATH, '${lsPyEscape(item.xpath)}')`;
     if (item.x != null && item.y != null) return `(${item.x}, ${item.y})  # position only, no locator - use self.driver.tap([self.NAME])`;
     return 'None  # no locator strategy available for this element';
