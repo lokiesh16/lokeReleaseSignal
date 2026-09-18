@@ -1681,50 +1681,121 @@
   });
 
   // ---------- Auto-fill UDID from whatever's physically connected ----------
-  // Copying a UDID out of `xcrun xctrace list devices` by hand every time a
-  // device gets plugged in (or swapped for a different one) is exactly the
-  // kind of busywork this console exists to remove. Polls the bridge server
-  // (see device_detect.py) and, when exactly one real device is currently
-  // connected, fills in UDID/device name/platform version on every form
-  // that has them - never while that field is mid-edit (checked via
-  // document.activeElement), and never overwrites the fields with nothing
-  // just because a device was unplugged (the last-known values are still
-  // useful to look at, and there's nothing better to replace them with).
+  // Copying a UDID out of `xcrun xctrace list devices`/`adb devices` by hand
+  // every time a device gets plugged in (or swapped for a different one) is
+  // exactly the kind of busywork this console exists to remove. Polls the
+  // bridge server (see device_detect.py) and, when exactly one real device
+  // of the CURRENTLY SELECTED PLATFORM is connected, fills in UDID/device
+  // name/platform version on that form - never while that field is
+  // mid-edit (checked via document.activeElement), and never overwrites the
+  // fields with nothing just because a device was unplugged (the
+  // last-known values are still useful to look at, and there's nothing
+  // better to replace them with).
   function fillIfIdle(id, value) {
     if (!value) return;
     const el = document.getElementById(id);
     if (el && document.activeElement !== el && el.value !== value) el.value = value;
   }
 
-  function applyDetectedDevice(devices) {
-    const statusEls = document.querySelectorAll('.device-detect-status');
-    let statusText;
-    if (devices.length === 1) {
-      const d = devices[0];
-      statusText = `✓ auto-filled from connected device: ${d.name} (iOS ${d.platform_version})`;
-      ['r', 'ls', ''].forEach(prefix => {
-        fillIfIdle(prefix + (prefix ? 'Udid' : 'udid'), d.udid);
-        fillIfIdle(prefix + (prefix ? 'Device' : 'device'), d.name);
-        fillIfIdle(prefix + (prefix ? 'PlatformVersion' : 'platformVersion'), d.platform_version);
-      });
-    } else if (devices.length > 1) {
-      statusText = `${devices.length} devices connected (${devices.map(d => d.name).join(', ')}) — enter the UDID manually to pick one`;
-    } else {
-      statusText = 'no connected device detected — enter UDID manually, or plug one in';
-    }
-    statusEls.forEach(el => { el.textContent = statusText; });
+  // Run tab has no prefix ("platform", "device", ...), Replay/Inspector
+  // tabs prefix every field id with "r"/"ls" ("rPlatform", "lsDevice", ...).
+  const PLATFORM_FIELD_PREFIXES = ['', 'r', 'ls'];
+
+  function fieldId(prefix, name) {
+    return prefix ? prefix + name[0].toUpperCase() + name.slice(1) : name;
   }
 
-  async function pollConnectedDevice() {
+  async function pollConnectedDeviceForPrefix(prefix) {
+    const platformEl = document.getElementById(fieldId(prefix, 'platform'));
+    const platform = platformEl ? platformEl.value : 'iOS';
+    const statusEl = document.querySelector(`.device-detect-status[data-target-prefix="${prefix}"]`);
     try {
-      const res = await fetch(BRIDGE_URL + '/api/devices');
+      const res = await fetch(BRIDGE_URL + '/api/devices?platform=' + encodeURIComponent(platform));
       if (!res.ok) return;
       const data = await res.json();
-      applyDetectedDevice(data.devices || []);
+      const devices = data.devices || [];
+      let statusText;
+      if (devices.length === 1) {
+        const d = devices[0];
+        statusText = `✓ auto-filled from connected device: ${d.name} (${platform} ${d.platform_version})`;
+        fillIfIdle(fieldId(prefix, 'udid'), d.udid);
+        fillIfIdle(fieldId(prefix, 'device'), d.name);
+        fillIfIdle(fieldId(prefix, 'platformVersion'), d.platform_version);
+      } else if (devices.length > 1) {
+        statusText = `${devices.length} devices connected (${devices.map(d => d.name).join(', ')}) — enter the UDID manually to pick one`;
+      } else {
+        statusText = `no connected ${platform} device detected — enter UDID manually, or plug one in`;
+      }
+      if (statusEl) statusEl.textContent = statusText;
     } catch (e) { /* bridge server reachability already surfaced by checkBridge() above */ }
   }
-  pollConnectedDevice();
-  setInterval(pollConnectedDevice, 3000);
+
+  function pollAllConnectedDevices() {
+    PLATFORM_FIELD_PREFIXES.forEach(pollConnectedDeviceForPrefix);
+  }
+  pollAllConnectedDevices();
+  setInterval(pollAllConnectedDevices, 3000);
+
+  // ---------- Platform-aware fields (Run / Replay / Inspector tabs) ----------
+  // Xcode Team ID only means anything for iOS (XCUITest real-device
+  // signing) - UiAutomator2 has no equivalent, so it's just a dead field
+  // sitting there once Android is selected; hide it instead of leaving it
+  // to confuse whoever's filling this in. Same story for the default Extra
+  // Capabilities JSON (wdaLocalPort, useNewWDA, ...) - all XCUITest-only,
+  // and sending them to UiAutomator2 would be a stray unrecognized
+  // capability, not just a no-op. The bundle/package ID and device-name
+  // swaps only fire when the field still holds the OTHER platform's known
+  // default (never overwriting something the user actually typed in) -
+  // same "only touch it if it's still idle/untouched" spirit fillIfIdle
+  // uses above.
+  const IOS_DEFAULT_EXTRA_CAPS = '{"appium:wdaLocalPort": 8100, "appium:useNewWDA": false, "appium:connectHardwareKeyboard": true, "appium:settings[snapshotMaxDepth]": 70}';
+  const IOS_DEFAULT_BUNDLE_ID = 'habitnu2.stag';
+  const ANDROID_DEFAULT_BUNDLE_ID = 'com.habitnu.musc';
+  const IOS_DEFAULT_DEVICE_NAME = "Lokesh's iPhone";
+  const ANDROID_DEFAULT_DEVICE_NAME = 'Android device';
+
+  function applyPlatformToFields(prefix) {
+    const platformEl = document.getElementById(fieldId(prefix, 'platform'));
+    if (!platformEl) return;
+    const isAndroid = platformEl.value === 'Android';
+
+    const xcodeOrgEl = document.getElementById(fieldId(prefix, 'xcodeOrg'));
+    if (xcodeOrgEl) {
+      const wrapper = xcodeOrgEl.closest('.field');
+      if (wrapper) wrapper.style.display = isAndroid ? 'none' : '';
+    }
+
+    const extraCapsEl = document.getElementById(fieldId(prefix, 'extraCaps'));
+    if (extraCapsEl) {
+      const current = extraCapsEl.value.trim();
+      if (isAndroid && current === IOS_DEFAULT_EXTRA_CAPS) extraCapsEl.value = '{}';
+      else if (!isAndroid && current === '{}') extraCapsEl.value = IOS_DEFAULT_EXTRA_CAPS;
+    }
+
+    const bundleIdEl = document.getElementById(fieldId(prefix, 'bundleId'));
+    if (bundleIdEl) {
+      const current = bundleIdEl.value.trim();
+      if (isAndroid && current === IOS_DEFAULT_BUNDLE_ID) bundleIdEl.value = ANDROID_DEFAULT_BUNDLE_ID;
+      else if (!isAndroid && current === ANDROID_DEFAULT_BUNDLE_ID) bundleIdEl.value = IOS_DEFAULT_BUNDLE_ID;
+    }
+
+    const deviceEl = document.getElementById(fieldId(prefix, 'device'));
+    if (deviceEl) {
+      const current = deviceEl.value.trim();
+      if (isAndroid && current === IOS_DEFAULT_DEVICE_NAME) deviceEl.value = ANDROID_DEFAULT_DEVICE_NAME;
+      else if (!isAndroid && current === ANDROID_DEFAULT_DEVICE_NAME) deviceEl.value = IOS_DEFAULT_DEVICE_NAME;
+    }
+
+    pollConnectedDeviceForPrefix(prefix);
+  }
+
+  PLATFORM_FIELD_PREFIXES.forEach(prefix => {
+    const platformEl = document.getElementById(fieldId(prefix, 'platform'));
+    if (platformEl) {
+      platformEl.addEventListener('change', () => applyPlatformToFields(prefix));
+      applyPlatformToFields(prefix); // reflects whatever's already selected on page load
+    }
+  });
 
   // ---------- CSV test-case upload ----------
   document.getElementById('csvLoadBtn').addEventListener('click', async () => {
