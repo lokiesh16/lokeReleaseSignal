@@ -633,6 +633,7 @@
           <button class="copy" id="refreshFlowsBtn" style="padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Refresh</button>
         </div>
         <div class="hint" style="font-size:10.5px; margin-top:2px;">deterministic replay — no LLM calls</div>
+        <div id="savedFlowsPlatformFilter" style="display:flex; gap:4px; margin-top:8px;"></div>
         <div id="savedFlowsList" style="margin-top:10px; font-size:13px;">Loading…</div>
         <div id="savedFlowsPager" style="display:none; justify-content:space-between; align-items:center; margin-top:8px; font-size:11px;"></div>
 
@@ -2509,13 +2510,51 @@ ${containerEl.innerHTML}
   // scroll makes picking a specific flow slower, not faster.
   const SAVED_FLOWS_PAGE_SIZE = 10;
   let savedFlowsPage = 1;
+  // "all" plus each real platform - every flow already carries its own
+  // recorded platform (server.py defaults missing ones to iOS, since that
+  // was the only platform this project drove before Android support), so
+  // this is a pure client-side filter over lastLoadedFlows, not a second
+  // fetch or a different storage location.
+  let savedFlowsPlatformFilter = 'all';
+
+  function renderSavedFlowsPlatformFilter() {
+    const filterEl = document.getElementById('savedFlowsPlatformFilter');
+    const counts = {iOS: 0, Android: 0};
+    lastLoadedFlows.forEach(f => { counts[f.platform] = (counts[f.platform] || 0) + 1; });
+    const options = [
+      ['all', `All (${lastLoadedFlows.length})`],
+      ['iOS', `iOS (${counts.iOS || 0})`],
+      ['Android', `Android (${counts.Android || 0})`],
+    ];
+    filterEl.innerHTML = options.map(([value, label]) => `
+      <button class="copy saved-flows-platform-btn" data-platform="${value}"
+              style="flex:1; padding:4px 6px; font-size:10.5px;
+                     background:${savedFlowsPlatformFilter === value ? 'var(--signal)' : 'var(--ink-line)'};
+                     color:var(--paper);">${label}</button>
+    `).join('');
+    filterEl.querySelectorAll('.saved-flows-platform-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        savedFlowsPlatformFilter = btn.dataset.platform;
+        savedFlowsPage = 1;
+        renderFlowsSidebarPage();
+      });
+    });
+  }
 
   function renderFlowsSidebarPage() {
     const listEl = document.getElementById('savedFlowsList');
     const pagerEl = document.getElementById('savedFlowsPager');
-    const flows = lastLoadedFlows;
-    if (!flows.length) {
+    renderSavedFlowsPlatformFilter();
+    const flows = savedFlowsPlatformFilter === 'all'
+      ? lastLoadedFlows
+      : lastLoadedFlows.filter(f => f.platform === savedFlowsPlatformFilter);
+    if (!lastLoadedFlows.length) {
       listEl.innerHTML = '<div class="empty-hint">No saved flows yet — run a goal below, then use "Save as flow" once it looks right.</div>';
+      pagerEl.style.display = 'none';
+      return;
+    }
+    if (!flows.length) {
+      listEl.innerHTML = `<div class="empty-hint">No ${escapeHtml(savedFlowsPlatformFilter)} flows yet.</div>`;
       pagerEl.style.display = 'none';
       return;
     }
@@ -2544,7 +2583,7 @@ ${containerEl.innerHTML}
           <span class="status-badge flow-sidebar-badge ${state ? state.badgeClass : ''}" data-sidebar-status-for="${escapeHtml(f.slug)}"
                 style="flex-shrink:0; font-size:9px; padding:1px 5px; ${state && state.badgeText ? '' : 'display:none;'}">${state ? escapeHtml(state.badgeText || '') : ''}</span>
         </div>
-        <div style="font-size:10.5px; color:${accent}; font-weight:600; margin-top:1px;">${f.test_count} test(s)</div>
+        <div style="font-size:10.5px; color:${accent}; font-weight:600; margin-top:1px;">${f.test_count} test(s) · ${escapeHtml(f.platform)}</div>
       </div>`;
     }).join('');
     listEl.querySelectorAll('.flow-list-item').forEach(item => {
@@ -2607,6 +2646,7 @@ ${containerEl.innerHTML}
         <div style="min-width:0; overflow-wrap:anywhere;">
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <span style="font-weight:700; font-size:15px;">${escapeHtml(f.name)}</span>
+            <span class="status-badge" style="background:var(--ink-line); color:var(--paper); font-size:9px;">${escapeHtml(f.platform)}</span>
             <span class="status-badge flow-status-badge ${state ? state.badgeClass : ''}" data-status-for="${escapeHtml(f.slug)}"
                   style="${state && state.badgeText ? '' : 'display:none;'}">${state ? escapeHtml(state.badgeText || '') : ''}</span>
           </div>
