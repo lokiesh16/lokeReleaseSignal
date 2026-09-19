@@ -5,21 +5,24 @@
 <title>Habi's Final Run</title>
 <style>
   :root {
-    /* Light, "premium dashboard" palette - variable NAMES kept as-is
+    /* Dark, "streaming service" palette - variable NAMES kept as-is
        (--ink/--paper etc. are used as background/foreground roles
        throughout this file's CSS and inline JS-generated styles, not
        literal "ink"/"paper" colors), only the VALUES changed, so every
        existing var(--x) reference across hundreds of inline styles
-       repaints correctly with zero markup changes. */
-    --ink: #F1F2F5;          /* page background + input/select/textarea fill */
-    --ink-raised: #FFFFFF;   /* card / elevated-surface background */
-    --ink-line: #E3E5EA;     /* borders */
-    --paper: #171A21;        /* primary text */
-    --paper-dim: #6B7280;    /* secondary/muted text */
-    --signal: #D97706;       /* amber accent - active tab, primary buttons */
-    --signal-dim: #FDE9C8;   /* light amber tint */
-    --circuit: #0D9488;      /* teal accent - success/glow */
-    --alert: #DC2626;        /* red - fail/danger */
+       repaints correctly with zero markup changes. Gold/amber stands in
+       for the genre's usual signature red (deliberately avoided) as the
+       one bold accent color; --alert stays red since that's a semantic
+       fail/error color, not a brand choice. */
+    --ink: #141414;          /* page background + input/select/textarea fill */
+    --ink-raised: #1F1F1F;   /* card / elevated-surface background */
+    --ink-line: #3A3A3A;     /* borders */
+    --paper: #FFFFFF;        /* primary text */
+    --paper-dim: #B3B3B3;    /* secondary/muted text */
+    --signal: #F2A900;       /* gold accent - active tab, primary buttons, ribbons */
+    --signal-dim: rgba(242,169,0,0.18); /* translucent gold tint - selected-row backgrounds etc. */
+    --circuit: #2DD4BF;      /* teal accent - success/glow */
+    --alert: #DC2626;        /* red - fail/danger only, not used decoratively */
     --mono: 'SF Mono', 'JetBrains Mono', 'Menlo', ui-monospace, monospace;
     --sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
   }
@@ -155,6 +158,74 @@
   .mode-toggle-opt.on { border-color: var(--circuit); background: rgba(13,148,136,0.08); }
   #panel-scraper.ai-mode-active .human-mode-only { display: none !important; }
   #panel-scraper:not(.ai-mode-active) .ai-mode-only { display: none !important; }
+
+  /* ---------- "Streaming service" row/poster-carousel (Saved Flows,
+     From team) - a horizontally scrolling strip of text-as-poster-art
+     cards, since these are test flows with no real thumbnail art to
+     show. Genre convention is a bold ribbon + bottom pill on a colored
+     backdrop; kept here, minus the usual signature red. ---------- */
+  .row-header {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .row-title { font-size: 20px; font-weight: 700; color: var(--paper); }
+
+  .poster-row {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+  }
+  .poster-row::-webkit-scrollbar { height: 8px; }
+  .poster-row::-webkit-scrollbar-thumb { background: var(--ink-line); border-radius: 8px; }
+
+  .poster-card {
+    position: relative;
+    flex: 0 0 220px;
+    height: 150px;
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .poster-card:hover { transform: scale(1.04); }
+  .poster-card.selected { border-color: var(--signal); }
+
+  .poster-ribbon {
+    position: absolute; top: 8px; left: 8px;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
+    padding: 3px 7px; border-radius: 4px;
+    background: rgba(0,0,0,0.55); color: var(--paper);
+    border: 1px solid rgba(255,255,255,0.25);
+  }
+  .poster-title {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 14px; box-sizing: border-box;
+    font-size: 15px; font-weight: 800; line-height: 1.25;
+    color: var(--paper); text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+  }
+  .poster-badge {
+    position: absolute; bottom: 8px; left: 8px; right: 8px;
+    font-size: 10px; font-weight: 700; text-align: center;
+    padding: 4px 6px; border-radius: 4px;
+    background: rgba(0,0,0,0.65); color: var(--paper);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .poster-badge.status-pass { background: var(--circuit); color: #0A2E2A; }
+  .poster-badge.status-fail { background: var(--alert); color: #FFF; }
+  .poster-badge.status-running { background: var(--signal); color: #2B1D00; }
+
+  .import-card {
+    flex: 0 0 180px; height: 90px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--ink-raised), var(--ink-line));
+    border: 1px solid var(--ink-line);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; padding: 10px; text-align: center;
+  }
+  .import-card .name { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 
   .card {
     background: var(--ink-raised);
@@ -626,31 +697,36 @@
   <!-- ============ TEST LIBRARY TAB: SAVED FLOWS (child) ============ -->
   <div class="panel" id="panel-library-flows">
 
-    <div class="card" id="savedFlowsCard" style="display:flex; gap:0; padding:0; overflow:hidden;">
-      <div style="width:250px; flex-shrink:0; border-right:1px solid var(--ink-line); padding:16px; box-sizing:border-box;">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-          <label style="margin:0;">Saved Flows</label>
-          <button class="copy" id="refreshFlowsBtn" style="padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Refresh</button>
+    <div class="card row-card">
+      <div class="row-header">
+        <div>
+          <div class="row-title">Saved Flows</div>
+          <div class="hint" style="font-size:10.5px; margin-top:2px;">deterministic replay — no LLM calls</div>
         </div>
-        <div class="hint" style="font-size:10.5px; margin-top:2px;">deterministic replay — no LLM calls</div>
-        <div id="savedFlowsPlatformFilter" style="display:flex; gap:4px; margin-top:8px;"></div>
-        <div id="savedFlowsList" style="margin-top:10px; font-size:13px;">Loading…</div>
-        <div id="savedFlowsPager" style="display:none; justify-content:space-between; align-items:center; margin-top:8px; font-size:11px;"></div>
+        <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+          <div id="savedFlowsPlatformFilter" style="display:flex; gap:4px;"></div>
+          <button class="copy" id="refreshFlowsBtn" style="padding:6px 12px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Refresh</button>
+        </div>
+      </div>
+      <div id="savedFlowsList" class="poster-row">Loading…</div>
+      <div id="savedFlowsPager" class="hint" style="margin-top:8px; font-size:11px;"></div>
+    </div>
 
-        <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--ink-line);">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-            <label style="margin:0;">From team</label>
-            <button class="copy" id="refreshSharedFlowsBtn" style="padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Refresh</button>
-          </div>
+    <div class="card row-card">
+      <div class="row-header">
+        <div>
+          <div class="row-title" style="font-size:16px;">From team</div>
           <div class="hint" style="font-size:10.5px; margin-top:2px;">published by teammates — import to run it locally</div>
-          <div id="sharedFlowsList" style="margin-top:8px; font-size:12px;">Loading…</div>
         </div>
+        <button class="copy" id="refreshSharedFlowsBtn" style="padding:6px 12px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Refresh</button>
       </div>
-      <div style="flex:1; min-width:0; padding:18px; box-sizing:border-box;">
-        <div id="savedFlowDetailEmpty" class="empty-hint">Select a flow on the left to view its details, run it, and see its execution trace.</div>
-        <div id="savedFlowDetail" style="display:none;"></div>
-        <datalist id="bundleIdOptions"></datalist>
-      </div>
+      <div id="sharedFlowsList" class="poster-row">Loading…</div>
+    </div>
+
+    <div class="card" id="savedFlowDetailCard">
+      <div id="savedFlowDetailEmpty" class="empty-hint">Select a flow above to view its details, run it, and see its execution trace.</div>
+      <div id="savedFlowDetail" style="display:none;"></div>
+      <datalist id="bundleIdOptions"></datalist>
     </div>
 
   </div>
@@ -2498,19 +2574,40 @@ ${containerEl.innerHTML}
       detailBadge.style.display = badgeText ? 'inline-block' : 'none';
       detailBadge.textContent = badgeText;
     }
+    // This selector matches EITHER a Saved Flow's poster pill or a Test
+    // Script's plain list badge - same data-sidebar-status-for contract,
+    // two different shapes (see renderFlowsSidebarPage vs
+    // renderTsSidebarRow). Toggling classList (add/remove the status-*
+    // class) rather than overwriting className wholesale is what keeps
+    // this function shape-agnostic - overwriting the full className would
+    // silently strip "poster-badge"'s positioning off a Saved Flow pill,
+    // or "status-badge" off a Test Script one, whichever this happens to
+    // be pointed at.
     const sidebarBadge = document.querySelector(`.flow-sidebar-badge[data-sidebar-status-for="${CSS.escape(slug)}"]`);
     if (sidebarBadge) {
-      sidebarBadge.className = 'status-badge flow-sidebar-badge ' + badgeClass;
-      sidebarBadge.style.display = badgeText ? 'inline-block' : 'none';
-      sidebarBadge.textContent = badgeText;
+      const isPoster = sidebarBadge.classList.contains('poster-badge');
+      ['status-pass', 'status-fail', 'status-stuck', 'status-error', 'status-skip', 'status-running']
+        .forEach(c => sidebarBadge.classList.remove(c));
+      if (badgeClass) sidebarBadge.classList.add(badgeClass);
+      if (isPoster) {
+        // The poster's bottom pill always shows something (the test count
+        // as a fallback, same as its initial render) rather than
+        // disappearing outright the moment a run status is cleared -
+        // unlike the plain list badge below, where empty really does mean
+        // "nothing to show".
+        const flow = lastLoadedFlows.find(x => x.slug === slug);
+        sidebarBadge.textContent = badgeText || (flow ? `${flow.test_count} test(s)` : '');
+      } else {
+        sidebarBadge.style.display = badgeText ? 'inline-block' : 'none';
+        sidebarBadge.textContent = badgeText;
+      }
     }
   }
 
-  // Paginated on purpose, same rationale as Test Scripts' own individual-
-  // files list below - a real project's saved-flow count keeps growing
-  // (this console has seen 14+ in practice), and one long unpaginated
-  // scroll makes picking a specific flow slower, not faster.
-  const SAVED_FLOWS_PAGE_SIZE = 10;
+  // No pagination needed any more - this renders as a horizontally
+  // scrolling row (see .poster-row), same as any streaming-service shelf,
+  // so a growing flow count just makes the row longer to scroll through
+  // rather than needing Prev/Next.
   let savedFlowsPage = 1;
   // "all" plus each real platform - every flow already carries its own
   // recorded platform (server.py defaults missing ones to iOS, since that
@@ -2543,6 +2640,16 @@ ${containerEl.innerHTML}
     });
   }
 
+  // A small rotating backdrop per card (not tied to any status) - purely
+  // to break up what would otherwise be a shelf of identical dark boxes,
+  // since these are test flows with no real poster art to show. Picked
+  // from the app's own existing palette so nothing new needs inventing.
+  // Plain hex, not var(--circuit)/var(--signal) - these get a hex alpha
+  // suffix appended below (e.g. "#2DD4BF59"), which only parses as a valid
+  // color when it's a real hex literal to begin with; "var(--circuit)59"
+  // is not valid CSS and silently fails the whole gradient stop.
+  const POSTER_ACCENTS = ['#2DD4BF', '#F2A900', '#7C3AED', '#2563EB', '#DB2777'];
+
   function renderFlowsSidebarPage() {
     const listEl = document.getElementById('savedFlowsList');
     const pagerEl = document.getElementById('savedFlowsPager');
@@ -2552,58 +2659,38 @@ ${containerEl.innerHTML}
       : lastLoadedFlows.filter(f => f.platform === savedFlowsPlatformFilter);
     if (!lastLoadedFlows.length) {
       listEl.innerHTML = '<div class="empty-hint">No saved flows yet — run a goal below, then use "Save as flow" once it looks right.</div>';
-      pagerEl.style.display = 'none';
+      pagerEl.textContent = '';
       return;
     }
     if (!flows.length) {
       listEl.innerHTML = `<div class="empty-hint">No ${escapeHtml(savedFlowsPlatformFilter)} flows yet.</div>`;
-      pagerEl.style.display = 'none';
+      pagerEl.textContent = '';
       return;
     }
-    const totalPages = Math.max(1, Math.ceil(flows.length / SAVED_FLOWS_PAGE_SIZE));
-    savedFlowsPage = Math.min(Math.max(1, savedFlowsPage), totalPages);
-    const start = (savedFlowsPage - 1) * SAVED_FLOWS_PAGE_SIZE;
-    const pageItems = flows.slice(start, start + SAVED_FLOWS_PAGE_SIZE);
 
-    // A small rotating accent per card (not tied to any status) - purely
-    // to break up what was a flat wall of identical gray boxes; picked
-    // from the app's own existing palette so nothing new needs inventing.
-    const ACCENTS = ['var(--circuit)', 'var(--signal)', '#6D28D9', '#2563EB'];
-
-    listEl.innerHTML = pageItems.map((f, i) => {
+    listEl.innerHTML = flows.map((f, i) => {
       const state = flowRunState[f.slug];
       const selected = f.slug === selectedFlowSlug;
-      const accent = ACCENTS[i % ACCENTS.length];
+      const accent = POSTER_ACCENTS[i % POSTER_ACCENTS.length];
+      // Last run's outcome takes over the bottom pill when there is one -
+      // exactly the "Recently added"/"New Episode" role in the reference
+      // design, just showing something actually true about this flow
+      // instead of a fixed label.
+      const badgeText = (state && state.badgeText) ? state.badgeText : `${f.test_count} test(s)`;
+      const badgeClass = (state && state.badgeClass) || '';
       return `
-      <div class="flow-list-item" data-slug="${escapeHtml(f.slug)}"
-           style="padding:9px 10px 9px 9px; border-radius:8px; cursor:pointer; margin-bottom:6px;
-                  border:1px solid ${selected ? 'var(--signal)' : 'var(--ink-line)'};
-                  border-left:3px solid ${selected ? 'var(--signal)' : accent};
-                  background:${selected ? 'var(--signal-dim)' : 'var(--ink)'};">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
-          <span style="font-weight:600; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(f.name)}</span>
-          <span class="status-badge flow-sidebar-badge ${state ? state.badgeClass : ''}" data-sidebar-status-for="${escapeHtml(f.slug)}"
-                style="flex-shrink:0; font-size:9px; padding:1px 5px; ${state && state.badgeText ? '' : 'display:none;'}">${state ? escapeHtml(state.badgeText || '') : ''}</span>
-        </div>
-        <div style="font-size:10.5px; color:${accent}; font-weight:600; margin-top:1px;">${f.test_count} test(s) · ${escapeHtml(f.platform)}</div>
+      <div class="poster-card flow-list-item ${selected ? 'selected' : ''}" data-slug="${escapeHtml(f.slug)}"
+           style="background: linear-gradient(135deg, ${accent}59, var(--ink-raised) 70%);">
+        <span class="poster-ribbon">${escapeHtml(f.platform)}</span>
+        <span class="poster-title">${escapeHtml(f.name)}</span>
+        <span class="poster-badge flow-sidebar-badge ${badgeClass}" data-sidebar-status-for="${escapeHtml(f.slug)}">${escapeHtml(badgeText)}</span>
       </div>`;
     }).join('');
     listEl.querySelectorAll('.flow-list-item').forEach(item => {
       item.addEventListener('click', () => selectFlow(item.dataset.slug));
     });
 
-    // Stacked, not one cramped row - "N flows · page X of Y" plus two full-
-    // width Prev/Next buttons never fit on one line in a 250px sidebar
-    // (it wrapped mid-phrase); a label row above a button row always fits.
-    pagerEl.style.cssText = 'display:flex; flex-direction:column; gap:6px; margin-top:8px; font-size:11px;';
-    pagerEl.innerHTML = `
-      <span class="hint">${flows.length} flow${flows.length === 1 ? '' : 's'} · page ${savedFlowsPage} of ${totalPages}</span>
-      <div style="display:flex; gap:6px;">
-        <button class="copy" id="savedFlowsPrevBtn" style="flex:1; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);" ${savedFlowsPage <= 1 ? 'disabled' : ''}>Prev</button>
-        <button class="copy" id="savedFlowsNextBtn" style="flex:1; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);" ${savedFlowsPage >= totalPages ? 'disabled' : ''}>Next</button>
-      </div>`;
-    document.getElementById('savedFlowsPrevBtn').addEventListener('click', () => { savedFlowsPage -= 1; renderFlowsSidebarPage(); });
-    document.getElementById('savedFlowsNextBtn').addEventListener('click', () => { savedFlowsPage += 1; renderFlowsSidebarPage(); });
+    pagerEl.textContent = `${flows.length} flow${flows.length === 1 ? '' : 's'}`;
   }
 
   function renderFlowsSidebar(flows) {
@@ -2742,9 +2829,9 @@ ${containerEl.innerHTML}
       if (!res.ok) throw new Error(data.error || 'failed to load shared flows');
       const flows = data.flows || [];
       listEl.innerHTML = flows.length ? flows.map(f => `
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:5px 0; border-bottom:1px solid var(--ink-line);">
-          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(f.name)}</span>
-          <button class="copy shared-flow-import-btn" data-path="${escapeHtml(f.path)}" data-slug="${escapeHtml(f.slug)}" style="padding:3px 8px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Import</button>
+        <div class="import-card">
+          <span class="name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+          <button class="copy shared-flow-import-btn" data-path="${escapeHtml(f.path)}" data-slug="${escapeHtml(f.slug)}" style="padding:4px 10px; font-size:11px; background:var(--signal); color:#2B1D00; flex-shrink:0;">Import</button>
         </div>`).join('') : '<div class="empty-hint" style="font-size:11.5px;">Nothing published yet.</div>';
     } catch (e) {
       listEl.innerHTML = `<div class="empty-hint" style="font-size:11.5px;">${escapeHtml(e.message)}</div>`;
