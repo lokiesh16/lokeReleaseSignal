@@ -203,9 +203,25 @@
   .poster-title {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
-    text-align: center; padding: 14px; box-sizing: border-box;
+    padding: 14px; box-sizing: border-box;
+  }
+  /* Flow names are often one long underscore_joined_token with no spaces
+     (e.g. "apple_health_sync_exercise_steps") - browsers only wrap at
+     whitespace by default, so a plain single-line/no-wrap span just runs
+     the text straight off the edge of the card. overflow-wrap:anywhere
+     lets it break mid-word instead of overflowing, and line-clamp caps it
+     at 3 lines with an ellipsis for the rare name that's still too long
+     to fit even wrapped. */
+  .poster-title-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-align: center;
     font-size: 15px; font-weight: 800; line-height: 1.25;
     color: var(--paper); text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   .poster-badge {
     position: absolute; bottom: 8px; left: 8px; right: 8px;
@@ -474,14 +490,14 @@
 
     <div class="tabs">
       <button class="tab" data-tab="build" style="display:none;">Build Command</button>
-      <button class="tab active" data-tab="run">Run in Browser</button>
+      <button class="tab active" data-tab="run">AI Eye</button>
       <div class="tab-group-label">Test Library</div>
       <button class="tab tab-child" data-tab="library-flows">Saved Flows</button>
       <button class="tab tab-child" data-tab="library-scripts">Test Scripts</button>
       <button class="tab" data-tab="manual">Manual API Capture</button>
       <button class="tab" data-tab="scraper">Inspector &amp; Recorder</button>
       <button class="tab" data-tab="mtc">Generate Manual Test Cases</button>
-      <button class="tab" data-tab="report">View Run Report</button>
+      <button class="tab" data-tab="report" style="display:none;">View Run Report</button>
     </div>
   </nav>
 
@@ -2682,7 +2698,7 @@ ${containerEl.innerHTML}
       <div class="poster-card flow-list-item ${selected ? 'selected' : ''}" data-slug="${escapeHtml(f.slug)}"
            style="background: linear-gradient(135deg, ${accent}59, var(--ink-raised) 70%);">
         <span class="poster-ribbon">${escapeHtml(f.platform)}</span>
-        <span class="poster-title">${escapeHtml(f.name)}</span>
+        <span class="poster-title"><span class="poster-title-text">${escapeHtml(f.name)}</span></span>
         <span class="poster-badge flow-sidebar-badge ${badgeClass}" data-sidebar-status-for="${escapeHtml(f.slug)}">${escapeHtml(badgeText)}</span>
       </div>`;
     }).join('');
