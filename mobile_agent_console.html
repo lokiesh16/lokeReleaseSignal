@@ -197,59 +197,79 @@
   .poster-row::-webkit-scrollbar { height: 8px; }
   .poster-row::-webkit-scrollbar-thumb { background: var(--ink-line); border-radius: 8px; }
 
+  /* Card layout below (icon tile + title + subtitle + a plain counts
+     footer) replaces an earlier "movie poster" version: a full-bleed
+     color gradient with the name centered over it in light text + a dark
+     drop-shadow. That treatment assumed a dark page background it no
+     longer has - on the bright theme, raw dark-cased/underscored flow
+     names wrapped across 2-3 centered lines over a pastel gradient read
+     as noise, not a name. This version keeps the same per-card accent
+     (still cycling through POSTER_ACCENTS) but only as a small icon
+     tint, so the accent still gives the shelf visual variety without
+     fighting with the text for contrast. */
   .poster-card {
     position: relative;
-    flex: 0 0 220px;
-    height: 150px;
-    border-radius: 10px;
-    overflow: hidden;
+    flex: 0 0 210px;
+    min-height: 188px;
+    box-sizing: border-box;
+    border-radius: 14px;
+    background: var(--ink-raised);
+    border: 1.5px solid var(--ink-line);
     cursor: pointer;
-    border: 2px solid transparent;
-    transition: transform 0.15s, border-color 0.15s;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 0 1px 2px rgba(16,20,28,0.04);
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
   }
-  .poster-card:hover { transform: scale(1.04); }
-  .poster-card.selected { border-color: var(--signal); }
+  .poster-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(16,20,28,0.08); }
+  .poster-card.selected { border-color: var(--signal); box-shadow: 0 0 0 2px var(--signal-dim); }
 
   .poster-ribbon {
-    position: absolute; top: 8px; left: 8px;
-    font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em;
-    padding: 3px 7px; border-radius: 4px;
-    background: rgba(0,0,0,0.55); color: var(--paper);
-    border: 1px solid rgba(255,255,255,0.25);
+    align-self: flex-start;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 5px;
+    background: var(--ink); color: var(--paper-dim);
   }
-  .poster-title {
-    position: absolute; inset: 0;
+
+  .poster-icon {
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    padding: 14px; box-sizing: border-box;
   }
+
   /* Flow names are often one long underscore_joined_token with no spaces
      (e.g. "apple_health_sync_exercise_steps") - browsers only wrap at
      whitespace by default, so a plain single-line/no-wrap span just runs
-     the text straight off the edge of the card. overflow-wrap:anywhere
-     lets it break mid-word instead of overflowing, and line-clamp caps it
-     at 3 lines with an ellipsis for the rare name that's still too long
-     to fit even wrapped. */
+     the text straight off the edge of the card. Display text is also
+     humanized first (see humanizeFlowName) so this is wrapping actual
+     words, not one long screaming-case token. overflow-wrap:anywhere
+     is the fallback for the rare name still too long even as words, and
+     line-clamp caps it at 2 lines with an ellipsis past that. */
   .poster-title-text {
     display: -webkit-box;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    text-align: center;
-    font-size: 15px; font-weight: 800; line-height: 1.25;
-    color: var(--paper); text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    text-align: left;
+    font-size: 14px; font-weight: 700; line-height: 1.3;
+    color: var(--paper);
     overflow-wrap: anywhere;
     word-break: break-word;
   }
+  .poster-subtitle {
+    font-size: 11.5px; color: var(--paper-dim); line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
   .poster-badge {
-    position: absolute; bottom: 8px; left: 8px; right: 8px;
-    font-size: 10px; font-weight: 700; text-align: center;
-    padding: 4px 6px; border-radius: 4px;
-    background: rgba(0,0,0,0.65); color: var(--paper);
+    margin-top: auto;
+    font-size: 11px; font-weight: 600; color: var(--paper-dim);
+    padding-top: 10px; border-top: 1px solid var(--ink-line);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .poster-badge.status-pass { background: var(--circuit); color: #0A2E2A; }
-  .poster-badge.status-fail { background: var(--alert); color: #FFF; }
-  .poster-badge.status-running { background: var(--signal); color: #2B1D00; }
+  .poster-badge.status-pass { color: var(--circuit); border-top-color: var(--circuit); }
+  .poster-badge.status-fail { color: var(--alert); border-top-color: var(--alert); }
+  .poster-badge.status-running { color: var(--signal); border-top-color: var(--signal); }
 
   .import-card {
     flex: 0 0 180px; height: 90px; border-radius: 10px;
@@ -2811,13 +2831,13 @@ ${containerEl.innerHTML}
         .forEach(c => sidebarBadge.classList.remove(c));
       if (badgeClass) sidebarBadge.classList.add(badgeClass);
       if (isPoster) {
-        // The poster's bottom pill always shows something (the test count
-        // as a fallback, same as its initial render) rather than
+        // The poster's bottom pill always shows something (the step/test
+        // counts as a fallback, same as its initial render) rather than
         // disappearing outright the moment a run status is cleared -
         // unlike the plain list badge below, where empty really does mean
         // "nothing to show".
         const flow = lastLoadedFlows.find(x => x.slug === slug);
-        sidebarBadge.textContent = badgeText || (flow ? `${flow.test_count} test(s)` : '');
+        sidebarBadge.textContent = badgeText || (flow ? `${flow.step_count} steps · ${flow.test_count} test(s)` : '');
       } else {
         sidebarBadge.style.display = badgeText ? 'inline-block' : 'none';
         sidebarBadge.textContent = badgeText;
@@ -2861,15 +2881,34 @@ ${containerEl.innerHTML}
     });
   }
 
-  // A small rotating backdrop per card (not tied to any status) - purely
-  // to break up what would otherwise be a shelf of identical dark boxes,
-  // since these are test flows with no real poster art to show. Picked
-  // from the app's own existing palette so nothing new needs inventing.
-  // Plain hex, not var(--circuit)/var(--signal) - these get a hex alpha
-  // suffix appended below (e.g. "#2DD4BF59"), which only parses as a valid
-  // color when it's a real hex literal to begin with; "var(--circuit)59"
-  // is not valid CSS and silently fails the whole gradient stop.
+  // A small rotating tint per card's icon (not tied to any status) -
+  // purely to break up what would otherwise be a shelf of identical
+  // white boxes, since these are test flows with no real per-flow art to
+  // show. Picked from the app's own existing palette so nothing new
+  // needs inventing. Plain hex, not var(--circuit)/var(--signal) - a hex
+  // alpha suffix gets appended below (e.g. "#2DD4BF22"), which only
+  // parses as a valid color when it's a real hex literal to begin with;
+  // "var(--circuit)22" is not valid CSS.
   const POSTER_ACCENTS = ['#2DD4BF', '#F2A900', '#7C3AED', '#2563EB', '#DB2777'];
+
+  // Generic "flow" glyph for every poster card's icon tile - there's no
+  // real per-flow artwork to show (see POSTER_ACCENTS above), so this is
+  // deliberately abstract (a path through a few nodes) rather than
+  // something more specific like a play button, which would wrongly
+  // imply the card itself is a run trigger.
+  const POSTER_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><circle cx="19" cy="6" r="2.4"/><path d="M7 7.2L17 16.8M17 7.2L12 15.6"/></svg>`;
+
+  // Flow/precondition names are usually a raw filename-safe slug
+  // (snake_case, or SCREAMING_CASE from an older recording) - display-
+  // only humanizing (underscores to spaces, each word capitalized) so the
+  // card shows something scannable instead of a wall of caps/underscores.
+  // Never used for the actual slug/name sent back to the API - just what
+  // the card prints.
+  function humanizeFlowName(name) {
+    return (name || '').split(/[_\s]+/).filter(Boolean)
+      .map(w => w[0].toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+  }
 
   function renderFlowsSidebarPage() {
     const listEl = document.getElementById('savedFlowsList');
@@ -2893,17 +2932,17 @@ ${containerEl.innerHTML}
       const state = flowRunState[f.slug];
       const selected = f.slug === selectedFlowSlug;
       const accent = POSTER_ACCENTS[i % POSTER_ACCENTS.length];
-      // Last run's outcome takes over the bottom pill when there is one -
-      // exactly the "Recently added"/"New Episode" role in the reference
-      // design, just showing something actually true about this flow
-      // instead of a fixed label.
-      const badgeText = (state && state.badgeText) ? state.badgeText : `${f.test_count} test(s)`;
+      // A live run's outcome takes over this line for as long as it's
+      // relevant (pass/fail/running - see updateFlowBadge), falling back
+      // to the flow's own step/test counts the rest of the time.
+      const badgeText = (state && state.badgeText) ? state.badgeText : `${f.step_count} steps · ${f.test_count} test(s)`;
       const badgeClass = (state && state.badgeClass) || '';
       return `
-      <div class="poster-card flow-list-item ${selected ? 'selected' : ''}" data-slug="${escapeHtml(f.slug)}"
-           style="background: linear-gradient(135deg, ${accent}59, var(--ink-raised) 70%);">
+      <div class="poster-card flow-list-item ${selected ? 'selected' : ''}" data-slug="${escapeHtml(f.slug)}">
         <span class="poster-ribbon">${escapeHtml(f.platform)}</span>
-        <span class="poster-title"><span class="poster-title-text">${escapeHtml(f.name)}</span></span>
+        <span class="poster-icon" style="background:${accent}1F; color:${accent};">${POSTER_ICON}</span>
+        <span class="poster-title-text">${escapeHtml(humanizeFlowName(f.name))}</span>
+        ${f.goal ? `<span class="poster-subtitle">${escapeHtml(f.goal)}</span>` : ''}
         <span class="poster-badge flow-sidebar-badge ${badgeClass}" data-sidebar-status-for="${escapeHtml(f.slug)}">${escapeHtml(badgeText)}</span>
       </div>`;
     }).join('');
@@ -3071,13 +3110,16 @@ ${containerEl.innerHTML}
         listEl.innerHTML = '<div class="empty-hint">No preconditions saved yet — record a setup flow (e.g. login) in Test Builder, then "Save as a Precondition".</div>';
         return;
       }
-      listEl.innerHTML = preconditions.map((p, i) => `
-        <div class="poster-card precondition-card" data-slug="${escapeHtml(p.slug)}" title="Click to edit"
-             style="background: linear-gradient(135deg, ${POSTER_ACCENTS[i % POSTER_ACCENTS.length]}59, var(--ink-raised) 70%);">
+      listEl.innerHTML = preconditions.map((p, i) => {
+        const accent = POSTER_ACCENTS[i % POSTER_ACCENTS.length];
+        return `
+        <div class="poster-card precondition-card" data-slug="${escapeHtml(p.slug)}" title="Click to edit">
           <span class="poster-ribbon">${escapeHtml(p.platform)}</span>
-          <span class="poster-title"><span class="poster-title-text">${escapeHtml(p.name)}</span></span>
+          <span class="poster-icon" style="background:${accent}1F; color:${accent};">${POSTER_ICON}</span>
+          <span class="poster-title-text">${escapeHtml(humanizeFlowName(p.name))}</span>
           <span class="poster-badge">${p.step_count} step(s)</span>
-        </div>`).join('');
+        </div>`;
+      }).join('');
       listEl.querySelectorAll('.precondition-card').forEach(card => {
         card.addEventListener('click', () => startEditingFlow('preconditions', card.dataset.slug));
       });
