@@ -3667,25 +3667,37 @@ ${containerEl.innerHTML}
   });
 
   // ---------- "Start from" precondition dropdown ----------
-  async function loadPreconditions() {
+  // Filtered to the Run tab's own selected platform - a precondition (e.g.
+  // "login") is exactly as platform-specific as any other flow, so
+  // offering an Android one while running on iOS would just replay the
+  // wrong locators against this run's app instead of anything useful.
+  let lastLoadedPreconditions = [];
+  function renderPreconditionOptions() {
     const select = document.getElementById('rPrecondition');
     const previousValue = select.value;
+    const platform = document.getElementById('platform').value;
+    const options = ['<option value="">None — start live exploration from the app\'s current state</option>'];
+    for (const p of lastLoadedPreconditions.filter(p => p.platform === platform)) {
+      options.push(`<option value="${escapeHtml(p.slug)}">${escapeHtml(p.name)} (${p.step_count} step(s))</option>`);
+    }
+    select.innerHTML = options.join('');
+    // Preserve whatever was selected across a refresh, if it still exists
+    if ([...select.options].some(o => o.value === previousValue)) select.value = previousValue;
+  }
+
+  async function loadPreconditions() {
     try {
       const res = await fetch(BRIDGE_URL + '/api/preconditions');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed to load preconditions');
-      const options = ['<option value="">None — start live exploration from the app\'s current state</option>'];
-      for (const p of (data.preconditions || [])) {
-        options.push(`<option value="${escapeHtml(p.slug)}">${escapeHtml(p.name)} (${p.step_count} step(s))</option>`);
-      }
-      select.innerHTML = options.join('');
-      // Preserve whatever was selected across a refresh, if it still exists
-      if ([...select.options].some(o => o.value === previousValue)) select.value = previousValue;
+      lastLoadedPreconditions = data.preconditions || [];
+      renderPreconditionOptions();
     } catch (e) {
       // Non-fatal - the dropdown just keeps its default "None" option if the
       // bridge server isn't reachable yet (same posture as loadSavedFlows).
     }
   }
+  document.getElementById('platform').addEventListener('change', renderPreconditionOptions);
   loadPreconditions();
   document.getElementById('saveFlowBtnReport').addEventListener('click', () => {
     saveFlow('rFlowNameReport', 'saveFlowStatusReport', 'saveFlowBtnReport', () => lastUploadedReportData);
@@ -4687,10 +4699,10 @@ ${containerEl.innerHTML}
       const preData = await preRes.json();
       const options = ['<option value="">Choose a flow or precondition…</option>'];
       for (const f of (flowsData.flows || [])) {
-        options.push(`<option value="flows:${escapeHtml(f.slug)}">Flow: ${escapeHtml(f.name)} (${f.test_count} test case(s))</option>`);
+        options.push(`<option value="flows:${escapeHtml(f.slug)}">Flow (${escapeHtml(f.platform)}): ${escapeHtml(f.name)} (${f.test_count} test case(s))</option>`);
       }
       for (const p of (preData.preconditions || [])) {
-        options.push(`<option value="preconditions:${escapeHtml(p.slug)}">Precondition: ${escapeHtml(p.name)}</option>`);
+        options.push(`<option value="preconditions:${escapeHtml(p.slug)}">Precondition (${escapeHtml(p.platform)}): ${escapeHtml(p.name)}</option>`);
       }
       select.innerHTML = options.join('');
       if ([...select.options].some(o => o.value === previousValue)) select.value = previousValue;
