@@ -5191,6 +5191,27 @@ ${containerEl.innerHTML}
       // no longer exists server-side (a NameError waiting to happen the
       // moment anything tries to actually use it).
       lsUpdateContext({});
+      // Recorded steps deliberately survive a disconnect (see below), so
+      // reconnecting mid-flow leaves the step list showing "save as X" a
+      // couple of steps up from a Compare/assert that then fails with a
+      // confusing NameError - the value was real, but this NEW connection
+      // (and its context) has no memory of the old one. Surfacing that
+      // explicitly here, instead of letting the same "nothing captured
+      // yet" hint quietly under-report it, is what actually explains what
+      // just happened and what to do about it - confirmed live: this is
+      // exactly the sequence that produces that NameError.
+      const staleSaveAs = [...new Set(
+        lsCapturedSteps.filter(s => s.action === 'parse_label' && s.save_as).map(s => s.save_as)
+      )];
+      if (staleSaveAs.length) {
+        const hint = document.getElementById('lsContextHint');
+        if (hint) {
+          hint.innerHTML = `<span style="color:var(--signal);">⚠ This connection starts with no captured values - `
+            + `${staleSaveAs.map(escapeHtml).join(', ')} ${staleSaveAs.length === 1 ? 'was' : 'were'} captured `
+            + `before this (re)connect and no longer exist. Re-run (▶) the parse_label step(s) that saved `
+            + `${staleSaveAs.length === 1 ? 'it' : 'them'} before comparing or asserting on ${staleSaveAs.length === 1 ? 'it' : 'them'}.</span>`;
+        }
+      }
       document.getElementById('lsConnectCard').style.display = 'none';
       document.getElementById('lsActiveCard').style.display = 'block';
       document.getElementById('lsEditFlowCard').style.display = 'block';
@@ -5312,7 +5333,22 @@ ${containerEl.innerHTML}
       renderLsCapturedSteps();
       statusEl.innerHTML = `<span style="color:var(--circuit);">✓ ${escapeHtml(data.result.detail)} - recorded</span>`;
     } catch (e) {
-      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+      // A NameError here almost always means "this WAS captured, but in a
+      // connection before the current one" (recorded steps survive a
+      // reconnect, captured values don't - see the connect handler's own
+      // warning above) rather than "this was never captured at all" -
+      // pointing at the exact step that (re-)saves it turns a confusing
+      // failure into a one-click fix.
+      let message = e.message;
+      const nameMatch = message.match(/name '(\w+)' is not defined/);
+      if (nameMatch) {
+        const stepIndex = lsCapturedSteps.findIndex(s => s.action === 'parse_label' && s.save_as === nameMatch[1]);
+        if (stepIndex !== -1) {
+          message += ` — step ${stepIndex + 1} saves this as "${nameMatch[1]}", but that only takes effect once `
+            + `you re-run (▶) it in THIS connection.`;
+        }
+      }
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(message)}</span>`;
     }
   });
 
