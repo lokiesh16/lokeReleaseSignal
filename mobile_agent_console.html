@@ -662,12 +662,20 @@
     <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
       <details style="font-size:11px;">
         <summary class="hint" style="cursor:pointer; display:inline;">Details</summary>
-        <div class="hint" style="position:absolute; z-index:5; margin-top:6px; right:0; width:320px; padding:10px 12px; background:var(--ink-raised); border:1px solid var(--ink-line); border-radius:8px; font-size:11.5px; line-height:1.5; box-shadow:0 4px 16px rgba(16,20,28,0.2);">
-          One-time setup, then never touch the terminal again: run <code>python -m mobile_agent.launcher</code>
-          once and just leave it running in the background. After that, use the Start/Stop buttons here
-          whenever you want.
+        <div class="hint" style="position:absolute; z-index:5; margin-top:6px; right:0; width:340px; padding:10px 12px; background:var(--ink-raised); border:1px solid var(--ink-line); border-radius:8px; font-size:11.5px; line-height:1.5; box-shadow:0 4px 16px rgba(16,20,28,0.2);">
+          Already have this project's Python code checked out? One-time setup, then never touch the
+          terminal again: run <code>python -m mobile_agent.launcher</code> once and just leave it running
+          in the background. After that, use the Start/Stop buttons here whenever you want.
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--ink-line);">
+            Nothing set up at all? Use <b>Download app</b> instead - a standalone build, no Python or
+            install needed. A browser can't run it for you automatically (no browser can, for any app -
+            that's not a limitation specific to this one), so after it downloads: on macOS, right-click it
+            and choose <b>Open</b> once to approve it (Gatekeeper blocks unsigned apps by default);
+            elsewhere, just run it. Leave it running - this banner turns green on its own once it's up.
+          </div>
         </div>
       </details>
+      <button class="copy" id="bridgeDownloadBtn" style="background:var(--ink-line); color:var(--paper); padding:5px 12px; font-size:11.5px;">Download app</button>
       <button class="copy" id="bridgeStartBtn" style="display:none; padding:5px 12px; font-size:11.5px;">Start server</button>
       <button class="copy" id="bridgeStopBtn" style="display:none; background:var(--ink-line); color:var(--paper); padding:5px 12px; font-size:11.5px;">Stop server</button>
     </div>
@@ -1899,6 +1907,17 @@
   const LAUNCHER_URL = 'http://localhost:5056';
   const LAUNCHER_UNREACHABLE_MSG =
     'Launcher not reachable — run this ONCE and leave it running forever: python -m mobile_agent.launcher';
+  // Direct release-asset URL (stable across re-uploads as long as the tag
+  // and filename stay the same - GitHub resolves it to whatever's
+  // currently attached, no version lookup needed). A browser can trigger
+  // this download on its own (it's just a normal file fetch, same as
+  // clicking any link) but can never install or run what it downloads -
+  // that boundary exists in every browser, for every kind of file, and
+  // isn't something any amount of JS here can work around.
+  const BRIDGE_BINARY_URL = 'https://github.com/lokiesh16/lokeReleaseSignal/releases/download/mobile-agent-bridge-v1/MobileAgentBridge';
+  document.getElementById('bridgeDownloadBtn').addEventListener('click', () => {
+    window.open(BRIDGE_BINARY_URL, '_blank');
+  });
 
   async function checkBridge() {
     const dot = document.getElementById('bridgeDot');
