@@ -598,10 +598,38 @@
   .flag-box b { color: var(--alert); }
 
   .empty-hint { color: var(--paper-dim); font-size: 13px; text-align: center; padding: 20px 0; }
+
+  /* Casual-visitor deterrent, not real security - a passcode hash sitting
+     in this page's own source can always be read by whoever opens dev
+     tools, so anyone determined can get past this. What it DOES stop is
+     the console being usable by someone who just stumbles onto the link
+     (or opens the local file) without ever meaning to touch it. */
+  #authGate {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(20,24,20,0.35); backdrop-filter: blur(6px);
+  }
+  #authGateCard {
+    width: 320px; background: var(--ink-raised); border: 1px solid var(--ink-line);
+    border-radius: 16px; padding: 28px; box-shadow: 0 20px 60px rgba(16,20,28,0.25);
+    text-align: center;
+  }
 </style>
 </head>
 <body>
-<div class="app-shell">
+
+<div id="authGate">
+  <div id="authGateCard">
+    <div class="dot" style="margin:0 auto 12px;"></div>
+    <div style="font-size:16px; font-weight:700; margin-bottom:4px;">Habi's Final Run</div>
+    <div class="hint" style="margin-bottom:16px;">Enter the team passcode to continue</div>
+    <input type="password" id="authGateInput" placeholder="Passcode" autocomplete="off" style="text-align:center; margin-bottom:10px;">
+    <button class="copy" id="authGateBtn" style="width:100%; padding:10px;">Unlock</button>
+    <div id="authGateError" style="color:var(--alert); font-size:12px; margin-top:10px; min-height:14px;"></div>
+  </div>
+</div>
+
+<div class="app-shell" id="appShell" style="display:none;">
   <nav class="side-nav">
     <header class="side-nav-header">
       <span class="dot"></span>
@@ -1563,6 +1591,55 @@
 </div>
 
 <script>
+  // ---------- auth gate (casual-visitor deterrent, not real security -
+  // see the #authGate CSS comment) ----------
+  // SHA-256 of the shared team passcode, not the passcode itself - a
+  // small step up from a bare string sitting in view-source, though
+  // still reversible by anyone willing to actually try (short shared
+  // secrets are always brute-forceable once you have the hash). Rotate
+  // this the same way any leaked credential gets rotated: agree a new
+  // passcode with the team, hash it, replace the constant below.
+  const AUTH_GATE_HASH = 'a19ec0d4058b4a13fd1af0b3a7ee33c8584dfb734489877d170250713121d050';
+  const AUTH_GATE_STORAGE_KEY = 'habiConsoleUnlocked';
+
+  async function sha256Hex(text) {
+    const bytes = new TextEncoder().encode(text);
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function showApp() {
+    document.getElementById('authGate').style.display = 'none';
+    document.getElementById('appShell').style.display = 'flex';
+  }
+
+  if (localStorage.getItem(AUTH_GATE_STORAGE_KEY) === AUTH_GATE_HASH) {
+    // Keyed by the hash itself, not just "1" - rotating the passcode
+    // above automatically re-locks everyone out (their stored value no
+    // longer matches the new hash) instead of needing a separate
+    // "bump this version number" step every time it changes.
+    showApp();
+  } else {
+    const input = document.getElementById('authGateInput');
+    const errorEl = document.getElementById('authGateError');
+    const attempt = async () => {
+      const value = input.value;
+      if (!value) return;
+      const hash = await sha256Hex(value);
+      if (hash === AUTH_GATE_HASH) {
+        localStorage.setItem(AUTH_GATE_STORAGE_KEY, hash);
+        showApp();
+      } else {
+        errorEl.textContent = 'Wrong passcode - try again.';
+        input.value = '';
+        input.focus();
+      }
+    };
+    document.getElementById('authGateBtn').addEventListener('click', attempt);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') attempt(); });
+    input.focus();
+  }
+
   // ---------- tabs ----------
   document.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
