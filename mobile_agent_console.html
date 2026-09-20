@@ -4768,6 +4768,24 @@ ${containerEl.innerHTML}
     // Deep copy - editing this buffer must never mutate the cached
     // original, since "Stop editing" without saving should discard changes.
     lsCapturedSteps = JSON.parse(JSON.stringify(test.steps || []));
+    // Backfill the "Compare captured values" hint from any parse_label
+    // steps already in this test case - those variable names WILL exist
+    // by the time a later assert_expr step runs (on replay, or once these
+    // steps get re-run live this session), even though lsContext is
+    // genuinely empty right now (nothing's actually executed yet this
+    // session). Without this, loading a flow that already has "save as
+    // b4_adding_wt" two steps up still says "nothing captured yet" right
+    // next to it - technically accurate, but confusing since the step is
+    // sitting right there. Merges onto whatever's already there rather
+    // than replacing it, in case something was captured live before this
+    // flow was loaded for editing.
+    const backfilledContext = {...lsContext};
+    for (const step of lsCapturedSteps) {
+      if (step.action === 'parse_label' && step.save_as) {
+        backfilledContext[step.save_as] = step.value;
+      }
+    }
+    lsUpdateContext(backfilledContext);
     lsResetSplitState();
     document.getElementById('lsCapturedDescription').value = test.description || '';
     const nameFieldId = lsEditFlowCache.kind === 'preconditions' ? 'lsCapturedPreconditionName' : 'lsCapturedFlowName';
