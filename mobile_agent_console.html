@@ -703,7 +703,27 @@
           </div>
         </div>
       </details>
-      <button class="copy" id="bridgeDownloadBtn" style="background:var(--ink-line); color:var(--paper); padding:5px 12px; font-size:11.5px;">Download app</button>
+      <div style="position:relative; flex-shrink:0;">
+        <button class="copy" id="bridgeDownloadBtn" style="background:var(--ink-line); color:var(--paper); padding:5px 12px; font-size:11.5px;">Download app</button>
+        <!-- Shown by default (not a hover/click tooltip) since this is
+             specifically for someone who's never done this before and has
+             no reason to think to hover/click for more - dismissible once
+             read, but not persisted across reloads, so a teammate coming
+             back later after actually forgetting these steps sees it
+             again instead of it staying hidden forever from one earlier
+             dismissal. -->
+        <div id="bridgeDownloadNote" style="position:absolute; z-index:6; top:calc(100% + 10px); right:0; width:260px; padding:12px 14px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; font-size:11.5px; line-height:1.55; color:var(--paper); box-shadow:0 6px 20px rgba(16,20,28,0.15);">
+          <div style="position:absolute; top:-6px; right:22px; width:11px; height:11px; background:#FFFBEB; border-left:1px solid #FDE68A; border-top:1px solid #FDE68A; transform:rotate(45deg);"></div>
+          <button id="bridgeDownloadNoteClose" title="Dismiss" style="position:absolute; top:6px; right:8px; background:none; border:none; cursor:pointer; color:var(--paper-dim); font-size:14px; line-height:1; padding:2px;">&times;</button>
+          <b>After it downloads:</b>
+          <ol style="margin:6px 0 0; padding-left:16px;">
+            <li>Open your <b>Downloads</b> folder, find <b>MobileAgentBridge</b>.</li>
+            <li>Right-click it → <b>Open</b> → <b>Open</b> again in the warning popup (first time only - macOS blocks unsigned apps by default).</li>
+            <li>Leave that window running in the background - closing it stops the server.</li>
+            <li>Come back here - this banner turns green on its own within a few seconds. No button needed.</li>
+          </ol>
+        </div>
+      </div>
       <button class="copy" id="bridgeStartBtn" style="display:none; padding:5px 12px; font-size:11.5px;">Start server</button>
       <button class="copy" id="bridgeStopBtn" style="display:none; background:var(--ink-line); color:var(--paper); padding:5px 12px; font-size:11.5px;">Stop server</button>
     </div>
@@ -1994,6 +2014,9 @@
   const BRIDGE_BINARY_URL = 'https://github.com/lokiesh16/lokeReleaseSignal/releases/download/mobile-agent-bridge-v1/MobileAgentBridge';
   document.getElementById('bridgeDownloadBtn').addEventListener('click', () => {
     window.open(BRIDGE_BINARY_URL, '_blank');
+  });
+  document.getElementById('bridgeDownloadNoteClose').addEventListener('click', () => {
+    document.getElementById('bridgeDownloadNote').style.display = 'none';
   });
 
   async function checkBridge() {
