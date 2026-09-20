@@ -243,7 +243,7 @@
   }
   .import-card .name { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 
-  /* ---------- Inspector & Recorder's step indicator - orientation, not a
+  /* ---------- Test Builder's step indicator - orientation, not a
      gate (see the HTML comment above where this renders). Plain bordered
      segments rather than the reference's angled/chevron shapes - same
      sequential idea, without clip-path arrow math. ---------- */
@@ -549,14 +549,14 @@
     </header>
 
     <div class="tabs">
-      <button class="tab" data-tab="build" style="display:none;">Build Command</button>
-      <button class="tab active" data-tab="run">AI Eye</button>
+      <button class="tab" data-tab="scraper">Test Builder</button>
       <div class="tab-group-label">Test Library</div>
       <button class="tab tab-child" data-tab="library-flows">Saved Flows</button>
       <button class="tab tab-child" data-tab="library-scripts">Test Scripts</button>
       <button class="tab" data-tab="manual">Manual API Capture</button>
-      <button class="tab" data-tab="scraper">Inspector &amp; Recorder</button>
       <button class="tab" data-tab="mtc">Generate Manual Test Cases</button>
+      <button class="tab active" data-tab="run">AI Eye</button>
+      <button class="tab" data-tab="build" style="display:none;">Build Command</button>
       <button class="tab" data-tab="report" style="display:none;">View Run Report</button>
     </div>
   </nav>
@@ -1362,11 +1362,11 @@
     <div class="card">
       <div style="font-weight:700; font-size:15px; margin-bottom:6px;">Generate manual test cases from exploring the app</div>
       <p class="hint" style="font-size:13px; margin:0 0 14px; line-height:1.5;">
-        Tap around on the screenshot to actually drive the app — same interactive tap as Inspector &amp; Recorder — then
+        Tap around on the screenshot to actually drive the app — same interactive tap as Test Builder — then
         generate plain, human-readable test cases grounded in the whole flow you just traversed, not just one isolated
         screen: happy path, edge cases, and negative scenarios included. These are for a person to follow by hand, not
         an automation flow — nothing here ever gets replayed. Uses the same connected session as
-        <b>Inspector &amp; Recorder</b> — connect there first if you haven't yet.
+        <b>Test Builder</b> — connect there first if you haven't yet.
       </p>
       <div class="field full">
         <label>Context overview <span class="opt">what are you testing? gives the AI the QA intent behind what you're about to explore</span></label>
@@ -1377,7 +1377,7 @@
     <div style="display:flex; gap:20px; align-items:flex-start;">
       <div style="flex:1; min-width:0;">
         <div class="card" id="mtcNoSessionCard">
-          <div class="empty-hint">Not connected yet — go to <b>Inspector &amp; Recorder</b>, connect to a device, then come back here.</div>
+          <div class="empty-hint">Not connected yet — go to <b>Test Builder</b>, connect to a device, then come back here.</div>
         </div>
 
         <div class="card" id="mtcTrailCard" style="display:none;">
@@ -1474,7 +1474,7 @@
     });
   });
 
-  // ---------- Human mode / AI mode toggle (Inspector & Recorder only) ----------
+  // ---------- Human mode / AI mode toggle (Test Builder only) ----------
   // "Human mode" = the existing tap-by-tap capture UI (no LLM calls).
   // "AI mode" = give it a goal in plain English right here and watch it
   // drive the app itself, live - same screenshot pane, updating step by
@@ -1503,7 +1503,7 @@
     });
   });
 
-  // ---------- AI mode: batch-plan a whole screen at a time, inline in Inspector & Recorder ----------
+  // ---------- AI mode: batch-plan a whole screen at a time, inline in Test Builder ----------
   // One /plan call per SCREEN (not per action) - it captures a fresh
   // screenshot + full locator list server-side, one LLM vision call plans
   // every action that screen's visible content supports, and the console
@@ -2907,7 +2907,7 @@ ${containerEl.innerHTML}
         </div>
         <div style="display:flex; gap:6px; flex-shrink:0;">
           <button class="copy flow-run-btn" data-slug="${escapeHtml(f.slug)}" data-name="${escapeHtml(f.name)}" style="padding:6px 10px; font-size:12px;">${state && state.status === 'running' ? 'Running…' : 'Run'}</button>
-          <button class="copy flow-edit-btn" data-slug="${escapeHtml(f.slug)}" title="Load this flow's steps into Inspector & Recorder to fix a locator, insert a step, or extend it - saving there updates this same flow in place." style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Edit</button>
+          <button class="copy flow-edit-btn" data-slug="${escapeHtml(f.slug)}" title="Load this flow's steps into Test Builder to fix a locator, insert a step, or extend it - saving there updates this same flow in place." style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Edit</button>
           <button class="copy flow-gen-tests-btn" data-slug="${escapeHtml(f.slug)}" data-name="${escapeHtml(f.name)}" title="Generate a page object + pytest test class from this flow's steps" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Generate tests</button>
           <button class="copy flow-share-btn" data-slug="${escapeHtml(f.slug)}" title="Publish this flow to the team's shared repo so teammates can import it" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Share with team</button>
           <button class="copy flow-delete-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Delete</button>
@@ -3023,7 +3023,7 @@ ${containerEl.innerHTML}
       if (!res.ok) throw new Error(data.error || 'failed to load preconditions');
       const preconditions = data.preconditions || [];
       if (!preconditions.length) {
-        listEl.innerHTML = '<div class="empty-hint">No preconditions saved yet — record a setup flow (e.g. login) in Inspector & Recorder, then "Save as a Precondition".</div>';
+        listEl.innerHTML = '<div class="empty-hint">No preconditions saved yet — record a setup flow (e.g. login) in Test Builder, then "Save as a Precondition".</div>';
         return;
       }
       listEl.innerHTML = preconditions.map((p, i) => `
@@ -6659,7 +6659,7 @@ ${lines}
     targetEl.innerHTML = html;
   }
 
-  // ---------- Generate Manual Test Cases (uses the Inspector & Recorder's
+  // ---------- Generate Manual Test Cases (uses the Test Builder's
   // own connected session - lsSessionId - rather than managing its own
   // separate connect/disconnect flow) ----------
   let mtcCases = []; // {title, category, steps: string[], expected}
