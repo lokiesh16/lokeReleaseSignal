@@ -891,13 +891,13 @@
   <div class="panel" id="panel-scraper">
 
     <!-- Orientation, not enforcement - this isn't a strict wizard (you can
-         Act before Validating, Validate more than once, or never at all),
-         so this just reflects real state (see updateLsStepper) rather than
-         gating anything. Explore/Build/Validate/Save map onto this tab's
-         existing sections: Explore = loading locators + the element list,
-         Build = Recorded steps growing as you Act, Validate = the AI
-         "Validate this screen" button, Save = the description/name/save-as
-         fields at the bottom of Captured steps. -->
+         Act more, reconnect, etc. in any order), so this just reflects real
+         state (see updateLsStepper) rather than gating anything.
+         Explore/Build map onto this tab's existing sections: Explore =
+         loading locators + the element list, Build = Recorded steps growing
+         as you Act. Validate/Save were dropped from this bar - they're
+         optional side actions (AI screen-check, naming/saving at the
+         bottom), not something worth a step indicator here. -->
     <div class="ls-stepper" id="lsStepper">
       <div class="ls-step" data-step="connect">
         <span class="ls-step-num">1</span>
@@ -910,14 +910,6 @@
       <div class="ls-step" data-step="build">
         <span class="ls-step-num">3</span>
         <span class="ls-step-text"><b>Build</b><span class="hint">Act to record steps</span></span>
-      </div>
-      <div class="ls-step" data-step="validate">
-        <span class="ls-step-num">4</span>
-        <span class="ls-step-text"><b>Validate</b><span class="hint">Optional — AI checks the screen</span></span>
-      </div>
-      <div class="ls-step" data-step="save">
-        <span class="ls-step-num">5</span>
-        <span class="ls-step-text"><b>Save</b><span class="hint">Name it, save as flow/precondition</span></span>
       </div>
     </div>
 
@@ -3955,14 +3947,6 @@ ${containerEl.innerHTML}
   // happened to share one row before this: "which one am I inspecting
   // right now" vs "which ones do I want to export".
   let lsSelectedElementIndex = null;
-  // Only-ever-set-to-true flags backing the Validate/Save step indicators
-  // (see updateLsStepper) - neither has a natural "in progress" state the
-  // way connect/explore/build do (you either have validated at least once
-  // this session, or saved at least once), so a boolean is enough. Reset
-  // on disconnect along with everything else session-scoped.
-  let lsHasValidated = false;
-  let lsHasSaved = false;
-
   // Orientation only (see the stepper's own HTML comment) - reflects real
   // state rather than gating anything, so this is safe to call liberally
   // after any state change instead of tracking "did this actually change
@@ -3977,10 +3961,8 @@ ${containerEl.innerHTML}
       connect: connected ? 'done' : 'active',
       explore: !connected ? '' : (explored ? 'done' : 'active'),
       build: !explored ? '' : (built ? 'done' : 'active'),
-      validate: !built ? '' : (lsHasValidated ? 'done' : 'active'),
-      save: !built ? '' : (lsHasSaved ? 'done' : 'active'),
     };
-    const stepNumbers = {connect: 1, explore: 2, build: 3, validate: 4, save: 5};
+    const stepNumbers = {connect: 1, explore: 2, build: 3};
     const connectHint = document.getElementById('lsStepConnectHint');
     if (connectHint) connectHint.textContent = connected ? 'App connected' : 'Not connected yet';
     Object.entries(stepStates).forEach(([step, state]) => {
@@ -5265,8 +5247,6 @@ ${containerEl.innerHTML}
       // poster row in Saved Flows - both need refreshing on a precondition
       // save since they're two different UI surfaces over the same data.
       if (isPrecondition) { loadPreconditions(); loadPreconditionsList(); } else { loadSavedFlows(); }
-      lsHasSaved = true;
-      updateLsStepper();
     } catch (e) {
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
     } finally {
@@ -5719,8 +5699,6 @@ ${containerEl.innerHTML}
     if (!lsCapturedSteps.length) {
       document.getElementById('lsCapturedCard').style.display = 'none';
     }
-    lsHasValidated = false;
-    lsHasSaved = false;
     updateLsStepper();
   });
 
@@ -6395,7 +6373,6 @@ ${containerEl.innerHTML}
       const steps = data.steps || [];
       steps.forEach(s => lsCapturedSteps.push(s));
       renderLsCapturedSteps();
-      lsHasValidated = true;
       updateLsStepper();
 
       statusEl.innerHTML = steps.length
