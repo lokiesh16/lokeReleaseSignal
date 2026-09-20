@@ -243,6 +243,37 @@
   }
   .import-card .name { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 
+  /* ---------- Inspector & Recorder's step indicator - orientation, not a
+     gate (see the HTML comment above where this renders). Plain bordered
+     segments rather than the reference's angled/chevron shapes - same
+     sequential idea, without clip-path arrow math. ---------- */
+  .ls-stepper {
+    display: flex; gap: 2px; margin-bottom: 18px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--ink-line);
+  }
+  .ls-step {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; background: var(--ink-raised);
+    border-right: 1px solid var(--ink-line);
+  }
+  .ls-step:last-child { border-right: none; }
+  .ls-step-num {
+    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+    background: var(--ink-line); color: var(--paper-dim);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px;
+  }
+  .ls-step-text { min-width: 0; font-size: 13px; font-weight: 700; color: var(--paper); }
+  .ls-step-text .hint { display: block; font-size: 10.5px; font-weight: 400; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ls-step.active { background: var(--signal-dim); }
+  .ls-step.active .ls-step-num { background: var(--signal); color: #2B1D00; }
+  .ls-step.done .ls-step-num { background: var(--circuit); color: #0A2E2A; }
+  .ls-step.done .ls-step-text { color: var(--paper-dim); }
+  @media (max-width: 900px) {
+    .ls-stepper { flex-wrap: wrap; }
+    .ls-step { flex: 1 1 45%; border-bottom: 1px solid var(--ink-line); }
+  }
+
   .card {
     background: var(--ink-raised);
     border: 1px solid var(--ink-line);
@@ -858,6 +889,37 @@
 
   <!-- ============ LOCATOR SCRAPER TAB ============ -->
   <div class="panel" id="panel-scraper">
+
+    <!-- Orientation, not enforcement - this isn't a strict wizard (you can
+         Act before Validating, Validate more than once, or never at all),
+         so this just reflects real state (see updateLsStepper) rather than
+         gating anything. Explore/Build/Validate/Save map onto this tab's
+         existing sections: Explore = loading locators + the element list,
+         Build = Recorded steps growing as you Act, Validate = the AI
+         "Validate this screen" button, Save = the description/name/save-as
+         fields at the bottom of Captured steps. -->
+    <div class="ls-stepper" id="lsStepper">
+      <div class="ls-step" data-step="connect">
+        <span class="ls-step-num">1</span>
+        <span class="ls-step-text"><b>Connect</b><span class="hint" id="lsStepConnectHint">Not connected yet</span></span>
+      </div>
+      <div class="ls-step" data-step="explore">
+        <span class="ls-step-num">2</span>
+        <span class="ls-step-text"><b>Explore</b><span class="hint">Load locators, pick an element</span></span>
+      </div>
+      <div class="ls-step" data-step="build">
+        <span class="ls-step-num">3</span>
+        <span class="ls-step-text"><b>Build</b><span class="hint">Act to record steps</span></span>
+      </div>
+      <div class="ls-step" data-step="validate">
+        <span class="ls-step-num">4</span>
+        <span class="ls-step-text"><b>Validate</b><span class="hint">Optional — AI checks the screen</span></span>
+      </div>
+      <div class="ls-step" data-step="save">
+        <span class="ls-step-num">5</span>
+        <span class="ls-step-text"><b>Save</b><span class="hint">Name it, save as flow/precondition</span></span>
+      </div>
+    </div>
 
     <div class="card mode-toggle-card" style="padding:10px; display:flex; gap:8px;">
       <label class="mode-toggle-opt on" data-mode="human" style="flex:1; display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:8px; cursor:pointer;">
@@ -3893,6 +3955,45 @@ ${containerEl.innerHTML}
   // happened to share one row before this: "which one am I inspecting
   // right now" vs "which ones do I want to export".
   let lsSelectedElementIndex = null;
+  // Only-ever-set-to-true flags backing the Validate/Save step indicators
+  // (see updateLsStepper) - neither has a natural "in progress" state the
+  // way connect/explore/build do (you either have validated at least once
+  // this session, or saved at least once), so a boolean is enough. Reset
+  // on disconnect along with everything else session-scoped.
+  let lsHasValidated = false;
+  let lsHasSaved = false;
+
+  // Orientation only (see the stepper's own HTML comment) - reflects real
+  // state rather than gating anything, so this is safe to call liberally
+  // after any state change instead of tracking "did this actually change
+  // a step" precisely.
+  function updateLsStepper() {
+    const stepper = document.getElementById('lsStepper');
+    if (!stepper) return;
+    const connected = !!lsSessionId;
+    const explored = lsLastElements.length > 0;
+    const built = lsCapturedSteps.length > 0;
+    const stepStates = {
+      connect: connected ? 'done' : 'active',
+      explore: !connected ? '' : (explored ? 'done' : 'active'),
+      build: !explored ? '' : (built ? 'done' : 'active'),
+      validate: !built ? '' : (lsHasValidated ? 'done' : 'active'),
+      save: !built ? '' : (lsHasSaved ? 'done' : 'active'),
+    };
+    const stepNumbers = {connect: 1, explore: 2, build: 3, validate: 4, save: 5};
+    const connectHint = document.getElementById('lsStepConnectHint');
+    if (connectHint) connectHint.textContent = connected ? 'App connected' : 'Not connected yet';
+    Object.entries(stepStates).forEach(([step, state]) => {
+      const el = stepper.querySelector(`.ls-step[data-step="${step}"]`);
+      if (!el) return;
+      el.classList.remove('active', 'done');
+      if (state) el.classList.add(state);
+      const numEl = el.querySelector('.ls-step-num');
+      if (numEl) numEl.textContent = state === 'done' ? '✓' : String(stepNumbers[step]);
+    });
+  }
+  updateLsStepper(); // reflects "not connected yet" immediately on page load, before any interaction
+
   // Mirrors the session-scoped context dict the server keeps per scrape
   // session (see scrape_start/scrape_act in server.py) - every parse_label
   // capture and assert_expr comparison reads/writes the SAME dict on the
@@ -4174,6 +4275,7 @@ ${containerEl.innerHTML}
 
   function lsRenderElementList(elements) {
     lsLastElements = elements;
+    updateLsStepper(); // Explore flips to done once elements are loaded; Build reflects lsCapturedSteps either way
     // The screen just changed (fresh load, or right after an Act) - the
     // old selected index may no longer point at the same element, so
     // don't carry a stale "Element Details" panel forward silently.
@@ -5158,8 +5260,13 @@ ${containerEl.innerHTML}
         renderLsCapturedSteps();
         if (!isPrecondition) showCreateTestScriptBtn(data.slug, name);
       }
-      if (isPrecondition) loadPreconditions(); else loadSavedFlows();
-      populateLsEditTargetSelect();
+      // loadPreconditions() refreshes the Run tab's "Start from" dropdown;
+      // loadPreconditionsList()/loadSavedFlows() refresh the matching
+      // poster row in Saved Flows - both need refreshing on a precondition
+      // save since they're two different UI surfaces over the same data.
+      if (isPrecondition) { loadPreconditions(); loadPreconditionsList(); } else { loadSavedFlows(); }
+      lsHasSaved = true;
+      updateLsStepper();
     } catch (e) {
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
     } finally {
@@ -5297,6 +5404,7 @@ ${containerEl.innerHTML}
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed to connect');
       lsSessionId = data.session_id;
+      updateLsStepper();
       // A fresh session always starts with an empty context server-side
       // (see scrape_start) - resetting the client mirror here too, instead
       // of leaving whatever a PREVIOUS session captured, is what stops
@@ -5338,7 +5446,6 @@ ${containerEl.innerHTML}
       // (the 0-steps empty-hint vs the real list) from here on, never this
       // visibility.
       document.getElementById('lsCapturedCard').style.display = 'block';
-      populateLsEditTargetSelect();
       // Same reasoning as the mode-toggle handler: if AI mode was already
       // selected before connecting, there's no human-mode "Tap anywhere"
       // button to trigger the first load, so do it here instead.
@@ -5612,6 +5719,9 @@ ${containerEl.innerHTML}
     if (!lsCapturedSteps.length) {
       document.getElementById('lsCapturedCard').style.display = 'none';
     }
+    lsHasValidated = false;
+    lsHasSaved = false;
+    updateLsStepper();
   });
 
   // ---------- Bug scanner: pure vision UI/UX critique, no locators involved ----------
@@ -6285,6 +6395,8 @@ ${containerEl.innerHTML}
       const steps = data.steps || [];
       steps.forEach(s => lsCapturedSteps.push(s));
       renderLsCapturedSteps();
+      lsHasValidated = true;
+      updateLsStepper();
 
       statusEl.innerHTML = steps.length
         ? `<span style="color:var(--circuit);">✓ Added ${steps.length} assert_visible step(s) (considered ${data.considered} element(s) on screen)</span>`
