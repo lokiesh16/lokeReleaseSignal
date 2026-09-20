@@ -4406,7 +4406,7 @@ ${containerEl.innerHTML}
       const locatorEditor = (s.strategy && s.value != null) ? `
         <div style="display:flex; gap:6px; align-items:center; margin-top:5px;" title="Hand-edit the locator this step uses to find the element - useful when you want to hand-write or tweak a class chain/predicate/xpath yourself instead of what got captured.">
           <select class="ls-step-locator-strategy" data-step-locator-strategy="${i}" style="width:auto; flex:0 0 165px; font-size:11px; padding:3px 6px;">
-            ${['accessibility id', 'xpath', 'class name', '-ios predicate string', '-ios class chain', 'id'].map(opt =>
+            ${['accessibility id', 'xpath', 'class name', '-ios predicate string', '-ios class chain', 'id', '-android uiautomator'].map(opt =>
               `<option value="${opt}" ${s.strategy === opt ? 'selected' : ''}>${opt}</option>`).join('')}
           </select>
           <input class="ls-step-locator-value" data-step-locator-value="${i}" value="${escapeHtml(s.value)}"
