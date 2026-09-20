@@ -697,9 +697,11 @@
           <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--ink-line);">
             Nothing set up at all? Use <b>Download app</b> instead - a standalone build, no Python or
             install needed. A browser can't run it for you automatically (no browser can, for any app -
-            that's not a limitation specific to this one), so after it downloads: on macOS, right-click it
-            and choose <b>Open</b> once to approve it (Gatekeeper blocks unsigned apps by default);
-            elsewhere, just run it. Leave it running - this banner turns green on its own once it's up.
+            that's not a limitation specific to this one), so after it downloads: unzip it, then
+            right-click the extracted app and choose <b>Open</b> once to approve it (Gatekeeper blocks
+            unsigned apps by default - a plain double-click's warning has no Open option). Leave it
+            running - this banner turns green on its own once it's up. See the note next to the button
+            for the exact steps.
           </div>
         </div>
       </details>
@@ -717,8 +719,8 @@
           <button id="bridgeDownloadNoteClose" title="Dismiss" style="position:absolute; top:6px; right:8px; background:none; border:none; cursor:pointer; color:var(--paper-dim); font-size:14px; line-height:1; padding:2px;">&times;</button>
           <b>After it downloads:</b>
           <ol style="margin:6px 0 0; padding-left:16px;">
-            <li>Open your <b>Downloads</b> folder, find <b>MobileAgentBridge</b>.</li>
-            <li>Right-click it → <b>Open</b> → <b>Open</b> again in the warning popup (first time only - macOS blocks unsigned apps by default).</li>
+            <li>Open your <b>Downloads</b> folder, double-click <b>MobileAgentBridge.zip</b> to unzip it (Finder does this on its own).</li>
+            <li>Right-click (not a plain double-click) the extracted <b>MobileAgentBridge</b> → <b>Open</b> → <b>Open</b> again in the warning popup (first time only - macOS blocks unsigned apps by default, and a plain double-click's warning has no Open option, only Trash).</li>
             <li>Leave that window running in the background - closing it stops the server.</li>
             <li>Come back here - this banner turns green on its own within a few seconds. No button needed.</li>
           </ol>
@@ -2011,7 +2013,14 @@
   // clicking any link) but can never install or run what it downloads -
   // that boundary exists in every browser, for every kind of file, and
   // isn't something any amount of JS here can work around.
-  const BRIDGE_BINARY_URL = 'https://github.com/lokiesh16/lokeReleaseSignal/releases/download/mobile-agent-bridge-v1/MobileAgentBridge';
+  // Zipped, not a raw binary - a browser download resets a plain
+  // executable's permission bits, so a raw binary downloaded straight
+  // from a release asset loses its executable bit and macOS can't tell
+  // it's a program at all (confirmed live: double-clicking/opening it
+  // fell back to a text viewer showing the binary's raw bytes). Zipping
+  // preserves the executable bit through Finder's own unzip, which is
+  // what actually makes "unzip → right-click → Open" work.
+  const BRIDGE_BINARY_URL = 'https://github.com/lokiesh16/lokeReleaseSignal/releases/download/mobile-agent-bridge-v1/MobileAgentBridge.zip';
   document.getElementById('bridgeDownloadBtn').addEventListener('click', () => {
     window.open(BRIDGE_BINARY_URL, '_blank');
   });
