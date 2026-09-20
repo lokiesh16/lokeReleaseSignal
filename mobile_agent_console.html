@@ -733,6 +733,17 @@
     <div class="card row-card">
       <div class="row-header">
         <div>
+          <div class="row-title" style="font-size:16px;">Preconditions</div>
+          <div class="hint" style="font-size:10.5px; margin-top:2px;">replayed automatically at the start of a run via "Start from" - e.g. login</div>
+        </div>
+        <button class="copy" id="refreshPreconditionsListBtn" style="padding:6px 12px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Refresh</button>
+      </div>
+      <div id="preconditionsList" class="poster-row">Loading…</div>
+    </div>
+
+    <div class="card row-card">
+      <div class="row-header">
+        <div>
           <div class="row-title" style="font-size:16px;">From team</div>
           <div class="hint" style="font-size:10.5px; margin-top:2px;">published by teammates — import to run it locally</div>
         </div>
@@ -965,23 +976,19 @@
       </div>
     </div>
 
+    <!-- Only shown once a flow/precondition is actually being edited - the
+         entry point for that is now the "Edit" button on a flow's own
+         detail view in Saved Flows (or a precondition's card there), which
+         calls startEditingFlow(kind, slug) and switches here with the
+         steps already loaded, rather than a separate picker living
+         permanently in this tab regardless of whether you're editing
+         anything. -->
     <div class="card human-mode-only" id="lsEditFlowCard" style="display:none;">
-      <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Edit an existing flow or precondition</div>
-      <div class="hint" style="font-size:11.5px; margin-bottom:10px; line-height:1.5;">
-        Load one test case from an already-saved flow/precondition back into Captured steps below -
-        fix a bad locator, insert a step, or extend it with a few more <b>Act</b>s - then save to
-        update that same test case in place, instead of duplicating it as a new one.
-      </div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <select id="lsEditTargetSelect" style="flex:1; min-width:200px;"><option value="">Loading…</option></select>
-        <button class="copy" id="lsEditLoadBtn" style="flex-shrink:0; background:var(--ink-line); color:var(--paper);">Load to edit</button>
-        <button class="copy" id="lsEditRefreshBtn" title="Refresh the list" style="flex-shrink:0; background:var(--ink-line); color:var(--paper); padding:8px 10px;">↻</button>
-      </div>
-      <div class="field full" id="lsEditTestCaseField" style="margin-top:10px; display:none;">
+      <div class="field full" id="lsEditTestCaseField" style="display:none;">
         <label>Which test case? <span class="opt">this flow has more than one</span></label>
         <select id="lsEditTestCaseSelect"></select>
       </div>
-      <div id="lsEditBanner" style="display:none; margin-top:10px; padding:8px 10px; background:rgba(26,188,156,0.1); border:1px solid var(--circuit); border-radius:6px; font-size:12.5px; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <div id="lsEditBanner" style="display:none; padding:8px 10px; background:rgba(26,188,156,0.1); border:1px solid var(--circuit); border-radius:6px; font-size:12.5px; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
         <span id="lsEditBannerText"></span>
         <div style="display:flex; gap:6px; flex-shrink:0;">
           <button class="copy" id="lsEditStopBtn" title="Keeps the loaded steps in the list below, but no longer saves back into this flow - handy if you'd rather save them under a different name instead." style="background:var(--ink-line); color:var(--paper); padding:4px 10px; font-size:11.5px;">Stop editing</button>
@@ -2794,6 +2801,7 @@ ${containerEl.innerHTML}
         </div>
         <div style="display:flex; gap:6px; flex-shrink:0;">
           <button class="copy flow-run-btn" data-slug="${escapeHtml(f.slug)}" data-name="${escapeHtml(f.name)}" style="padding:6px 10px; font-size:12px;">${state && state.status === 'running' ? 'Running…' : 'Run'}</button>
+          <button class="copy flow-edit-btn" data-slug="${escapeHtml(f.slug)}" title="Load this flow's steps into Inspector & Recorder to fix a locator, insert a step, or extend it - saving there updates this same flow in place." style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Edit</button>
           <button class="copy flow-gen-tests-btn" data-slug="${escapeHtml(f.slug)}" data-name="${escapeHtml(f.name)}" title="Generate a page object + pytest test class from this flow's steps" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Generate tests</button>
           <button class="copy flow-share-btn" data-slug="${escapeHtml(f.slug)}" title="Publish this flow to the team's shared repo so teammates can import it" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Share with team</button>
           <button class="copy flow-delete-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Delete</button>
@@ -2893,6 +2901,41 @@ ${containerEl.innerHTML}
   }
   loadSharedFlows();
   document.getElementById('refreshSharedFlowsBtn').addEventListener('click', loadSharedFlows);
+
+  // Same poster-card treatment as Saved Flows above (reuses POSTER_ACCENTS/
+  // .poster-card/.poster-ribbon/.poster-badge) - a precondition is just a
+  // flow replayed automatically at the start of a run rather than a
+  // standalone Test Library entry, so it gets the same visual language,
+  // just without Run/Generate tests/Share (none of those apply to
+  // something that's never run on its own). Clicking a card jumps
+  // straight to editing it - see startEditingFlow.
+  async function loadPreconditionsList() {
+    const listEl = document.getElementById('preconditionsList');
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/preconditions');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to load preconditions');
+      const preconditions = data.preconditions || [];
+      if (!preconditions.length) {
+        listEl.innerHTML = '<div class="empty-hint">No preconditions saved yet — record a setup flow (e.g. login) in Inspector & Recorder, then "Save as a Precondition".</div>';
+        return;
+      }
+      listEl.innerHTML = preconditions.map((p, i) => `
+        <div class="poster-card precondition-card" data-slug="${escapeHtml(p.slug)}" title="Click to edit"
+             style="background: linear-gradient(135deg, ${POSTER_ACCENTS[i % POSTER_ACCENTS.length]}59, var(--ink-raised) 70%);">
+          <span class="poster-ribbon">${escapeHtml(p.platform)}</span>
+          <span class="poster-title"><span class="poster-title-text">${escapeHtml(p.name)}</span></span>
+          <span class="poster-badge">${p.step_count} step(s)</span>
+        </div>`).join('');
+      listEl.querySelectorAll('.precondition-card').forEach(card => {
+        card.addEventListener('click', () => startEditingFlow('preconditions', card.dataset.slug));
+      });
+    } catch (e) {
+      listEl.innerHTML = `<div class="empty-hint" style="font-size:11.5px;">${escapeHtml(e.message)}</div>`;
+    }
+  }
+  loadPreconditionsList();
+  document.getElementById('refreshPreconditionsListBtn').addEventListener('click', loadPreconditionsList);
 
   document.getElementById('sharedFlowsList').addEventListener('click', async (e) => {
     const importBtn = e.target.closest('.shared-flow-import-btn');
@@ -3014,6 +3057,7 @@ ${containerEl.innerHTML}
 
   document.getElementById('savedFlowDetail').addEventListener('click', async (e) => {
     const runBtn = e.target.closest('.flow-run-btn');
+    const editBtn = e.target.closest('.flow-edit-btn');
     const delBtn = e.target.closest('.flow-delete-btn');
     const genTestsBtn = e.target.closest('.flow-gen-tests-btn');
     const shareBtn = e.target.closest('.flow-share-btn');
@@ -3127,6 +3171,10 @@ ${containerEl.innerHTML}
     }
     if (downloadPdfBtn) {
       downloadServerFile(downloadPdfBtn.dataset.slug, 'pdf');
+      return;
+    }
+    if (editBtn) {
+      startEditingFlow('flows', editBtn.dataset.slug);
       return;
     }
 
@@ -4771,29 +4819,6 @@ ${containerEl.innerHTML}
   // GET every time the human switches which test case they're looking at.
   let lsEditFlowCache = null;
 
-  async function populateLsEditTargetSelect() {
-    const select = document.getElementById('lsEditTargetSelect');
-    const previousValue = select.value;
-    try {
-      const [flowsRes, preRes] = await Promise.all([
-        fetch(BRIDGE_URL + '/api/flows'), fetch(BRIDGE_URL + '/api/preconditions'),
-      ]);
-      const flowsData = await flowsRes.json();
-      const preData = await preRes.json();
-      const options = ['<option value="">Choose a flow or precondition…</option>'];
-      for (const f of (flowsData.flows || [])) {
-        options.push(`<option value="flows:${escapeHtml(f.slug)}">Flow (${escapeHtml(f.platform)}): ${escapeHtml(f.name)} (${f.test_count} test case(s))</option>`);
-      }
-      for (const p of (preData.preconditions || [])) {
-        options.push(`<option value="preconditions:${escapeHtml(p.slug)}">Precondition (${escapeHtml(p.platform)}): ${escapeHtml(p.name)}</option>`);
-      }
-      select.innerHTML = options.join('');
-      if ([...select.options].some(o => o.value === previousValue)) select.value = previousValue;
-    } catch (e) {
-      select.innerHTML = '<option value="">Couldn\'t load the list</option>';
-    }
-  }
-
   function renderLsEditBanner() {
     const banner = document.getElementById('lsEditBanner');
     const text = document.getElementById('lsEditBannerText');
@@ -4811,8 +4836,10 @@ ${containerEl.innerHTML}
     lsEditingTarget = null;
     lsEditFlowCache = null;
     document.getElementById('lsEditTestCaseField').style.display = 'none';
-    document.getElementById('lsEditTargetSelect').value = '';
     document.getElementById('lsEditStatus').textContent = '';
+    // No longer anything to show in this card once nothing's being edited -
+    // it only exists at all while startEditingFlow has something loaded.
+    document.getElementById('lsEditFlowCard').style.display = 'none';
     // The name field held whatever flow/precondition you were editing -
     // leaving it filled in after stopping is what makes "Save as flow"
     // silently add another test case onto that SAME flow instead of the
@@ -4878,17 +4905,19 @@ ${containerEl.innerHTML}
     updateCapturedSaveButtonLabels();
   }
 
-  document.getElementById('lsEditRefreshBtn').addEventListener('click', populateLsEditTargetSelect);
-
-  document.getElementById('lsEditLoadBtn').addEventListener('click', async () => {
-    const select = document.getElementById('lsEditTargetSelect');
+  // The entry point for editing a saved flow or precondition - called from
+  // its "Edit" button in Saved Flows (or a precondition's own card there),
+  // not from a picker living in this tab. Switches to Inspector &
+  // Recorder, fetches the flow/precondition, and loads its first test
+  // case into Captured steps - same fetch/cache/test-case-picker logic
+  // the old in-tab picker used, just triggered directly with a known
+  // kind+slug instead of read from a <select>.
+  async function startEditingFlow(kind, slug) {
+    const scraperTab = document.querySelector('[data-tab="scraper"]');
+    if (scraperTab) scraperTab.click();
+    document.getElementById('lsEditFlowCard').style.display = 'block';
     const statusEl = document.getElementById('lsEditStatus');
-    const [kind, slug] = (select.value || '').split(':');
-    if (!kind || !slug) {
-      statusEl.innerHTML = '<span style="color:var(--signal);">Pick a flow or precondition first</span>';
-      return;
-    }
-    statusEl.textContent = '';
+    statusEl.textContent = 'Loading…';
     try {
       const res = await fetch(BRIDGE_URL + '/api/' + kind + '/' + encodeURIComponent(slug));
       const data = await res.json();
@@ -4907,11 +4936,12 @@ ${containerEl.innerHTML}
         testCaseField.style.display = 'none';
       }
       applyEditTestCase(0);
-      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Loaded "${escapeHtml(lsEditFlowCache.name)}" — ${tests.length} test case(s)</span>`;
+      const connectedNote = lsSessionId ? '' : ' — connect above to start fixing/extending it live.';
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Loaded "${escapeHtml(lsEditFlowCache.name)}" — ${tests.length} test case(s)${connectedNote}</span>`;
     } catch (e) {
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
     }
-  });
+  }
 
   document.getElementById('lsEditTestCaseSelect').addEventListener('change', (e) => {
     applyEditTestCase(Number(e.target.value));
@@ -5297,7 +5327,9 @@ ${containerEl.innerHTML}
       }
       document.getElementById('lsConnectCard').style.display = 'none';
       document.getElementById('lsActiveCard').style.display = 'block';
-      document.getElementById('lsEditFlowCard').style.display = 'block';
+      // lsEditFlowCard is NOT shown here - it only appears once
+      // startEditingFlow has actually loaded something to edit, not just
+      // because a session connected (see stopEditingFlow/startEditingFlow).
       // Shown from the moment you connect, not just after the first
       // recorded step - switch_app/the locator lab live inside this card
       // now (see the "flow-scoped tools" comment above them), and both
