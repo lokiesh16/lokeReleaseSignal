@@ -3837,6 +3837,14 @@ ${containerEl.innerHTML}
   // ---------- locator scraper (no LLM, no agent loop) ----------
   let lsSessionId = null;
   let lsLastElements = [];
+  // Which element the "Element Details" panel currently shows, an index
+  // into lsLastElements - null means nothing selected yet (or the screen
+  // just refreshed, so the old index may not mean the same element any
+  // more). Kept separate from lsSelected (the checkbox multi-select for
+  // CSV/page-object export below) - two different, independent ideas that
+  // happened to share one row before this: "which one am I inspecting
+  // right now" vs "which ones do I want to export".
+  let lsSelectedElementIndex = null;
   // Mirrors the session-scoped context dict the server keeps per scrape
   // session (see scrape_start/scrape_act in server.py) - every parse_label
   // capture and assert_expr comparison reads/writes the SAME dict on the
@@ -4074,8 +4082,7 @@ ${containerEl.innerHTML}
                 <option value="parse_label">capture value (parse_label)</option>` : '';
 
     return `
-      <details style="margin-top:8px; margin-left:26px;">
-        <summary style="cursor:pointer; font-size:11.5px; color:var(--signal); font-weight:600;">Act…</summary>
+      <div class="ls-act-panel">
         ${targetPicker}
         ${positionOnlyNote}
         <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:6px;">
@@ -4114,11 +4121,15 @@ ${containerEl.innerHTML}
           <button class="copy ls-act-run-btn" data-index="${i}" style="padding:5px 10px; font-size:11.5px;">Do it + Record</button>
         </div>
         <div class="ls-act-status" style="font-size:11px; margin-top:4px;"></div>
-      </details>`;
+      </div>`;
   }
 
   function lsRenderElementList(elements) {
     lsLastElements = elements;
+    // The screen just changed (fresh load, or right after an Act) - the
+    // old selected index may no longer point at the same element, so
+    // don't carry a stale "Element Details" panel forward silently.
+    lsSelectedElementIndex = null;
     const wrap = document.getElementById('lsElementListWrap');
     if (!elements.length) {
       wrap.style.display = 'none';
@@ -4127,35 +4138,50 @@ ${containerEl.innerHTML}
     }
     wrap.style.display = 'block';
 
+    // Compact, single-line rows - just enough to find the element you
+    // want (id/tag/label + the checkbox for CSV/page-object export).
+    // Locators and the Act controls used to render inline per row here,
+    // which is exactly what made this list dense to scroll through with
+    // 40+ elements loaded; they now live in the "Element Details" panel
+    // on the right, populated on demand for whichever ONE row you click -
+    // same underlying data and the exact same Act logic (see
+    // renderLsElementDetails/wireLsActPanel below), just shown for one
+    // element at a time instead of all of them at once.
     const rows = elements.map((el, i) => {
       const key = lsElementKey(el);
       const checked = lsSelected.has(key);
       const searchText = `${el.element_id} ${el.tag || ''} ${el.label || ''}`.toLowerCase();
       return `
-        <div class="ls-element-row" data-search="${escapeHtml(searchText)}" style="padding:8px 10px; border:1px solid var(--ink-line); border-radius:6px; margin-bottom:4px;">
-          <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; text-transform:none;">
-            <input type="checkbox" class="ls-check" data-key="${escapeHtml(key)}" data-index="${i}" ${checked ? 'checked' : ''} style="width:auto; flex-shrink:0; margin-top:4px;">
-            <span style="flex:1; min-width:0;">
-              <span style="font-family:var(--mono); font-size:12px; color:var(--circuit);">${escapeHtml(el.element_id)}</span>
-              <span style="font-family:var(--mono); font-size:11.5px; color:var(--paper-dim); margin-left:6px;">${escapeHtml(el.tag || '')}</span>
-              <div style="display:grid; grid-template-columns:auto 1fr; gap:2px 10px; font-family:var(--mono); font-size:10.5px; margin-top:6px;">
-                ${renderFindByRows(el)}
-              </div>
-            </span>
-          </label>
-          ${lsRenderActPanel(el, i)}
+        <div class="ls-element-row" data-search="${escapeHtml(searchText)}" data-index="${i}"
+             style="display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--ink-line);
+                    border-radius:6px; margin-bottom:3px; cursor:pointer; text-transform:none;">
+          <input type="checkbox" class="ls-check" data-key="${escapeHtml(key)}" data-index="${i}" ${checked ? 'checked' : ''} style="width:auto; flex-shrink:0;">
+          <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:var(--mono); font-size:11.5px;">
+            <span style="color:var(--circuit);">${escapeHtml(el.element_id)}</span>
+            <span style="color:var(--paper-dim); margin-left:6px;">${escapeHtml(el.tag || '')}</span>
+            ${el.label ? `<span style="color:var(--paper); margin-left:6px;">${escapeHtml(el.label)}</span>` : ''}
+          </span>
         </div>`;
     }).join('');
 
     wrap.innerHTML = `
-      <input id="lsSearchInput" placeholder="Search by id, tag, or label…" style="margin-bottom:8px;">
-      <button class="copy" id="lsSelectAllVisibleBtn" style="background:var(--ink-line); color:var(--paper); padding:6px 10px; font-size:11.5px; margin-bottom:8px;">Select all visible</button>
-      <div id="lsElementListContainer" style="max-height:360px; overflow-y:auto;">${rows}</div>`;
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="width:300px; flex-shrink:0;">
+          <input id="lsSearchInput" placeholder="Search by id, tag, or label…" style="margin-bottom:8px;">
+          <button class="copy" id="lsSelectAllVisibleBtn" style="background:var(--ink-line); color:var(--paper); padding:6px 10px; font-size:11.5px; margin-bottom:8px;">Select all visible</button>
+          <div id="lsElementListContainer" style="max-height:460px; overflow-y:auto;">${rows}</div>
+        </div>
+        <div style="flex:1; min-width:0; border-left:1px solid var(--ink-line); padding-left:16px;">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Element details</div>
+          <div id="lsElementDetailsEmpty" class="empty-hint">Click an element on the left to see its locators and act on it.</div>
+          <div id="lsElementDetailsBody" style="display:none;"></div>
+        </div>
+      </div>`;
 
     document.getElementById('lsSearchInput').addEventListener('input', (e) => {
       const query = e.target.value.trim().toLowerCase();
       document.querySelectorAll('#lsElementListContainer .ls-element-row').forEach(row => {
-        row.style.display = (!query || row.dataset.search.includes(query)) ? 'block' : 'none';
+        row.style.display = (!query || row.dataset.search.includes(query)) ? 'flex' : 'none';
       });
     });
 
@@ -4193,8 +4219,63 @@ ${containerEl.innerHTML}
       });
     });
 
-    wrap.querySelectorAll('.ls-act-type').forEach(sel => {
-      const row = sel.closest('details');
+    // Clicking the row itself (not the checkbox, which has its own
+    // handler above and shouldn't also select the row) shows this
+    // element's locators + Act controls in the details panel.
+    wrap.querySelectorAll('.ls-element-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.ls-check')) return;
+        lsSelectedElementIndex = Number(row.dataset.index);
+        wrap.querySelectorAll('.ls-element-row').forEach(r => {
+          r.style.borderColor = (Number(r.dataset.index) === lsSelectedElementIndex) ? 'var(--signal)' : 'var(--ink-line)';
+        });
+        renderLsElementDetails();
+      });
+    });
+
+    renderLsElementDetails();
+  }
+
+  // Renders the currently-selected element's "Find By" locators + Act
+  // controls into the details panel - the exact same content that used to
+  // render inline for every row (see lsRenderActPanel/renderFindByRows),
+  // just for one element at a time now. Called both right after picking a
+  // row and after lsRenderElementList resets the selection to none.
+  function renderLsElementDetails() {
+    const body = document.getElementById('lsElementDetailsBody');
+    const empty = document.getElementById('lsElementDetailsEmpty');
+    if (!body || !empty) return; // panel not in the DOM yet (no elements loaded)
+    const el = lsSelectedElementIndex != null ? lsLastElements[lsSelectedElementIndex] : null;
+    if (!el) {
+      body.style.display = 'none';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    body.style.display = 'block';
+    body.innerHTML = `
+      <div style="margin-bottom:10px;">
+        <span style="font-family:var(--mono); font-size:13px; color:var(--circuit); font-weight:600;">${escapeHtml(el.element_id)}</span>
+        <span style="font-family:var(--mono); font-size:12px; color:var(--paper-dim); margin-left:8px;">${escapeHtml(el.tag || '')}</span>
+      </div>
+      <div style="display:grid; grid-template-columns:auto 1fr; gap:3px 10px; font-family:var(--mono); font-size:11px; margin-bottom:14px;">
+        ${renderFindByRows(el)}
+      </div>
+      ${lsRenderActPanel(el, lsSelectedElementIndex)}`;
+    wireLsActPanel(body);
+  }
+
+  // Wires the Act panel's own controls (action-type-driven field
+  // visibility, the locator/position target picker, and the "Do it +
+  // Record" button that actually calls /act) - factored out of
+  // lsRenderElementList so it can be re-run against the details panel
+  // every time a different element gets selected, instead of once against
+  // every row up front. Content and behavior are unchanged from before;
+  // only WHERE this gets attached (one details panel instead of N rows)
+  // and WHEN (on selection, not on every list render) changed.
+  function wireLsActPanel(container) {
+    container.querySelectorAll('.ls-act-type').forEach(sel => {
+      const row = sel.closest('.ls-act-panel');
       const textField = row.querySelector('.ls-act-text');
       const directionField = row.querySelector('.ls-act-direction');
       const secondsField = row.querySelector('.ls-act-seconds');
@@ -4224,9 +4305,9 @@ ${containerEl.innerHTML}
     // scrape_act's own check) - locking the action dropdown to "tap" and
     // disabling it while "position" is selected keeps the UI from ever
     // offering a combination the backend will reject.
-    wrap.querySelectorAll('.ls-act-target').forEach(radio => {
+    container.querySelectorAll('.ls-act-target').forEach(radio => {
       radio.addEventListener('change', () => {
-        const details = radio.closest('details');
+        const details = radio.closest('.ls-act-panel');
         const typeSelect = details.querySelector('.ls-act-type');
         if (radio.checked && radio.value === 'position') {
           typeSelect.value = 'tap';
@@ -4238,10 +4319,10 @@ ${containerEl.innerHTML}
       });
     });
 
-    wrap.querySelectorAll('.ls-act-run-btn').forEach(btn => {
+    container.querySelectorAll('.ls-act-run-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const el = lsLastElements[Number(btn.dataset.index)];
-        const details = btn.closest('details');
+        const details = btn.closest('.ls-act-panel');
         const statusEl = details.querySelector('.ls-act-status');
         const actionType = details.querySelector('.ls-act-type').value;
 
