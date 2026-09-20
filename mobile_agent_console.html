@@ -3992,7 +3992,6 @@ ${containerEl.innerHTML}
       if (numEl) numEl.textContent = state === 'done' ? '✓' : String(stepNumbers[step]);
     });
   }
-  updateLsStepper(); // reflects "not connected yet" immediately on page load, before any interaction
 
   // Mirrors the session-scoped context dict the server keeps per scrape
   // session (see scrape_start/scrape_act in server.py) - every parse_label
@@ -4027,6 +4026,7 @@ ${containerEl.innerHTML}
   // straight from what the human picked here, not something to
   // re-derive later.
   let lsCapturedSteps = [];
+  updateLsStepper(); // reflects "not connected yet" immediately on page load, before any interaction - deferred until here since it reads lsCapturedSteps (declared just above)
   let lsDragFromIndex = null;
 
   // Forward-looking split: click "Split here" and the CURRENT Description
