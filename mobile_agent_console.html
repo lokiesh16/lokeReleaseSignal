@@ -30,25 +30,51 @@
 
   * { box-sizing: border-box; }
 
+  /* "Pastel Gradient Background 001" - fixed to the viewport (not the
+     page) so it reads as a backdrop the app floats on rather than
+     something that scrolls away with the content. Two soft radial blobs
+     over a diagonal base gradient, all in the same mint/cream family, is
+     what gives it the "aurora" look rather than a flat two-stop fade.
+     Background ONLY per this change - --ink/--paper etc. (card fills,
+     text, the amber accent) are untouched, so this is purely what shows
+     through the gaps around/between the existing white cards.
+     On `html`, not `body`: background-attachment:fixed on `body` mispaints
+     once the page is scrolled and `body` itself has padding (confirmed
+     live - scrolling down left a plain white band where the gradient
+     should be, because the "fixed" image was being measured against
+     body's own padded box instead of the viewport). `html` has no
+     padding/sizing of its own, so this paints correctly at any scroll
+     position. */
+  html {
+    background:
+      radial-gradient(circle at 88% 12%, rgba(151,214,175,0.55) 0%, rgba(151,214,175,0) 45%),
+      radial-gradient(circle at 8% 92%, rgba(214,209,140,0.5) 0%, rgba(214,209,140,0) 45%),
+      linear-gradient(135deg, #D7F0DD 0%, #FBF3D6 50%, #D9EEDD 100%);
+    background-attachment: fixed;
+  }
+
   body {
     margin: 0;
-    background: var(--ink);
+    padding: 20px;
     color: var(--paper);
     font-family: var(--sans);
     min-height: 100vh;
+    box-sizing: border-box;
   }
 
-  .app-shell { display: flex; min-height: 100vh; width: 100%; }
+  .app-shell { display: flex; gap: 20px; min-height: calc(100vh - 40px); width: 100%; }
 
   .side-nav {
     width: 250px;
     flex-shrink: 0;
     background: var(--ink-raised);
-    border-right: 1px solid var(--ink-line);
+    border: 1px solid var(--ink-line);
+    border-radius: 18px;
+    box-shadow: 0 1px 2px rgba(16,20,28,0.04), 0 4px 16px rgba(16,20,28,0.05);
     padding: 28px 18px;
     position: sticky;
-    top: 0;
-    height: 100vh;
+    top: 20px;
+    height: calc(100vh - 40px);
     overflow-y: auto;
     box-sizing: border-box;
   }
