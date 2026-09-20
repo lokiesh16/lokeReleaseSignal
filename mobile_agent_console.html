@@ -529,6 +529,7 @@
 
         <div class="field">
           <label>Bundle / package ID</label>
+          <select id="bundleIdEnv" style="margin-bottom:2px;"></select>
           <input id="bundleId" placeholder="habitnu2.stag" value="habitnu2.stag">
         </div>
         <div class="field">
@@ -645,6 +646,7 @@
         </div>
         <div class="field">
           <label>Bundle / package ID</label>
+          <select id="rBundleIdEnv" style="margin-bottom:2px;"></select>
           <input id="rBundleId" value="habitnu2.stag">
         </div>
         <div class="field">
@@ -742,7 +744,6 @@
     <div class="card" id="savedFlowDetailCard">
       <div id="savedFlowDetailEmpty" class="empty-hint">Select a flow above to view its details, run it, and see its execution trace.</div>
       <div id="savedFlowDetail" style="display:none;"></div>
-      <datalist id="bundleIdOptions"></datalist>
     </div>
 
   </div>
@@ -887,6 +888,7 @@
         </div>
         <div class="field">
           <label>Bundle / package ID</label>
+          <select id="lsBundleIdEnv" style="margin-bottom:2px;"></select>
           <input id="lsBundleId" value="habitnu2.stag">
         </div>
         <div class="field">
@@ -1847,6 +1849,38 @@
   const IOS_DEFAULT_DEVICE_NAME = "Lokesh's iPhone";
   const ANDROID_DEFAULT_DEVICE_NAME = 'Android device';
 
+  // The team's actual known staging apps, one set per platform - a fixed,
+  // curated list rather than "whatever bundle_id happened to show up in a
+  // saved flow before" (a native <datalist> built from that, which this
+  // used to be: it can't be restyled to match the console's theme at all -
+  // that's the browser's own OS-level autocomplete popup, not something
+  // CSS reaches - and it only ever offered ids someone had already used,
+  // never a fresh environment nobody's recorded a flow against yet).
+  const KNOWN_ENVIRONMENTS = {
+    iOS: [
+      {value: 'habitnu2.stag', label: 'ios_habitnu_staging'},
+      {value: 'habitnu2.musc.stag', label: 'ios_musc_staging'},
+      {value: 'habitnu2.ada.stag', label: 'ios_ADA_staging'},
+    ],
+    Android: [
+      {value: 'com.habitnu', label: 'android_habitnu_staging'},
+      {value: 'com.habitnu.musc', label: 'android_musc_staging'},
+      {value: 'com.habitnu.ada', label: 'android_ADA_staging'},
+    ],
+  };
+
+  // `placeholderLabel` is the first, valueless option - what shows before
+  // anything is picked. `selectedValue` gets pre-selected when it matches
+  // one of this platform's known ids, so opening the picker on a field
+  // that's already set to a known environment reflects that instead of
+  // resetting to the placeholder.
+  function renderEnvironmentOptions(platform, placeholderLabel, selectedValue) {
+    const envs = KNOWN_ENVIRONMENTS[platform] || [];
+    const options = [`<option value="">${escapeHtml(placeholderLabel)}</option>`]
+      .concat(envs.map(e => `<option value="${escapeHtml(e.value)}" ${e.value === selectedValue ? 'selected' : ''}>${escapeHtml(e.label)}</option>`));
+    return options.join('');
+  }
+
   function applyPlatformToFields(prefix) {
     const platformEl = document.getElementById(fieldId(prefix, 'platform'));
     if (!platformEl) return;
@@ -1871,6 +1905,11 @@
       if (isAndroid && current === IOS_DEFAULT_BUNDLE_ID) bundleIdEl.value = ANDROID_DEFAULT_BUNDLE_ID;
       else if (!isAndroid && current === ANDROID_DEFAULT_BUNDLE_ID) bundleIdEl.value = IOS_DEFAULT_BUNDLE_ID;
     }
+    const bundleIdEnvEl = document.getElementById(fieldId(prefix, 'bundleIdEnv'));
+    if (bundleIdEnvEl && bundleIdEl) {
+      bundleIdEnvEl.innerHTML = renderEnvironmentOptions(
+        isAndroid ? 'Android' : 'iOS', '— pick a known environment —', bundleIdEl.value.trim());
+    }
 
     const deviceEl = document.getElementById(fieldId(prefix, 'device'));
     if (deviceEl) {
@@ -1887,6 +1926,13 @@
     if (platformEl) {
       platformEl.addEventListener('change', () => applyPlatformToFields(prefix));
       applyPlatformToFields(prefix); // reflects whatever's already selected on page load
+    }
+    const bundleIdEnvEl = document.getElementById(fieldId(prefix, 'bundleIdEnv'));
+    const bundleIdEl = document.getElementById(fieldId(prefix, 'bundleId'));
+    if (bundleIdEnvEl && bundleIdEl) {
+      bundleIdEnvEl.addEventListener('change', () => {
+        if (bundleIdEnvEl.value) bundleIdEl.value = bundleIdEnvEl.value;
+      });
     }
   });
 
@@ -2713,18 +2759,6 @@ ${containerEl.innerHTML}
     lastLoadedFlows = flows;
     savedFlowsPage = 1;
     renderFlowsSidebarPage();
-    renderBundleIdOptions(flows);
-  }
-
-  // Every distinct bundle_id already used by some saved flow, offered as
-  // <datalist> suggestions on the "App bundle ID" field below - lets you
-  // pick a previously-used app without retyping it, while still allowing
-  // any free-typed value for a new one.
-  function renderBundleIdOptions(flows) {
-    const datalist = document.getElementById('bundleIdOptions');
-    if (!datalist) return;
-    const ids = [...new Set(flows.map(f => f.bundle_id).filter(Boolean))].sort();
-    datalist.innerHTML = ids.map(id => `<option value="${escapeHtml(id)}"></option>`).join('');
   }
 
   function selectFlow(slug) {
@@ -2786,7 +2820,10 @@ ${containerEl.innerHTML}
 
       <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px; font-size:11px;" title="Which app this run launches (Appium's bundleId capability) - a one-off override for just this run, not saved back to the flow. Leave blank to use whatever app this flow is already set up for.">
         <span class="hint" style="font-size:11px; flex-shrink:0;">App bundle ID:</span>
-        <input type="text" class="flow-bundle-id" data-slug="${escapeHtml(f.slug)}" value="${escapeHtml(f.bundle_id || '')}" placeholder="e.g. com.habitnu.app (leave blank for this flow's own app)" list="bundleIdOptions" style="width:auto; flex:1 1 260px; min-width:160px; font-size:11px; padding:3px 6px;">
+        <select class="flow-bundle-id-env" data-slug="${escapeHtml(f.slug)}" style="width:auto; flex:1 1 200px; font-size:11px; padding:3px 6px;">
+          ${renderEnvironmentOptions(f.platform, "— use this flow's own app —", f.bundle_id || '')}
+        </select>
+        <input type="text" class="flow-bundle-id" data-slug="${escapeHtml(f.slug)}" value="${escapeHtml(f.bundle_id || '')}" placeholder="or type a custom bundle/package id" style="width:auto; flex:1 1 220px; min-width:160px; font-size:11px; padding:3px 6px;">
       </div>
 
       <div class="hint flow-gen-tests-status" data-gen-status-for="${escapeHtml(f.slug)}" style="font-size:11.5px; margin-top:8px;"></div>
@@ -2966,6 +3003,13 @@ ${containerEl.innerHTML}
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
     }
   }
+
+  document.getElementById('savedFlowDetail').addEventListener('change', (e) => {
+    const envSelect = e.target.closest('.flow-bundle-id-env');
+    if (!envSelect || !envSelect.value) return;
+    const input = document.querySelector(`.flow-bundle-id[data-slug="${CSS.escape(envSelect.dataset.slug)}"]`);
+    if (input) input.value = envSelect.value;
+  });
 
   document.getElementById('savedFlowDetail').addEventListener('click', async (e) => {
     const runBtn = e.target.closest('.flow-run-btn');
