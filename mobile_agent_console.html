@@ -274,6 +274,35 @@
     .ls-step { flex: 1 1 45%; border-bottom: 1px solid var(--ink-line); }
   }
 
+  /* Phone-bezel chrome around the live screenshot - purely cosmetic (no
+     asset image, just CSS) so a raw device screenshot reads as "a phone
+     you're looking at" instead of a bare <img> floating in a card. */
+  .phone-frame {
+    background: #0a0d12;
+    border: 1px solid var(--ink-line);
+    border-radius: 26px;
+    padding: 10px 10px 14px;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.03);
+  }
+  .phone-frame .phone-notch { width: 60px; height: 5px; border-radius: 4px; background: rgba(255,255,255,0.14); margin: 0 auto 8px; }
+  .phone-frame img { border-radius: 14px; display: block; }
+
+  /* Tap/Swipe mode picker, restyled from the old plain radio pair into the
+     same "labeled tile wrapping a hidden radio" pattern .mode-toggle-opt
+     already uses above - clicking the label natively checks its radio and
+     fires the existing 'change' listener untouched, so none of the
+     tap/swipe recording logic needed to change, only how you pick between them. */
+  .ls-mode-tiles { display: flex; gap: 8px; }
+  .ls-mode-tile {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 10px 8px; border-radius: 10px; border: 1.5px solid var(--ink-line);
+    cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    font-size: 11.5px; font-weight: 600; color: var(--paper-dim);
+  }
+  .ls-mode-tile svg { color: var(--paper-dim); transition: color 0.15s; }
+  .ls-mode-tile.on { border-color: var(--signal); background: rgba(230,126,34,0.08); color: var(--paper); }
+  .ls-mode-tile.on svg { color: var(--signal); }
+
   .card {
     background: var(--ink-raised);
     border: 1px solid var(--ink-line);
@@ -1261,27 +1290,34 @@
 
       <div style="width:380px; flex-shrink:0; position:sticky; top:20px;">
         <div class="card" id="lsScreenshotCard" style="display:none;">
-          <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Tap anywhere on screenshot</div>
-          <div class="hint" style="font-size:11.5px; margin-bottom:10px; line-height:1.5;">
-            Always shows what's actually on screen right now, in either mode - updated after every AI-planned
-            step, or on demand below. For an element with no label or value at all - it never shows up in the
-            list because the accessibility tree itself has nothing to key it by. Click the exact spot on the
-            picture below; it's converted straight to a screen-point tap, no locator involved.
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
+            <div style="min-width:0;">
+              <div style="font-size:14px; font-weight:700; color:var(--paper);">Live App Screen</div>
+              <div class="hint" style="font-size:11px; margin-top:1px;">Tap on any element to inspect</div>
+            </div>
+            <button class="copy" id="lsScreenshotRefreshBtn" style="background:var(--ink-line); color:var(--paper); padding:7px 12px; font-size:11.5px; flex-shrink:0;">↻ Refresh</button>
           </div>
           <div id="lsScreenshotAiCaption" style="font-size:12px; color:var(--paper-dim); margin-bottom:8px; display:none;"></div>
-          <div style="display:flex; gap:14px; align-items:center; margin-bottom:10px; font-size:11.5px;">
-            <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
-              <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeTap" value="tap" checked style="width:auto;"> Tap point
-            </label>
-            <label style="display:flex; align-items:center; gap:4px; cursor:pointer;" title="Click a start point, then an end point - records a raw point-to-point swipe/drag between them, for a gesture a plain up/down/left/right can't express.">
-              <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeSwipe" value="swipe" style="width:auto;"> Swipe (click start, then end)
-            </label>
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div style="position:relative; display:inline-block; max-width:100%; width:100%;">
+              <img id="lsScreenshotImg" style="max-width:100%; width:100%; display:block; cursor:crosshair;">
+              <div id="lsScreenshotHighlight" style="display:none; position:absolute; border:2px solid var(--circuit); background:rgba(26,188,156,0.18); pointer-events:none; box-sizing:border-box;"></div>
+              <div id="lsScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
+              <div id="lsScreenshotMarkerEnd" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--circuit); background:rgba(26,188,156,0.25); pointer-events:none;"></div>
+            </div>
           </div>
-          <div style="position:relative; display:inline-block; max-width:100%;">
-            <img id="lsScreenshotImg" style="max-width:100%; display:block; cursor:crosshair; border:1px solid var(--ink-line); border-radius:6px;">
-            <div id="lsScreenshotHighlight" style="display:none; position:absolute; border:2px solid var(--circuit); background:rgba(26,188,156,0.18); pointer-events:none; box-sizing:border-box;"></div>
-            <div id="lsScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
-            <div id="lsScreenshotMarkerEnd" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--circuit); background:rgba(26,188,156,0.25); pointer-events:none;"></div>
+          <div class="ls-mode-tiles" style="margin-top:12px;">
+            <label class="ls-mode-tile on">
+              <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeTap" value="tap" checked style="display:none;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7" stroke-opacity="0.55"/><circle cx="12" cy="12" r="10.5" stroke-opacity="0.25"/></svg>
+              Tap
+            </label>
+            <label class="ls-mode-tile" title="Click a start point, then an end point - records a raw point-to-point swipe/drag between them, for a gesture a plain up/down/left/right can't express.">
+              <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeSwipe" value="swipe" style="display:none;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2" fill="currentColor" stroke="none"/><line x1="7.5" y1="12" x2="17" y2="12"/><polyline points="13 8 17 12 13 16"/></svg>
+              Swipe
+            </label>
           </div>
           <div style="display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap;">
             <span class="hint" id="lsScreenshotPointLabel" style="font-size:12px;">Click on the screenshot to select an element there.</span>
@@ -1289,9 +1325,17 @@
           <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
             <button class="copy" id="lsScreenshotTapBtn" disabled style="flex:1; padding:8px 12px; font-size:11.5px;">Tap this point + Record</button>
             <button class="copy" id="lsScreenshotSwipeBtn" disabled style="display:none; flex:1; padding:8px 12px; font-size:11.5px;">Swipe start → end + Record</button>
-            <button class="copy" id="lsScreenshotRefreshBtn" style="background:var(--ink-line); color:var(--paper); padding:8px 12px; font-size:11.5px;">Refresh</button>
           </div>
           <div id="lsScreenshotStatus" style="font-size:12px; margin-top:8px;"></div>
+          <details style="margin-top:10px;">
+            <summary class="hint" style="cursor:pointer; font-size:11px;">What is this?</summary>
+            <div class="hint" style="font-size:11.5px; margin-top:8px; line-height:1.5;">
+              Always shows what's actually on screen right now, in either mode - updated after every AI-planned
+              step, or on demand above. For an element with no label or value at all - it never shows up in the
+              list because the accessibility tree itself has nothing to key it by. Click the exact spot on the
+              picture above; it's converted straight to a screen-point tap, no locator involved.
+            </div>
+          </details>
 
           <div style="border-top:1px solid var(--ink-line); margin-top:16px; padding-top:14px;">
             <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:6px;">Validate this screen (AI)</div>
@@ -1361,17 +1405,25 @@
 
       <div style="width:380px; flex-shrink:0; position:sticky; top:20px;">
         <div class="card" id="mtcScreenshotCard" style="display:none;">
-          <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:8px;">Tap anywhere on screenshot</div>
-          <div style="position:relative; display:inline-block; max-width:100%;">
-            <img id="mtcScreenshotImg" style="max-width:100%; display:block; cursor:crosshair; border:1px solid var(--ink-line); border-radius:6px;">
-            <div id="mtcScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
+            <div style="min-width:0;">
+              <div style="font-size:14px; font-weight:700; color:var(--paper);">Live App Screen</div>
+              <div class="hint" style="font-size:11px; margin-top:1px;">Tap on any element to inspect</div>
+            </div>
+            <button class="copy" id="mtcRefreshBtn" style="background:var(--ink-line); color:var(--paper); padding:7px 12px; font-size:11.5px; flex-shrink:0;">↻ Refresh</button>
           </div>
-          <div style="margin-top:8px;">
+          <div class="phone-frame">
+            <div class="phone-notch"></div>
+            <div style="position:relative; display:inline-block; max-width:100%; width:100%;">
+              <img id="mtcScreenshotImg" style="max-width:100%; width:100%; display:block; cursor:crosshair;">
+              <div id="mtcScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
+            </div>
+          </div>
+          <div style="margin-top:10px;">
             <span class="hint" id="mtcPointLabel" style="font-size:12px;">Click on the screenshot to select a spot to tap.</span>
           </div>
           <div style="display:flex; gap:8px; margin-top:8px;">
             <button class="copy" id="mtcTapBtn" disabled style="flex:1; padding:10px 12px; font-size:13px;">Tap this point + Record</button>
-            <button class="copy" id="mtcRefreshBtn" style="background:var(--ink-line); color:var(--paper); padding:10px 12px; font-size:13px;">Refresh</button>
           </div>
           <div id="mtcTapStatus" style="font-size:12px; margin-top:6px;"></div>
           <button class="copy" id="mtcGenerateBtn" style="width:100%; padding:10px 12px; font-size:13px; margin-top:14px;">Generate test cases from this flow</button>
@@ -6141,6 +6193,11 @@ ${containerEl.innerHTML}
       document.getElementById('lsScreenshotPointLabel').textContent = swipeMode
         ? 'Click a start point on the screenshot, then an end point.'
         : 'Click on the screenshot to select an element there.';
+      // Purely visual - same "which label wraps the checked radio" toggle
+      // .mode-toggle-opt already does above, just for the Tap/Swipe tiles.
+      document.querySelectorAll('.ls-mode-tile').forEach(tile => {
+        tile.classList.toggle('on', tile.querySelector('input').checked);
+      });
     });
   });
 
