@@ -1,0 +1,28 @@
+{
+  "name": "verification_test_push",
+  "module": "Weight Widget TEST",
+  "context": "Verifying the push-to-github feature works end to end",
+  "created_at": "2026-09-21T12:59:53Z",
+  "cases": [
+    {
+      "title": "Log a meal with valid entries",
+      "category": "happy_path",
+      "objective": "Verify calorie total updates correctly.",
+      "precondition": "User is logged in and on the Food tab.",
+      "execution_status": "pass",
+      "execution_comment": "Verified on build 4.2.1",
+      "steps": [
+        {
+          "step": "Tap Add meal",
+          "test_data": "",
+          "expected_result": "Meal entry form opens"
+        },
+        {
+          "step": "Enter food name and calories",
+          "test_data": "2 fried eggs, 180 kcal",
+          "expected_result": "Fields accept the input"
+        }
+      ]
+    }
+  ]
+}
