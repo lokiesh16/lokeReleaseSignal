@@ -378,28 +378,23 @@
   .phone-frame-bezel img { border: none; box-shadow: none; }
 
   /* Tap/Swipe action tiles - a bigger, colorful icon-card look (icon in
-     its own tinted circle, bold title, small subtitle) instead of the
-     earlier plain icon+label row. Each tile still just wraps a hidden
-     radio (.mode-toggle-opt above uses the same trick) - clicking the
-     label natively checks its radio and fires the existing 'change'
-     listener untouched, so none of the tap/swipe recording logic needed
-     to change, only how the two options are presented. Per-tile accent
-     color comes from the --accent/--accent-bg custom properties set
-     inline on each tile, not a separate CSS class per color. */
+     a compact, minimal button - icon + label side by side, same size
+     class as any other small button in this app, not a big card - the
+     screenshot itself should be the thing that draws the eye here.
+     Each tile still just wraps a hidden radio (.mode-toggle-opt above
+     uses the same trick) - clicking the label natively checks its radio
+     and fires the existing 'change' listener untouched, so none of the
+     tap/swipe recording logic needed to change, only how the two
+     options are presented. Per-tile accent color (icon only) comes from
+     the --accent custom property set inline on each tile. */
   .ls-mode-tile {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 12px 8px; border-radius: 14px; border: 1.5px solid var(--ink-line);
+    display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--ink-line);
     cursor: pointer; transition: border-color 0.15s, background-color 0.15s;
-    background: var(--ink-raised); text-align: center;
+    background: var(--ink-raised); font-size: 12px; font-weight: 700; color: var(--paper-dim);
   }
-  .ls-mode-tile-icon {
-    width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--accent-bg); color: var(--accent);
-  }
-  .ls-mode-tile-title { font-size: 12.5px; font-weight: 700; color: var(--paper); }
-  .ls-mode-tile-sub { font-size: 10px; color: var(--paper-dim); }
-  .ls-mode-tile.on { border-color: var(--accent); background: var(--accent-bg); }
+  .ls-mode-tile svg { color: var(--accent); flex-shrink: 0; }
+  .ls-mode-tile.on { border-color: var(--accent); background: var(--accent-bg); color: var(--paper); }
 
   /* Both tiles + their own confirm button, stacked in the margin beside
      the screenshot instead of their own full-width rows below it - the
@@ -407,7 +402,7 @@
      width, so that side space would otherwise just sit empty while
      everything needed to act on the screen scrolls further down than
      it has to. */
-  .ls-mode-stack { display: flex; flex-direction: column; align-items: stretch; gap: 10px; width: 110px; flex-shrink: 0; }
+  .ls-mode-stack { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 84px; flex-shrink: 0; }
   .ls-mode-stack button.copy { padding: 7px 4px; font-size: 10.5px; white-space: normal; line-height: 1.3; }
 
   .card {
@@ -1499,7 +1494,7 @@
         </div>
       </div>
 
-      <div style="width:380px; flex-shrink:0; position:sticky; top:20px;">
+      <div style="width:460px; flex-shrink:0; position:sticky; top:20px;">
         <div class="card" id="lsScreenshotCard" style="display:none;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
             <div style="display:flex; align-items:center; gap:10px; min-width:0;">
@@ -1528,7 +1523,7 @@
                    by the letterboxing gap once the image is height-capped
                    and narrower than the column. -->
               <div style="position:relative; display:inline-block; max-width:100%;">
-                <img id="lsScreenshotImg" style="max-width:100%; max-height:56vh; width:auto; height:auto; display:block; cursor:crosshair;">
+                <img id="lsScreenshotImg" style="max-width:100%; max-height:74vh; width:auto; height:auto; display:block; cursor:crosshair;">
                 <div id="lsScreenshotHighlight" style="display:none; position:absolute; border:2px solid var(--circuit); background:rgba(26,188,156,0.18); pointer-events:none; box-sizing:border-box;"></div>
                 <div id="lsScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
                 <div id="lsScreenshotMarkerEnd" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--circuit); background:rgba(26,188,156,0.25); pointer-events:none;"></div>
@@ -1538,17 +1533,15 @@
             <div class="ls-mode-stack">
               <label class="ls-mode-tile on" style="--accent:#E67E22; --accent-bg:rgba(230,126,34,0.12);">
                 <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeTap" value="tap" checked style="display:none;">
-                <span class="ls-mode-tile-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7" stroke-opacity="0.55"/><circle cx="12" cy="12" r="10.5" stroke-opacity="0.25"/></svg></span>
-                <span class="ls-mode-tile-title">Tap</span>
-                <span class="ls-mode-tile-sub">Select a point</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7" stroke-opacity="0.55"/><circle cx="12" cy="12" r="10.5" stroke-opacity="0.25"/></svg>
+                Tap
               </label>
               <button class="copy" id="lsScreenshotTapBtn" disabled style="padding:8px 12px; font-size:11.5px;">Tap + Record</button>
 
               <label class="ls-mode-tile" style="--accent:#0D9488; --accent-bg:rgba(13,148,136,0.12);" title="Click a start point, then an end point - records a raw point-to-point swipe/drag between them, for a gesture a plain up/down/left/right can't express.">
                 <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeSwipe" value="swipe" style="display:none;">
-                <span class="ls-mode-tile-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2" fill="currentColor" stroke="none"/><line x1="7.5" y1="12" x2="17" y2="12"/><polyline points="13 8 17 12 13 16"/></svg></span>
-                <span class="ls-mode-tile-title">Swipe</span>
-                <span class="ls-mode-tile-sub">Drag gesture</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2" fill="currentColor" stroke="none"/><line x1="7.5" y1="12" x2="17" y2="12"/><polyline points="13 8 17 12 13 16"/></svg>
+                Swipe
               </label>
               <button class="copy" id="lsScreenshotSwipeBtn" disabled style="display:none; padding:8px 12px; font-size:11.5px;">Swipe + Record</button>
             </div>
