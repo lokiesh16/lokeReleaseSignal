@@ -346,6 +346,15 @@
     border-radius: 26px;
     padding: 10px 10px 14px;
     box-shadow: inset 0 0 0 2px rgba(255,255,255,0.03);
+    /* Height-capped, not just width-capped, so the whole sticky card
+       (phone + every button below it) fits inside a normal viewport
+       without scrolling - a full-width real device screenshot (tall,
+       ~9:19.5) rendered at this column's width was taller than most
+       laptop screens on its own, pushing "Generate test cases"/"Tap
+       this point" off the bottom. text-align:center compensates for the
+       image now being narrower than the column at that capped height -
+       see the click-handler note on the wrapper div below for why. */
+    text-align: center;
   }
   .phone-frame .phone-notch { width: 60px; height: 5px; border-radius: 4px; background: rgba(255,255,255,0.14); margin: 0 auto 8px; }
   .phone-frame img { border-radius: 14px; display: block; }
@@ -1449,8 +1458,18 @@
           <div id="lsScreenshotAiCaption" style="font-size:12px; color:var(--paper-dim); margin-bottom:8px; display:none;"></div>
           <div class="phone-frame">
             <div class="phone-notch"></div>
-            <div style="position:relative; display:inline-block; max-width:100%; width:100%;">
-              <img id="lsScreenshotImg" style="max-width:100%; width:100%; display:block; cursor:crosshair;">
+            <!-- Wrapper shrinks to the image's own rendered size (no
+                 width:100%) rather than staying full-column-width with
+                 the image centered inside it - the click handler below
+                 positions markers via `clickX = e.clientX - img.getBoundingClientRect().left`
+                 and writes that straight onto this wrapper's `left`
+                 (its nearest positioned ancestor), which is only correct
+                 when the wrapper's own left edge lines up with the
+                 image's - true at full width, but would silently be off
+                 by the letterboxing gap once the image is height-capped
+                 and narrower than the column. -->
+            <div style="position:relative; display:inline-block; max-width:100%;">
+              <img id="lsScreenshotImg" style="max-width:100%; max-height:46vh; width:auto; height:auto; display:block; cursor:crosshair;">
               <div id="lsScreenshotHighlight" style="display:none; position:absolute; border:2px solid var(--circuit); background:rgba(26,188,156,0.18); pointer-events:none; box-sizing:border-box;"></div>
               <div id="lsScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
               <div id="lsScreenshotMarkerEnd" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--circuit); background:rgba(26,188,156,0.25); pointer-events:none;"></div>
@@ -1563,8 +1582,10 @@
           </div>
           <div class="phone-frame">
             <div class="phone-notch"></div>
-            <div style="position:relative; display:inline-block; max-width:100%; width:100%;">
-              <img id="mtcScreenshotImg" style="max-width:100%; width:100%; display:block; cursor:crosshair;">
+            <!-- Same reasoning as Test Builder's screenshot wrapper - see
+                 that one's comment. -->
+            <div style="position:relative; display:inline-block; max-width:100%;">
+              <img id="mtcScreenshotImg" style="max-width:100%; max-height:46vh; width:auto; height:auto; display:block; cursor:crosshair;">
               <div id="mtcScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
             </div>
           </div>
