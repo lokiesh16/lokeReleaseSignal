@@ -1,0 +1,49 @@
+{
+  "name": "filter_test_push",
+  "module": "Filter Verification",
+  "context": "Testing filters and logo",
+  "created_at": "2026-09-21T13:42:41Z",
+  "cases": [
+    {
+      "title": "Case A - Happy Pass",
+      "category": "happy_path",
+      "execution_status": "pass",
+      "steps": [
+        {
+          "step": "s1",
+          "test_data": "",
+          "expected_result": "e1"
+        }
+      ]
+    },
+    {
+      "title": "Case B - Edge Fail",
+      "category": "edge_case",
+      "execution_status": "fail",
+      "steps": [
+        {
+          "step": "s1",
+          "test_data": "",
+          "expected_result": "e1"
+        },
+        {
+          "step": "s2",
+          "test_data": "",
+          "expected_result": "e2"
+        }
+      ]
+    },
+    {
+      "title": "Case C - Negative NotRun",
+      "category": "negative",
+      "execution_status": "not_run",
+      "steps": [
+        {
+          "step": "s1",
+          "test_data": "",
+          "expected_result": "e1"
+        }
+      ]
+    }
+  ]
+}
