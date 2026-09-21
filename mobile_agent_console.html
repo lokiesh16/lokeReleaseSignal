@@ -1617,7 +1617,20 @@
           <div id="mtcSaveStatus" style="font-size:12px; margin-top:6px;"></div>
 
           <div style="border-top:1px solid var(--ink-line); margin-top:14px; padding-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <input id="mtcModuleName" placeholder="Feature/Module these belong to, e.g. Weight Widget" style="flex:1; min-width:200px;">
+            <select id="mtcModuleName" style="flex:1; min-width:200px;">
+              <option value="" disabled selected>Feature/Module these belong to…</option>
+              <option value="Login">Login</option>
+              <option value="HomePage">HomePage</option>
+              <option value="Food">Food</option>
+              <option value="Health">Health</option>
+              <option value="Talk to my coach">Talk to my coach</option>
+              <option value="Discussion Forum">Discussion Forum</option>
+              <option value="Paywall">Paywall</option>
+              <option value="Learn">Learn</option>
+              <option value="Videos">Videos</option>
+              <option value="Profile">Profile</option>
+              <option value="Chatbot">Chatbot</option>
+            </select>
             <button class="copy" id="mtcPushGithubBtn" style="flex-shrink:0;">Push to GitHub</button>
           </div>
           <div class="hint" style="font-size:11px; margin-top:5px;">
