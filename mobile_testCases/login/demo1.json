@@ -1,0 +1,347 @@
+{
+  "name": "demo1",
+  "module": "login",
+  "context": "",
+  "created_at": "2026-09-21T13:48:49Z",
+  "cases": [
+    {
+      "category": "happy_path",
+      "objective": "Verify that a user can sign in successfully with a valid registered email and correct password",
+      "precondition": "User has a registered account on habitnu and is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "Email field is focused and keyboard appears",
+          "step": "Tap the Email field",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Email is displayed in the field without error styling",
+          "step": "Enter a valid registered email address",
+          "test_data": "testuser@example.com"
+        },
+        {
+          "expected_result": "Password field is focused",
+          "step": "Tap the Password field",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Password is masked/hidden with dots",
+          "step": "Enter the correct password",
+          "test_data": "ValidPass123!"
+        },
+        {
+          "expected_result": "User is logged in and navigated to the home/dashboard screen",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Successful login with valid email and password"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify that submitting without entering an email shows the 'Please enter a valid email id' error",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "Email field remains empty",
+          "step": "Leave the Email field empty",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Password is entered and masked",
+          "step": "Enter any value in the Password field",
+          "test_data": "AnyPassword1"
+        },
+        {
+          "expected_result": "Email field turns red and 'Please enter a valid email id' error message is shown below it",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with empty email field shows validation error"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify that an improperly formatted email triggers the visible validation error",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "Text is entered in the field",
+          "step": "Tap the Email field and enter an invalid email format",
+          "test_data": "notanemail"
+        },
+        {
+          "expected_result": "Password is entered and masked",
+          "step": "Tap the Password field and enter a password",
+          "test_data": "Password123"
+        },
+        {
+          "expected_result": "Email field is highlighted in red and 'Please enter a valid email id' message appears",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with invalid email format shows validation error"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify that submitting with a valid email but empty password shows an appropriate error",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "Email is accepted without error",
+          "step": "Enter a valid email in the Email field",
+          "test_data": "testuser@example.com"
+        },
+        {
+          "expected_result": "Password field remains empty",
+          "step": "Leave the Password field empty",
+          "test_data": ""
+        },
+        {
+          "expected_result": "An error message or indication is shown requiring the password field to be filled",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with empty password field"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify that an incorrect password for a valid registered email shows an authentication error",
+      "precondition": "User has a registered account and is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "Email accepted with no error",
+          "step": "Enter a valid registered email",
+          "test_data": "testuser@example.com"
+        },
+        {
+          "expected_result": "Password is masked and entered",
+          "step": "Enter an incorrect password",
+          "test_data": "WrongPass999"
+        },
+        {
+          "expected_result": "An error message is displayed indicating invalid credentials or wrong password",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with correct email but wrong password"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping the eye/hide icon in the password field toggles password visibility",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "Password is entered and characters are hidden/masked",
+          "step": "Tap the Password field and enter a password",
+          "test_data": "TestPass123"
+        },
+        {
+          "expected_result": "Password becomes visible as plain text",
+          "step": "Tap the eye icon (hide icon) on the right side of the Password field",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Password is masked again",
+          "step": "Tap the eye icon again",
+          "test_data": ""
+        }
+      ],
+      "title": "Toggle password visibility using eye icon"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Forgot password?' navigates the user to the password reset screen",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "User is navigated to the forgot/reset password screen",
+          "step": "Tap the 'Forgot password?' link",
+          "test_data": ""
+        }
+      ],
+      "title": "Tap Forgot Password link"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Sign in with Code' takes the user to the code-based login screen",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "User is navigated to a screen allowing code-based sign in",
+          "step": "Tap the 'Sign in with Code' button",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with Code button navigates correctly"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Register' in the 'Don't have an account? Register' text navigates to the registration screen",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "User is navigated to the account registration screen",
+          "step": "Tap the 'Register' link in the 'Don't have an account? Register' text",
+          "test_data": ""
+        }
+      ],
+      "title": "Navigate to Register screen via Register link"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Need Help?' opens the help/support section",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "User is navigated to a help or support screen/page",
+          "step": "Tap the 'Need Help?' link",
+          "test_data": ""
+        }
+      ],
+      "title": "Tap Need Help link"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Change language' allows the user to select a different app language",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "A language selection screen or dialog appears",
+          "step": "Tap the 'Change language' link",
+          "test_data": ""
+        }
+      ],
+      "title": "Tap Change Language option"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Privacy Policy' opens the privacy policy content",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "The Privacy Policy document or webpage is displayed",
+          "step": "Tap the 'Privacy Policy' link at the bottom of the screen",
+          "test_data": ""
+        }
+      ],
+      "title": "Tap Privacy Policy link"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Terms of Use' opens the terms of use content",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "The Terms of Use document or webpage is displayed",
+          "step": "Tap the 'Terms of Use' link at the bottom of the screen",
+          "test_data": ""
+        }
+      ],
+      "title": "Tap Terms of Use link"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify how the app handles an email with special characters that are technically valid in email addresses",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "Email is accepted in the field without immediate validation error",
+          "step": "Enter an email with special characters in the local part",
+          "test_data": "user+tag@example.com"
+        },
+        {
+          "expected_result": "Password is entered and masked",
+          "step": "Enter a password",
+          "test_data": "Password123"
+        },
+        {
+          "expected_result": "App attempts authentication; either logs in or shows invalid credentials error (not a format error)",
+          "step": "Tap Sign in",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with email containing special characters"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify the app handles an excessively long email input without crashing or UI breakage",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "Field accepts the input or truncates gracefully without crashing",
+          "step": "Tap the Email field and enter a very long email address",
+          "test_data": "averylongemailaddressthatexceedsnormallengthlimits12345678901234567890@averylongdomainname.com"
+        },
+        {
+          "expected_result": "App shows a validation or authentication error without crashing",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with very long email address"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that an email containing spaces is flagged as invalid",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "Email with space is entered in the field",
+          "step": "Enter an email with spaces",
+          "test_data": "user @example.com"
+        },
+        {
+          "expected_result": "'Please enter a valid email id' error is shown and sign in is blocked",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with spaces in email field"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that a numeric-only password is accepted in the password field and processed correctly",
+      "precondition": "User is on the Sign In screen",
+      "steps": [
+        {
+          "expected_result": "Email is accepted",
+          "step": "Enter a valid email",
+          "test_data": "testuser@example.com"
+        },
+        {
+          "expected_result": "Password is entered and masked",
+          "step": "Enter a numeric-only password",
+          "test_data": "123456789"
+        },
+        {
+          "expected_result": "App attempts authentication and returns appropriate success or invalid credentials response",
+          "step": "Tap Sign in",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with numeric-only password"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that the red email validation error state is dismissed when a valid email is subsequently typed",
+      "precondition": "User is on the Sign In screen and the email validation error is visible (red border and error text)",
+      "steps": [
+        {
+          "expected_result": "Error state is visible",
+          "step": "Observe the email field showing red border and 'Please enter a valid email id' error",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Red border disappears and error message is removed as valid input is entered",
+          "step": "Tap the Email field and type a valid email address",
+          "test_data": "valid@email.com"
+        }
+      ],
+      "title": "Validation error clears when valid email is entered after error state"
+    }
+  ]
+}
