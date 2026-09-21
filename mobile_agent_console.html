@@ -362,42 +362,53 @@
     .ls-step { flex: 1 1 45%; border-bottom: 1px solid var(--ink-line); }
   }
 
-  /* Live screenshot, both Test Builder's and Generate Manual Test
-     Cases' - no device-bezel chrome, just the picture with a thin
-     border, so the screenshot itself gets the space instead of a fake
-     phone frame around it. text-align:center matters: the image is
-     height-capped (see the click-handler note on the wrapper div
-     below), so it's narrower than this column and needs centering. */
+  /* Live screenshot. Plain (.phone-frame alone) is Generate Manual Test
+     Cases' - no bezel, just the picture, since that column is narrower
+     and the space saved goes to the test case table beside it instead.
+     Test Builder adds .phone-frame-bezel on top for the device-bezel
+     look (dark frame + notch) - the two cards intentionally look
+     different for that one reason, not an inconsistency. text-align:
+     center matters either way: the image is height-capped (see the
+     click-handler note on the wrapper div below), so it's narrower than
+     this column and needs centering. */
   .phone-frame { text-align: center; }
   .phone-frame img { border-radius: 12px; display: block; margin: 0 auto; border: 1px solid var(--ink-line); box-shadow: 0 4px 16px rgba(16,20,28,0.1); }
+  .phone-frame-bezel { background: #0a0d12; border-radius: 26px; padding: 10px 10px 14px; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.03); }
+  .phone-frame-bezel .phone-notch { width: 60px; height: 5px; border-radius: 4px; background: rgba(255,255,255,0.14); margin: 0 auto 8px; }
+  .phone-frame-bezel img { border: none; box-shadow: none; }
 
-  /* Tap/Swipe mode picker, restyled from the old plain radio pair into the
-     same "labeled tile wrapping a hidden radio" pattern .mode-toggle-opt
-     already uses above - clicking the label natively checks its radio and
-     fires the existing 'change' listener untouched, so none of the
-     tap/swipe recording logic needed to change, only how you pick between them. */
-  .ls-mode-tiles { display: flex; gap: 8px; }
+  /* Tap/Swipe action tiles - a bigger, colorful icon-card look (icon in
+     its own tinted circle, bold title, small subtitle) instead of the
+     earlier plain icon+label row. Each tile still just wraps a hidden
+     radio (.mode-toggle-opt above uses the same trick) - clicking the
+     label natively checks its radio and fires the existing 'change'
+     listener untouched, so none of the tap/swipe recording logic needed
+     to change, only how the two options are presented. Per-tile accent
+     color comes from the --accent/--accent-bg custom properties set
+     inline on each tile, not a separate CSS class per color. */
   .ls-mode-tile {
-    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px;
-    padding: 10px 8px; border-radius: 10px; border: 1.5px solid var(--ink-line);
-    cursor: pointer; transition: border-color 0.15s, background 0.15s;
-    font-size: 11.5px; font-weight: 600; color: var(--paper-dim);
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 12px 8px; border-radius: 14px; border: 1.5px solid var(--ink-line);
+    cursor: pointer; transition: border-color 0.15s, background-color 0.15s;
+    background: var(--ink-raised); text-align: center;
   }
-  .ls-mode-tile svg { color: var(--paper-dim); transition: color 0.15s; }
-  .ls-mode-tile.on { border-color: var(--signal); background: rgba(230,126,34,0.08); color: var(--paper); }
-  .ls-mode-tile.on svg { color: var(--signal); }
+  .ls-mode-tile-icon {
+    width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent-bg); color: var(--accent);
+  }
+  .ls-mode-tile-title { font-size: 12.5px; font-weight: 700; color: var(--paper); }
+  .ls-mode-tile-sub { font-size: 10px; color: var(--paper-dim); }
+  .ls-mode-tile.on { border-color: var(--accent); background: var(--accent-bg); }
 
-  /* Tap/Swipe tile + its own confirm button, stacked in the margin
-     beside the screenshot instead of in their own full-width rows below
-     it - the screenshot is height-capped (see .phone-frame) and rarely
-     fills this column's full width, so that side space would otherwise
-     just sit empty while everything needed to act on the screen scrolls
-     further down than it has to. flex:none overrides .ls-mode-tile's
-     own flex:1 (meant for sitting in a same-width-split row, not a
-     stack), since here it should size to its own content instead. */
-  .ls-mode-side { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 92px; flex-shrink: 0; }
-  .ls-mode-side .ls-mode-tile { flex: none; }
-  .ls-mode-side button.copy { padding: 7px 4px; font-size: 10.5px; white-space: normal; line-height: 1.3; }
+  /* Both tiles + their own confirm button, stacked in the margin beside
+     the screenshot instead of their own full-width rows below it - the
+     screenshot is height-capped and rarely fills this column's full
+     width, so that side space would otherwise just sit empty while
+     everything needed to act on the screen scrolls further down than
+     it has to. */
+  .ls-mode-stack { display: flex; flex-direction: column; align-items: stretch; gap: 10px; width: 110px; flex-shrink: 0; }
+  .ls-mode-stack button.copy { padding: 7px 4px; font-size: 10.5px; white-space: normal; line-height: 1.3; }
 
   .card {
     background: var(--ink-raised);
@@ -1491,24 +1502,21 @@
       <div style="width:380px; flex-shrink:0; position:sticky; top:20px;">
         <div class="card" id="lsScreenshotCard" style="display:none;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
-            <div style="min-width:0;">
-              <div style="font-size:14px; font-weight:700; color:var(--paper);">Live App Screen</div>
-              <div class="hint" style="font-size:11px; margin-top:1px;">Tap on any element to inspect</div>
+            <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+              <span style="width:34px; height:34px; border-radius:50%; background:rgba(124,58,237,0.12); color:#7C3AED; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+              </span>
+              <div style="min-width:0;">
+                <div style="font-size:14px; font-weight:700; color:var(--paper);">Live App Screen</div>
+                <div class="hint" style="font-size:11px; margin-top:1px;">Tap on any element to inspect</div>
+              </div>
             </div>
-            <button class="copy" id="lsScreenshotRefreshBtn" style="background:var(--ink-line); color:var(--paper); padding:7px 12px; font-size:11.5px; flex-shrink:0;">↻ Refresh</button>
+            <button class="copy" id="lsScreenshotRefreshBtn" style="background:var(--ink-line); color:var(--paper); padding:7px 12px; font-size:11.5px; border-radius:20px; flex-shrink:0;">↻ Refresh</button>
           </div>
           <div id="lsScreenshotAiCaption" style="font-size:12px; color:var(--paper-dim); margin-bottom:8px; display:none;"></div>
-          <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
-            <div class="ls-mode-side">
-              <label class="ls-mode-tile on">
-                <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeTap" value="tap" checked style="display:none;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7" stroke-opacity="0.55"/><circle cx="12" cy="12" r="10.5" stroke-opacity="0.25"/></svg>
-                Tap
-              </label>
-              <button class="copy" id="lsScreenshotTapBtn" disabled style="padding:8px 12px; font-size:11.5px;">Tap + Record</button>
-            </div>
-
-            <div class="phone-frame">
+          <div style="display:flex; align-items:center; justify-content:center; gap:10px;">
+            <div class="phone-frame phone-frame-bezel">
+              <div class="phone-notch"></div>
               <!-- Wrapper shrinks to the image's own rendered size (no
                    width:100%) rather than staying full-column-width with
                    the image centered inside it - the click handler below
@@ -1527,28 +1535,42 @@
               </div>
             </div>
 
-            <div class="ls-mode-side">
-              <label class="ls-mode-tile" title="Click a start point, then an end point - records a raw point-to-point swipe/drag between them, for a gesture a plain up/down/left/right can't express.">
+            <div class="ls-mode-stack">
+              <label class="ls-mode-tile on" style="--accent:#E67E22; --accent-bg:rgba(230,126,34,0.12);">
+                <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeTap" value="tap" checked style="display:none;">
+                <span class="ls-mode-tile-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7" stroke-opacity="0.55"/><circle cx="12" cy="12" r="10.5" stroke-opacity="0.25"/></svg></span>
+                <span class="ls-mode-tile-title">Tap</span>
+                <span class="ls-mode-tile-sub">Select a point</span>
+              </label>
+              <button class="copy" id="lsScreenshotTapBtn" disabled style="padding:8px 12px; font-size:11.5px;">Tap + Record</button>
+
+              <label class="ls-mode-tile" style="--accent:#0D9488; --accent-bg:rgba(13,148,136,0.12);" title="Click a start point, then an end point - records a raw point-to-point swipe/drag between them, for a gesture a plain up/down/left/right can't express.">
                 <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeSwipe" value="swipe" style="display:none;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2" fill="currentColor" stroke="none"/><line x1="7.5" y1="12" x2="17" y2="12"/><polyline points="13 8 17 12 13 16"/></svg>
-                Swipe
+                <span class="ls-mode-tile-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2" fill="currentColor" stroke="none"/><line x1="7.5" y1="12" x2="17" y2="12"/><polyline points="13 8 17 12 13 16"/></svg></span>
+                <span class="ls-mode-tile-title">Swipe</span>
+                <span class="ls-mode-tile-sub">Drag gesture</span>
               </label>
               <button class="copy" id="lsScreenshotSwipeBtn" disabled style="display:none; padding:8px 12px; font-size:11.5px;">Swipe + Record</button>
             </div>
           </div>
-          <div style="display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap;">
-            <span class="hint" id="lsScreenshotPointLabel" style="font-size:12px;">Click on the screenshot to select an element there.</span>
+          <div style="display:flex; gap:8px; align-items:flex-start; margin-top:12px; padding:10px 12px; border-radius:10px; background:rgba(37,99,235,0.07); border:1px solid rgba(37,99,235,0.15);">
+            <span style="flex-shrink:0; color:#2563EB; margin-top:1px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+            </span>
+            <div style="min-width:0;">
+              <span class="hint" id="lsScreenshotPointLabel" style="font-size:12px; color:var(--paper);">Click on the screenshot to select an element there.</span>
+              <details style="margin-top:4px;">
+                <summary class="hint" style="cursor:pointer; font-size:11px;">What is this?</summary>
+                <div class="hint" style="font-size:11.5px; margin-top:8px; line-height:1.5;">
+                  Always shows what's actually on screen right now, in either mode - updated after every AI-planned
+                  step, or on demand above. For an element with no label or value at all - it never shows up in the
+                  list because the accessibility tree itself has nothing to key it by. Click the exact spot on the
+                  picture above; it's converted straight to a screen-point tap, no locator involved.
+                </div>
+              </details>
+            </div>
           </div>
           <div id="lsScreenshotStatus" style="font-size:12px; margin-top:8px;"></div>
-          <details style="margin-top:10px;">
-            <summary class="hint" style="cursor:pointer; font-size:11px;">What is this?</summary>
-            <div class="hint" style="font-size:11.5px; margin-top:8px; line-height:1.5;">
-              Always shows what's actually on screen right now, in either mode - updated after every AI-planned
-              step, or on demand above. For an element with no label or value at all - it never shows up in the
-              list because the accessibility tree itself has nothing to key it by. Click the exact spot on the
-              picture above; it's converted straight to a screen-point tap, no locator involved.
-            </div>
-          </details>
 
           <div style="border-top:1px solid var(--ink-line); margin-top:16px; padding-top:14px;">
             <div style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600; margin-bottom:6px;">Validate this screen (AI)</div>
@@ -1557,7 +1579,11 @@
               checking (titles, values, statuses - not icons, dividers, or generic containers) and
               adds an <b>assert_visible</b> step for each one, straight into Captured steps below.
             </div>
-            <button class="copy" id="lsValidateScreenBtn" style="width:100%; padding:10px 12px; font-size:12.5px;">Validate everything on screen</button>
+            <button class="copy" id="lsValidateScreenBtn" style="width:100%; padding:12px; font-size:13px; border-radius:24px; background:linear-gradient(135deg, #0D9488, #0891B2); color:#fff; display:flex; align-items:center; justify-content:center; gap:8px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 5.6L19 9l-5.4 1.4L12 16l-1.6-5.6L5 9l5.4-1.4L12 2z"/></svg>
+              Validate everything on screen
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </button>
             <div id="lsValidateScreenStatus" style="font-size:12px; margin-top:8px;"></div>
           </div>
 
