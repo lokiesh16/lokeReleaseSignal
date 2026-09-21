@@ -1,0 +1,19 @@
+{
+  "name": "binary_test_push",
+  "module": "Binary Verification",
+  "context": "",
+  "created_at": "2026-09-21T13:04:26Z",
+  "cases": [
+    {
+      "title": "Sanity check",
+      "category": "happy_path",
+      "steps": [
+        {
+          "step": "Do a thing",
+          "test_data": "",
+          "expected_result": "It works"
+        }
+      ]
+    }
+  ]
+}
