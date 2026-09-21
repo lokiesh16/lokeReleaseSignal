@@ -387,6 +387,18 @@
   .ls-mode-tile.on { border-color: var(--signal); background: rgba(230,126,34,0.08); color: var(--paper); }
   .ls-mode-tile.on svg { color: var(--signal); }
 
+  /* Tap/Swipe tile + its own confirm button, stacked in the margin
+     beside the screenshot instead of in their own full-width rows below
+     it - the screenshot is height-capped (see .phone-frame) and rarely
+     fills this column's full width, so that side space would otherwise
+     just sit empty while everything needed to act on the screen scrolls
+     further down than it has to. flex:none overrides .ls-mode-tile's
+     own flex:1 (meant for sitting in a same-width-split row, not a
+     stack), since here it should size to its own content instead. */
+  .ls-mode-side { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 92px; flex-shrink: 0; }
+  .ls-mode-side .ls-mode-tile { flex: none; }
+  .ls-mode-side button.copy { padding: 7px 4px; font-size: 10.5px; white-space: normal; line-height: 1.3; }
+
   .card {
     background: var(--ink-raised);
     border: 1px solid var(--ink-line);
@@ -1486,42 +1498,46 @@
             <button class="copy" id="lsScreenshotRefreshBtn" style="background:var(--ink-line); color:var(--paper); padding:7px 12px; font-size:11.5px; flex-shrink:0;">↻ Refresh</button>
           </div>
           <div id="lsScreenshotAiCaption" style="font-size:12px; color:var(--paper-dim); margin-bottom:8px; display:none;"></div>
-          <div class="phone-frame">
-            <!-- Wrapper shrinks to the image's own rendered size (no
-                 width:100%) rather than staying full-column-width with
-                 the image centered inside it - the click handler below
-                 positions markers via `clickX = e.clientX - img.getBoundingClientRect().left`
-                 and writes that straight onto this wrapper's `left`
-                 (its nearest positioned ancestor), which is only correct
-                 when the wrapper's own left edge lines up with the
-                 image's - true at full width, but would silently be off
-                 by the letterboxing gap once the image is height-capped
-                 and narrower than the column. -->
-            <div style="position:relative; display:inline-block; max-width:100%;">
-              <img id="lsScreenshotImg" style="max-width:100%; max-height:56vh; width:auto; height:auto; display:block; cursor:crosshair;">
-              <div id="lsScreenshotHighlight" style="display:none; position:absolute; border:2px solid var(--circuit); background:rgba(26,188,156,0.18); pointer-events:none; box-sizing:border-box;"></div>
-              <div id="lsScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
-              <div id="lsScreenshotMarkerEnd" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--circuit); background:rgba(26,188,156,0.25); pointer-events:none;"></div>
+          <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
+            <div class="ls-mode-side">
+              <label class="ls-mode-tile on">
+                <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeTap" value="tap" checked style="display:none;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7" stroke-opacity="0.55"/><circle cx="12" cy="12" r="10.5" stroke-opacity="0.25"/></svg>
+                Tap
+              </label>
+              <button class="copy" id="lsScreenshotTapBtn" disabled style="padding:8px 12px; font-size:11.5px;">Tap + Record</button>
             </div>
-          </div>
-          <div class="ls-mode-tiles" style="margin-top:12px;">
-            <label class="ls-mode-tile on">
-              <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeTap" value="tap" checked style="display:none;">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7" stroke-opacity="0.55"/><circle cx="12" cy="12" r="10.5" stroke-opacity="0.25"/></svg>
-              Tap
-            </label>
-            <label class="ls-mode-tile" title="Click a start point, then an end point - records a raw point-to-point swipe/drag between them, for a gesture a plain up/down/left/right can't express.">
-              <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeSwipe" value="swipe" style="display:none;">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2" fill="currentColor" stroke="none"/><line x1="7.5" y1="12" x2="17" y2="12"/><polyline points="13 8 17 12 13 16"/></svg>
-              Swipe
-            </label>
+
+            <div class="phone-frame">
+              <!-- Wrapper shrinks to the image's own rendered size (no
+                   width:100%) rather than staying full-column-width with
+                   the image centered inside it - the click handler below
+                   positions markers via `clickX = e.clientX - img.getBoundingClientRect().left`
+                   and writes that straight onto this wrapper's `left`
+                   (its nearest positioned ancestor), which is only correct
+                   when the wrapper's own left edge lines up with the
+                   image's - true at full width, but would silently be off
+                   by the letterboxing gap once the image is height-capped
+                   and narrower than the column. -->
+              <div style="position:relative; display:inline-block; max-width:100%;">
+                <img id="lsScreenshotImg" style="max-width:100%; max-height:56vh; width:auto; height:auto; display:block; cursor:crosshair;">
+                <div id="lsScreenshotHighlight" style="display:none; position:absolute; border:2px solid var(--circuit); background:rgba(26,188,156,0.18); pointer-events:none; box-sizing:border-box;"></div>
+                <div id="lsScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
+                <div id="lsScreenshotMarkerEnd" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--circuit); background:rgba(26,188,156,0.25); pointer-events:none;"></div>
+              </div>
+            </div>
+
+            <div class="ls-mode-side">
+              <label class="ls-mode-tile" title="Click a start point, then an end point - records a raw point-to-point swipe/drag between them, for a gesture a plain up/down/left/right can't express.">
+                <input type="radio" name="lsScreenshotMode" id="lsScreenshotModeSwipe" value="swipe" style="display:none;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="2" fill="currentColor" stroke="none"/><line x1="7.5" y1="12" x2="17" y2="12"/><polyline points="13 8 17 12 13 16"/></svg>
+                Swipe
+              </label>
+              <button class="copy" id="lsScreenshotSwipeBtn" disabled style="display:none; padding:8px 12px; font-size:11.5px;">Swipe + Record</button>
+            </div>
           </div>
           <div style="display:flex; align-items:center; gap:8px; margin-top:10px; flex-wrap:wrap;">
             <span class="hint" id="lsScreenshotPointLabel" style="font-size:12px;">Click on the screenshot to select an element there.</span>
-          </div>
-          <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
-            <button class="copy" id="lsScreenshotTapBtn" disabled style="flex:1; padding:8px 12px; font-size:11.5px;">Tap this point + Record</button>
-            <button class="copy" id="lsScreenshotSwipeBtn" disabled style="display:none; flex:1; padding:8px 12px; font-size:11.5px;">Swipe start → end + Record</button>
           </div>
           <div id="lsScreenshotStatus" style="font-size:12px; margin-top:8px;"></div>
           <details style="margin-top:10px;">
