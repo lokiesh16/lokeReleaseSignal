@@ -1976,11 +1976,20 @@
           }
 
           statusEl.innerHTML = `<span style="color:var(--paper-dim);">Screen ${screenNum}: ${escapeHtml(a.type)}${a.label ? ' → ' + escapeHtml(a.label) : ''}…</span>`;
+          // Ask /act to grab a screenshot on its already-happening settle
+          // check when this is the last action before a next /plan call -
+          // that /plan call then skips its own from-scratch capture and
+          // reuses this one instead (see scrape_act/scrape_plan_screen).
+          const idx = actions.indexOf(a);
+          const nextIsVerdict = actions[idx + 1] && ['done', 'stuck'].includes(actions[idx + 1].type);
+          const isLastAction = idx === actions.length - 1 || nextIsVerdict;
+          const actPayload = lsActPayloadFromPlanAction(a);
+          if (isLastAction && screenNum < MAX_SCREENS) actPayload.prefetch_next = true;
           try {
             const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
-              body: JSON.stringify(lsActPayloadFromPlanAction(a)),
+              body: JSON.stringify(actPayload),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'action failed');
