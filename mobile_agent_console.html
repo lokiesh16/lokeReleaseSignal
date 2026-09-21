@@ -341,20 +341,18 @@
      asset image, just CSS) so a raw device screenshot reads as "a phone
      you're looking at" instead of a bare <img> floating in a card. */
   .phone-frame {
-    /* No more device-bezel chrome (dark background/padding/notch) - the
-       screenshot itself is the picture now, not wrapped in a fake phone
-       frame. text-align:center still matters: the image is height-capped
-       (see the click-handler note on the wrapper div below), so it's
-       narrower than this column and needs centering. */
+    background: #0a0d12;
+    border: 1px solid var(--ink-line);
+    border-radius: 26px;
+    padding: 10px 10px 14px;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.03);
+    /* text-align:center matters here: the image is height-capped (see
+       the click-handler note on the wrapper div below), so it's
+       narrower than this column and needs centering inside the bezel. */
     text-align: center;
   }
-  .phone-frame img {
-    border-radius: 16px;
-    display: block;
-    margin: 0 auto;
-    border: 1px solid var(--ink-line);
-    box-shadow: 0 4px 16px rgba(16,20,28,0.1);
-  }
+  .phone-frame .phone-notch { width: 60px; height: 5px; border-radius: 4px; background: rgba(255,255,255,0.14); margin: 0 auto 8px; }
+  .phone-frame img { border-radius: 14px; display: block; margin: 0 auto; }
 
   /* Tap/Swipe mode picker, restyled from the old plain radio pair into the
      same "labeled tile wrapping a hidden radio" pattern .mode-toggle-opt
@@ -1466,6 +1464,7 @@
           </div>
           <div id="lsScreenshotAiCaption" style="font-size:12px; color:var(--paper-dim); margin-bottom:8px; display:none;"></div>
           <div class="phone-frame">
+            <div class="phone-notch"></div>
             <!-- Wrapper shrinks to the image's own rendered size (no
                  width:100%) rather than staying full-column-width with
                  the image centered inside it - the click handler below
@@ -1477,7 +1476,7 @@
                  by the letterboxing gap once the image is height-capped
                  and narrower than the column. -->
             <div style="position:relative; display:inline-block; max-width:100%;">
-              <img id="lsScreenshotImg" style="max-width:100%; max-height:50vh; width:auto; height:auto; display:block; cursor:crosshair;">
+              <img id="lsScreenshotImg" style="max-width:100%; max-height:46vh; width:auto; height:auto; display:block; cursor:crosshair;">
               <div id="lsScreenshotHighlight" style="display:none; position:absolute; border:2px solid var(--circuit); background:rgba(26,188,156,0.18); pointer-events:none; box-sizing:border-box;"></div>
               <div id="lsScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
               <div id="lsScreenshotMarkerEnd" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--circuit); background:rgba(26,188,156,0.25); pointer-events:none;"></div>
@@ -1590,10 +1589,11 @@
             <button class="copy" id="mtcRefreshBtn" style="background:var(--ink-line); color:var(--paper); padding:7px 12px; font-size:11.5px; flex-shrink:0;">↻ Refresh</button>
           </div>
           <div class="phone-frame">
+            <div class="phone-notch"></div>
             <!-- Same reasoning as Test Builder's screenshot wrapper - see
                  that one's comment. -->
             <div style="position:relative; display:inline-block; max-width:100%;">
-              <img id="mtcScreenshotImg" style="max-width:100%; max-height:60vh; width:auto; height:auto; display:block; cursor:crosshair;">
+              <img id="mtcScreenshotImg" style="max-width:100%; max-height:55vh; width:auto; height:auto; display:block; cursor:crosshair;">
               <div id="mtcScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
             </div>
           </div>
