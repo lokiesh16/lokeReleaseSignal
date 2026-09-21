@@ -76,8 +76,22 @@
     top: 20px;
     height: calc(100vh - 40px);
     overflow-y: auto;
+    overflow-x: hidden;
     box-sizing: border-box;
+    transition: width 0.15s ease, padding 0.15s ease;
   }
+
+  /* Collapsed = icons only, more room for whatever tab you're actually
+     on (a wide table, a phone screenshot, ...) - state persisted in
+     localStorage the same way the auth gate remembers itself, so it
+     doesn't spring back open on every reload. */
+  .side-nav.collapsed { width: 64px; padding-left: 10px; padding-right: 10px; }
+  .side-nav.collapsed .side-nav-title,
+  .side-nav.collapsed .tab-group-label,
+  .side-nav.collapsed .tab-label { display: none; }
+  .side-nav.collapsed .side-nav-header { justify-content: center; }
+  .side-nav.collapsed .tab { justify-content: center; padding-left: 0; padding-right: 0; }
+  .side-nav.collapsed #sideNavToggleBtn svg { transform: rotate(180deg); }
 
   .side-nav-header {
     display: flex;
@@ -88,6 +102,17 @@
   }
 
   .side-nav-header .dot { margin-top: 7px; }
+  .side-nav-title { flex: 1; min-width: 0; }
+
+  #sideNavToggleBtn {
+    flex-shrink: 0;
+    width: 24px; height: 24px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--ink); border: 1px solid var(--ink-line); color: var(--paper-dim);
+    cursor: pointer; transition: background-color 0.15s, color 0.15s;
+  }
+  #sideNavToggleBtn:hover { background: var(--ink-line); color: var(--paper); }
+  #sideNavToggleBtn svg { transition: transform 0.15s ease; }
 
   .content {
     flex: 1;
@@ -354,6 +379,14 @@
   .phone-frame .phone-notch { width: 60px; height: 5px; border-radius: 4px; background: rgba(255,255,255,0.14); margin: 0 auto 8px; }
   .phone-frame img { border-radius: 14px; display: block; margin: 0 auto; }
 
+  /* Generate Manual Test Cases' screenshot only - no bezel/padding here,
+     just the picture with a thin border, so this narrower column (see
+     its own width) spends its space on the screenshot itself rather
+     than a device-frame border, leaving more room next to it for the
+     test case table. */
+  .phone-frame-plain { background: none; border: none; padding: 0; box-shadow: none; }
+  .phone-frame-plain img { border-radius: 12px; border: 1px solid var(--ink-line); box-shadow: 0 4px 16px rgba(16,20,28,0.1); }
+
   /* Tap/Swipe mode picker, restyled from the old plain radio pair into the
      same "labeled tile wrapping a hidden radio" pattern .mode-toggle-opt
      already uses above - clicking the label natively checks its radio and
@@ -614,6 +647,9 @@
   .mtc-table th { background: var(--ink); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--paper-dim); font-weight: 700; }
   .mtc-table tr.mtc-case-start td { border-top: 2px solid var(--paper-dim); }
   .mtc-table .mtc-remove-btn { padding: 3px 8px; font-size: 10.5px; background: var(--ink-line); color: var(--paper); white-space: nowrap; }
+  .mtc-execution-cell { min-width: 140px; }
+  .mtc-exec-status { width: 100%; font-size: 11px; font-weight: 700; padding: 3px 4px; margin-bottom: 5px; background: var(--ink-raised); }
+  .mtc-exec-comment { width: 100%; font-size: 11.5px; padding: 5px 6px; resize: vertical; min-height: 40px; box-sizing: border-box; }
 
   /* Casual-visitor deterrent, not real security - a passcode hash sitting
      in this page's own source can always be read by whoever opens dev
@@ -646,40 +682,43 @@
 </div>
 
 <div class="app-shell" id="appShell" style="display:none;">
-  <nav class="side-nav">
+  <nav class="side-nav" id="sideNav">
     <header class="side-nav-header">
       <span class="dot"></span>
-      <div>
+      <div class="side-nav-title">
         <h1>Habi's Final Run</h1>
         <p class="sub">Guide it once. Then I will handle every re-test after.</p>
       </div>
+      <button id="sideNavToggleBtn" title="Collapse sidebar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
     </header>
 
     <div class="tabs">
-      <button class="tab" data-tab="scraper">
+      <button class="tab" data-tab="scraper" title="Test Builder">
         <span class="tab-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/></svg></span>
-        Test Builder
+        <span class="tab-label">Test Builder</span>
       </button>
       <div class="tab-group-label">Test Library</div>
-      <button class="tab tab-child" data-tab="library-flows">
+      <button class="tab tab-child" data-tab="library-flows" title="Saved Flows">
         <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>
-        Saved Flows
+        <span class="tab-label">Saved Flows</span>
       </button>
-      <button class="tab tab-child" data-tab="library-scripts">
+      <button class="tab tab-child" data-tab="library-scripts" title="Test Scripts">
         <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg></span>
-        Test Scripts
+        <span class="tab-label">Test Scripts</span>
       </button>
-      <button class="tab" data-tab="manual">
+      <button class="tab" data-tab="manual" title="Manual API Capture">
         <span class="tab-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></span>
-        Manual API Capture
+        <span class="tab-label">Manual API Capture</span>
       </button>
-      <button class="tab" data-tab="mtc">
+      <button class="tab" data-tab="mtc" title="Generate Manual Test Cases">
         <span class="tab-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg></span>
-        Generate Manual Test Cases
+        <span class="tab-label">Generate Manual Test Cases</span>
       </button>
-      <button class="tab active" data-tab="run">
+      <button class="tab active" data-tab="run" title="AI Eye">
         <span class="tab-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
-        AI Eye
+        <span class="tab-label">AI Eye</span>
       </button>
       <button class="tab" data-tab="build" style="display:none;">Build Command</button>
       <button class="tab" data-tab="report" style="display:none;">View Run Report</button>
@@ -1579,7 +1618,7 @@
         </div>
       </div>
 
-      <div style="width:380px; flex-shrink:0; position:sticky; top:20px;">
+      <div style="width:280px; flex-shrink:0; position:sticky; top:20px;">
         <div class="card" id="mtcScreenshotCard" style="display:none;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px;">
             <div style="min-width:0;">
@@ -1588,12 +1627,15 @@
             </div>
             <button class="copy" id="mtcRefreshBtn" style="background:var(--ink-line); color:var(--paper); padding:7px 12px; font-size:11.5px; flex-shrink:0;">↻ Refresh</button>
           </div>
-          <div class="phone-frame">
-            <div class="phone-notch"></div>
+          <div class="phone-frame phone-frame-plain">
             <!-- Same reasoning as Test Builder's screenshot wrapper - see
-                 that one's comment. -->
+                 that one's comment. Plain (no bezel/notch) here
+                 specifically - this column is also narrower than Test
+                 Builder's (see its own width below) to leave the manual
+                 test case table next to it more room to show every
+                 column without horizontal scrolling. -->
             <div style="position:relative; display:inline-block; max-width:100%;">
-              <img id="mtcScreenshotImg" style="max-width:100%; max-height:55vh; width:auto; height:auto; display:block; cursor:crosshair;">
+              <img id="mtcScreenshotImg" style="max-width:100%; max-height:52vh; width:auto; height:auto; display:block; cursor:crosshair;">
               <div id="mtcScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
             </div>
           </div>
@@ -1690,6 +1732,15 @@
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') attempt(); });
     input.focus();
   }
+
+  // ---------- collapsible sidebar ----------
+  const SIDE_NAV_COLLAPSED_KEY = 'habiSideNavCollapsed';
+  const sideNav = document.getElementById('sideNav');
+  if (localStorage.getItem(SIDE_NAV_COLLAPSED_KEY) === '1') sideNav.classList.add('collapsed');
+  document.getElementById('sideNavToggleBtn').addEventListener('click', () => {
+    const collapsed = sideNav.classList.toggle('collapsed');
+    localStorage.setItem(SIDE_NAV_COLLAPSED_KEY, collapsed ? '1' : '0');
+  });
 
   // ---------- tabs ----------
   document.querySelectorAll('.tab').forEach(btn => {
@@ -6932,7 +6983,13 @@ ${lines}
   // ---------- Generate Manual Test Cases (uses the Test Builder's
   // own connected session - lsSessionId - rather than managing its own
   // separate connect/disconnect flow) ----------
-  let mtcCases = []; // {title, category, objective, precondition, steps: {step, test_data, expected_result}[]}
+  let mtcCases = []; // {title, category, objective, precondition, steps: {step, test_data, expected_result}[], execution_status, execution_comment}
+
+  const MTC_EXECUTION_META = {
+    not_run: {label: 'Not run', color: 'var(--paper-dim)'},
+    pass: {label: 'Pass', color: 'var(--circuit)'},
+    fail: {label: 'Fail', color: 'var(--alert)'},
+  };
   // One entry per tap, in order - {x, y, screenshot_b64}, where
   // screenshot_b64 is what was ON SCREEN right before that tap (i.e. what
   // the human was looking at when they chose to tap here). Manual test
@@ -7109,6 +7166,8 @@ ${lines}
     const rows = [];
     mtcCases.forEach((c, i) => {
       const meta = MTC_CATEGORY_META[c.category] || MTC_CATEGORY_META.happy_path;
+      const execStatus = c.execution_status || 'not_run';
+      const execMeta = MTC_EXECUTION_META[execStatus] || MTC_EXECUTION_META.not_run;
       // Always at least one row per case, even with zero steps, so the
       // case itself (name/objective/precondition) never silently
       // disappears just because the LLM gave it no steps yet.
@@ -7127,7 +7186,16 @@ ${lines}
           <td>${escapeHtml(s.step || '')}</td>
           <td>${escapeHtml(s.test_data || '')}</td>
           <td>${escapeHtml(s.expected_result || '')}</td>
-          ${first ? `<td rowspan="${steps.length}"><button class="copy mtc-remove-btn" data-index="${i}">Remove</button></td>` : ''}
+          ${first ? `
+          <td rowspan="${steps.length}" class="mtc-execution-cell">
+            <select class="mtc-exec-status" data-index="${i}" style="border-color:${execMeta.color}; color:${execMeta.color}; font-weight:700;">
+              <option value="not_run" ${execStatus === 'not_run' ? 'selected' : ''}>Not run</option>
+              <option value="pass" ${execStatus === 'pass' ? 'selected' : ''}>Pass</option>
+              <option value="fail" ${execStatus === 'fail' ? 'selected' : ''}>Fail</option>
+            </select>
+            <textarea class="mtc-exec-comment" data-index="${i}" placeholder="Comment…" rows="2">${escapeHtml(c.execution_comment || '')}</textarea>
+          </td>
+          <td rowspan="${steps.length}"><button class="copy mtc-remove-btn" data-index="${i}">Remove</button></td>` : ''}
         </tr>`);
       });
     });
@@ -7143,6 +7211,7 @@ ${lines}
               <th>Test Script (Step-by-Step) — Step</th>
               <th>Test Script (Step-by-Step) — Test Data</th>
               <th>Test Script (Step-by-Step) — Expected Result</th>
+              <th>Test Execution</th>
               <th></th>
             </tr>
           </thead>
@@ -7154,6 +7223,22 @@ ${lines}
       btn.addEventListener('click', () => {
         mtcCases.splice(Number(btn.dataset.index), 1);
         mtcRenderTray();
+      });
+    });
+    listEl.querySelectorAll('.mtc-exec-status').forEach(sel => {
+      sel.addEventListener('change', () => {
+        mtcCases[Number(sel.dataset.index)].execution_status = sel.value;
+        // Full re-render (not just a style tweak) so the select's own
+        // border/text color updates to match the new status - cheap
+        // enough here since a status change is a discrete click, not
+        // continuous typing (unlike the comment box below, which
+        // deliberately does NOT re-render on every keystroke).
+        mtcRenderTray();
+      });
+    });
+    listEl.querySelectorAll('.mtc-exec-comment').forEach(ta => {
+      ta.addEventListener('input', () => {
+        mtcCases[Number(ta.dataset.index)].execution_comment = ta.value;
       });
     });
   }
@@ -7194,7 +7279,10 @@ ${lines}
         md += '\n';
         if (s.expected_result) md += `   → **Expected:** ${s.expected_result}\n`;
       });
-      md += '\n';
+      const execMeta = MTC_EXECUTION_META[c.execution_status || 'not_run'];
+      md += `\n**Execution:** ${execMeta.label}`;
+      if (c.execution_comment) md += ` - ${c.execution_comment}`;
+      md += '\n\n';
     });
     const blob = new Blob([md], {type: 'text/markdown'});
     const url = URL.createObjectURL(blob);
@@ -7215,6 +7303,7 @@ ${lines}
       'Test Script (Step-by-Step) — Step',
       'Test Script (Step-by-Step) — Test Data',
       'Test Script (Step-by-Step) — Expected Result',
+      'Test Execution — Status', 'Test Execution — Comment',
     ];
     const csvEscape = (v) => {
       const s = String(v == null ? '' : v);
@@ -7223,12 +7312,16 @@ ${lines}
     const lines = [headers.map(csvEscape).join(',')];
     mtcCases.forEach(c => {
       // Same "at least one row per case" rule as the on-screen table -
-      // Name/Objective/Precondition get repeated on every row here since
-      // a flat CSV has no merged-cell concept to lean on instead.
+      // Name/Objective/Precondition/Test Execution get repeated on every
+      // row here since a flat CSV has no merged-cell concept to lean on
+      // instead.
       const steps = (c.steps && c.steps.length) ? c.steps : [{step: '', test_data: '', expected_result: ''}];
+      const execMeta = MTC_EXECUTION_META[c.execution_status || 'not_run'];
       steps.forEach(s => {
-        lines.push([c.title, c.objective || '', c.precondition || '', s.step || '', s.test_data || '', s.expected_result || '']
-          .map(csvEscape).join(','));
+        lines.push([
+          c.title, c.objective || '', c.precondition || '', s.step || '', s.test_data || '', s.expected_result || '',
+          execMeta.label, c.execution_comment || '',
+        ].map(csvEscape).join(','));
       });
     });
     // Leading BOM so Excel (which otherwise guesses the system codepage,
