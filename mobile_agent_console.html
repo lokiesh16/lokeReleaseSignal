@@ -1527,23 +1527,23 @@
 
   <!-- ============ GENERATE MANUAL TEST CASES TAB ============ -->
   <div class="panel" id="panel-mtc">
-    <div class="card">
-      <div style="font-weight:700; font-size:15px; margin-bottom:6px;">Generate manual test cases from exploring the app</div>
-      <p class="hint" style="font-size:13px; margin:0 0 14px; line-height:1.5;">
-        Tap around on the screenshot to actually drive the app — same interactive tap as Test Builder — then
-        generate plain, human-readable test cases grounded in the whole flow you just traversed, not just one isolated
-        screen: happy path, edge cases, and negative scenarios included. These are for a person to follow by hand, not
-        an automation flow — nothing here ever gets replayed. Uses the same connected session as
-        <b>Test Builder</b> — connect there first if you haven't yet.
-      </p>
-      <div class="field full">
-        <label>Context overview <span class="opt">what are you testing? gives the AI the QA intent behind what you're about to explore</span></label>
-        <textarea id="mtcContext" rows="3" placeholder="e.g. Testing the Weight Widget: adding a weight entry, setting a target, switching lbs/kg, and the &quot;lbs left to goal&quot; math"></textarea>
-      </div>
-    </div>
-
     <div style="display:flex; gap:20px; align-items:flex-start;">
       <div style="flex:1; min-width:0;">
+        <div class="card">
+          <div style="font-weight:700; font-size:15px; margin-bottom:6px;">Generate manual test cases from exploring the app</div>
+          <p class="hint" style="font-size:13px; margin:0 0 14px; line-height:1.5;">
+            Tap around on the screenshot to actually drive the app — same interactive tap as Test Builder — then
+            generate plain, human-readable test cases grounded in the whole flow you just traversed, not just one isolated
+            screen: happy path, edge cases, and negative scenarios included. These are for a person to follow by hand, not
+            an automation flow — nothing here ever gets replayed. Uses the same connected session as
+            <b>Test Builder</b> — connect there first if you haven't yet.
+          </p>
+          <div class="field full">
+            <label>Context overview <span class="opt">what are you testing? gives the AI the QA intent behind what you're about to explore</span></label>
+            <textarea id="mtcContext" rows="3" placeholder="e.g. Testing the Weight Widget: adding a weight entry, setting a target, switching lbs/kg, and the &quot;lbs left to goal&quot; math"></textarea>
+          </div>
+        </div>
+
         <div class="card" id="mtcNoSessionCard">
           <div class="empty-hint">Not connected yet — go to <b>Test Builder</b>, connect to a device, then come back here.</div>
         </div>
@@ -1585,7 +1585,7 @@
             <!-- Same reasoning as Test Builder's screenshot wrapper - see
                  that one's comment. -->
             <div style="position:relative; display:inline-block; max-width:100%;">
-              <img id="mtcScreenshotImg" style="max-width:100%; max-height:46vh; width:auto; height:auto; display:block; cursor:crosshair;">
+              <img id="mtcScreenshotImg" style="max-width:100%; max-height:55vh; width:auto; height:auto; display:block; cursor:crosshair;">
               <div id="mtcScreenshotMarker" style="display:none; position:absolute; width:16px; height:16px; margin-left:-8px; margin-top:-8px; border-radius:50%; border:2px solid var(--signal); background:rgba(230,126,34,0.25); pointer-events:none;"></div>
             </div>
           </div>
