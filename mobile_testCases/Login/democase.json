@@ -1,0 +1,332 @@
+{
+  "name": "democase",
+  "module": "Login",
+  "context": "",
+  "created_at": "2026-09-21T13:28:31Z",
+  "cases": [
+    {
+      "category": "happy_path",
+      "objective": "Verify that a user can log in successfully with a valid registered email and password",
+      "precondition": "User has a registered account and is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "Email field is focused and keyboard appears",
+          "step": "Tap the Email field",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Email is entered and no error message is shown",
+          "step": "Enter a valid registered email address",
+          "test_data": "testuser@example.com"
+        },
+        {
+          "expected_result": "Password field is focused",
+          "step": "Tap the Password field",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Password is entered as masked characters",
+          "step": "Enter the correct password",
+          "test_data": "Password123!"
+        },
+        {
+          "expected_result": "User is navigated to the home/dashboard screen",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Successful sign in with valid credentials"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify that submitting with an empty email field triggers the 'Please enter a valid email id' error",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "Email field remains empty",
+          "step": "Leave the Email field empty",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Email field is highlighted in red with the message 'Please enter a valid email id'",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Error shown when email field is empty on sign in"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify that entering an email without proper format triggers the email validation error",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "Text is entered in the field",
+          "step": "Tap the Email field and enter an invalid email",
+          "test_data": "invalidemail"
+        },
+        {
+          "expected_result": "Email field is highlighted in red with 'Please enter a valid email id' error message",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Invalid email format shows validation error"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that an email missing the domain part (e.g. user@) is rejected with a validation error",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "Text is entered in the field",
+          "step": "Tap the Email field and enter a partial email",
+          "test_data": "user@"
+        },
+        {
+          "expected_result": "Email field shows 'Please enter a valid email id' error",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Invalid email with missing domain shows error"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify that entering a correct email but incorrect password shows an authentication error",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "Email is accepted with no error",
+          "step": "Enter a valid registered email",
+          "test_data": "testuser@example.com"
+        },
+        {
+          "expected_result": "Password is entered as masked characters",
+          "step": "Enter an incorrect password",
+          "test_data": "WrongPass999"
+        },
+        {
+          "expected_result": "An error message is displayed indicating invalid credentials",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with valid email but wrong password"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping the eye icon in the password field toggles the password visibility",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "Password is displayed as masked dots",
+          "step": "Tap the Password field and enter a password",
+          "test_data": "Password123!"
+        },
+        {
+          "expected_result": "Password text becomes visible in plain text",
+          "step": "Tap the eye/visibility icon on the right of the password field",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Password is masked again",
+          "step": "Tap the eye/visibility icon again",
+          "test_data": ""
+        }
+      ],
+      "title": "Password visibility toggle shows and hides password"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify that submitting with a valid email but empty password triggers an appropriate error",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "Email is entered without error",
+          "step": "Enter a valid email in the Email field",
+          "test_data": "testuser@example.com"
+        },
+        {
+          "expected_result": "Password field remains empty",
+          "step": "Leave the Password field empty",
+          "test_data": ""
+        },
+        {
+          "expected_result": "An error or validation message appears prompting the user to enter a password",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with empty password field"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Forgot password?' navigates the user to the password reset flow",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "User is navigated to the forgot/reset password screen",
+          "step": "Tap the 'Forgot password?' link",
+          "test_data": ""
+        }
+      ],
+      "title": "Forgot password link navigates to password reset screen"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Sign in with Code' takes the user to the code-based authentication screen",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "User is navigated to the sign-in with code screen",
+          "step": "Tap the 'Sign in with Code' button",
+          "test_data": ""
+        }
+      ],
+      "title": "Sign in with Code button navigates to code-based login"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping the 'Register' link takes a new user to the account registration screen",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "User is navigated to the registration screen",
+          "step": "Tap the 'Register' link in the 'Don't have an account? Register' text",
+          "test_data": ""
+        }
+      ],
+      "title": "Register link navigates to registration screen"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Need Help?' opens a help or support page",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "A help/support page or contact form is displayed",
+          "step": "Tap the 'Need Help?' link",
+          "test_data": ""
+        }
+      ],
+      "title": "Need Help link opens support or help content"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Change language' allows the user to select a different app language",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "A language selection screen or dropdown is displayed",
+          "step": "Tap the 'Change language' link",
+          "test_data": ""
+        }
+      ],
+      "title": "Change language link opens language selection"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Privacy Policy' in the footer opens the privacy policy document",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "The Privacy Policy page or document is displayed",
+          "step": "Tap the 'Privacy Policy' link at the bottom of the screen",
+          "test_data": ""
+        }
+      ],
+      "title": "Privacy Policy link opens privacy policy content"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Terms of Use' in the footer opens the terms of use document",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "The Terms of Use page or document is displayed",
+          "step": "Tap the 'Terms of Use' link at the bottom of the screen",
+          "test_data": ""
+        }
+      ],
+      "title": "Terms of Use link opens terms content"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that an email containing unsupported special characters is rejected",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "Text is entered in the field",
+          "step": "Tap the Email field and enter an email with special characters",
+          "test_data": "user!!@@##$$.com"
+        },
+        {
+          "expected_result": "Email field shows 'Please enter a valid email id' error",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Email field with special characters shows validation error"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that emails with surrounding whitespace are either trimmed and accepted or rejected gracefully",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "Text is entered in the field",
+          "step": "Tap the Email field and enter an email with spaces around it",
+          "test_data": "testuser@example.com"
+        },
+        {
+          "expected_result": "App either trims spaces and processes login, or shows a validation error",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Email field with leading and trailing spaces"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify the app handles a very long email string without crashing",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "App either accepts or shows a validation error without crashing",
+          "step": "Tap the Email field and enter a very long email address",
+          "test_data": "averylongemailaddressthatexceedsnormallimits1234567890@averylongdomainnamethatisunusual.com"
+        },
+        {
+          "expected_result": "App displays an appropriate error or processes the request without freezing",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Very long email address input"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that a password consisting only of spaces is rejected or handled appropriately",
+      "precondition": "User is on the Habitnu login screen",
+      "steps": [
+        {
+          "expected_result": "Email is accepted",
+          "step": "Enter a valid email",
+          "test_data": "testuser@example.com"
+        },
+        {
+          "expected_result": "Spaces are entered in the password field",
+          "step": "Tap the Password field and enter only spaces",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App shows an error about invalid or missing password",
+          "step": "Tap the Sign in button",
+          "test_data": ""
+        }
+      ],
+      "title": "Password with only spaces"
+    }
+  ]
+}
