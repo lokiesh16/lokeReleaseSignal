@@ -608,6 +608,18 @@
 
   .empty-hint { color: var(--paper-dim); font-size: 13px; text-align: center; padding: 20px 0; }
 
+  /* Generate Manual Test Cases' table - Name/Objective/Precondition are
+     rowspan'd across every step row of their own case (one real HTML
+     table row per step) rather than repeated in each row, so the table
+     itself shows which rows belong to the same case without extra
+     styling; the CSV export still repeats them per row since a flat CSV
+     has no merged-cell concept. */
+  .mtc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .mtc-table th, .mtc-table td { border: 1px solid var(--ink-line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  .mtc-table th { background: var(--ink); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--paper-dim); font-weight: 700; }
+  .mtc-table tr.mtc-case-start td { border-top: 2px solid var(--paper-dim); }
+  .mtc-table .mtc-remove-btn { padding: 3px 8px; font-size: 10.5px; background: var(--ink-line); color: var(--paper); white-space: nowrap; }
+
   /* Casual-visitor deterrent, not real security - a passcode hash sitting
      in this page's own source can always be read by whoever opens dev
      tools, so anyone determined can get past this. What it DOES stop is
@@ -1565,6 +1577,7 @@
           <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
             <input id="mtcSaveName" placeholder="Name this test case set, e.g. weight_widget_manual_cases" style="flex:1; min-width:200px;">
             <button class="copy" id="mtcSaveBtn" style="flex-shrink:0;">Save set</button>
+            <button class="copy" id="mtcDownloadCsvBtn" style="background:var(--ink-line); color:var(--paper); flex-shrink:0;">Download (.csv)</button>
             <button class="copy" id="mtcDownloadBtn" style="background:var(--ink-line); color:var(--paper); flex-shrink:0;">Download (.md)</button>
           </div>
           <div id="mtcSaveStatus" style="font-size:12px; margin-top:6px;"></div>
@@ -6924,7 +6937,7 @@ ${lines}
   // ---------- Generate Manual Test Cases (uses the Test Builder's
   // own connected session - lsSessionId - rather than managing its own
   // separate connect/disconnect flow) ----------
-  let mtcCases = []; // {title, category, steps: string[], expected}
+  let mtcCases = []; // {title, category, objective, precondition, steps: {step, test_data, expected_result}[]}
   // One entry per tap, in order - {x, y, screenshot_b64}, where
   // screenshot_b64 is what was ON SCREEN right before that tap (i.e. what
   // the human was looking at when they chose to tap here). Manual test
@@ -7097,24 +7110,51 @@ ${lines}
     const countEl = document.getElementById('mtcCount');
     card.style.display = mtcCases.length ? 'block' : 'none';
     countEl.textContent = `${mtcCases.length} case(s)`;
-    listEl.innerHTML = mtcCases.map((c, i) => {
+
+    const rows = [];
+    mtcCases.forEach((c, i) => {
       const meta = MTC_CATEGORY_META[c.category] || MTC_CATEGORY_META.happy_path;
-      return `
-      <div style="border:1px solid var(--ink-line); border-radius:8px; padding:12px 14px; margin-bottom:10px; background:var(--ink);">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
-          <div style="min-width:0;">
-            <span class="status-badge" style="background:${meta.color}; color:#0A0D13; font-size:9.5px;">${escapeHtml(meta.label)}</span>
-            <span style="font-weight:700; font-size:13px; margin-left:6px;">${escapeHtml(c.title)}</span>
-          </div>
-          <button class="copy mtc-remove-btn" data-index="${i}" style="padding:4px 8px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Remove</button>
-        </div>
-        ${c.steps && c.steps.length ? `
-        <ol style="margin:8px 0 0; padding-left:20px; font-size:12px;">
-          ${c.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
-        </ol>` : ''}
-        ${c.expected ? `<div style="margin-top:6px; font-size:12px;"><b>Expected:</b> ${escapeHtml(c.expected)}</div>` : ''}
+      // Always at least one row per case, even with zero steps, so the
+      // case itself (name/objective/precondition) never silently
+      // disappears just because the LLM gave it no steps yet.
+      const steps = (c.steps && c.steps.length) ? c.steps : [{step: '', test_data: '', expected_result: ''}];
+      steps.forEach((s, si) => {
+        const first = si === 0;
+        rows.push(`
+        <tr class="${first ? 'mtc-case-start' : ''}">
+          ${first ? `
+          <td rowspan="${steps.length}">
+            <span class="status-badge" style="background:${meta.color}; color:#0A0D13; font-size:9px; margin-bottom:4px; display:inline-block;">${escapeHtml(meta.label)}</span>
+            <div style="font-weight:700;">${escapeHtml(c.title)}</div>
+          </td>
+          <td rowspan="${steps.length}">${escapeHtml(c.objective || '')}</td>
+          <td rowspan="${steps.length}">${escapeHtml(c.precondition || '')}</td>` : ''}
+          <td>${escapeHtml(s.step || '')}</td>
+          <td>${escapeHtml(s.test_data || '')}</td>
+          <td>${escapeHtml(s.expected_result || '')}</td>
+          ${first ? `<td rowspan="${steps.length}"><button class="copy mtc-remove-btn" data-index="${i}">Remove</button></td>` : ''}
+        </tr>`);
+      });
+    });
+
+    listEl.innerHTML = `
+      <div style="overflow-x:auto;">
+        <table class="mtc-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Objective</th>
+              <th>Precondition</th>
+              <th>Test Script (Step-by-Step) — Step</th>
+              <th>Test Script (Step-by-Step) — Test Data</th>
+              <th>Test Script (Step-by-Step) — Expected Result</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>${rows.join('')}</tbody>
+        </table>
       </div>`;
-    }).join('');
+
     listEl.querySelectorAll('.mtc-remove-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         mtcCases.splice(Number(btn.dataset.index), 1);
@@ -7151,8 +7191,14 @@ ${lines}
     mtcCases.forEach((c, i) => {
       const meta = MTC_CATEGORY_META[c.category] || MTC_CATEGORY_META.happy_path;
       md += `## ${i + 1}. ${c.title} (${meta.label})\n\n`;
-      (c.steps || []).forEach((s, si) => { md += `${si + 1}. ${s}\n`; });
-      if (c.expected) md += `\n**Expected:** ${c.expected}\n`;
+      if (c.objective) md += `**Objective:** ${c.objective}\n\n`;
+      if (c.precondition) md += `**Precondition:** ${c.precondition}\n\n`;
+      (c.steps || []).forEach((s, si) => {
+        md += `${si + 1}. ${s.step}`;
+        if (s.test_data) md += ` _(test data: ${s.test_data})_`;
+        md += '\n';
+        if (s.expected_result) md += `   → **Expected:** ${s.expected_result}\n`;
+      });
       md += '\n';
     });
     const blob = new Blob([md], {type: 'text/markdown'});
@@ -7160,6 +7206,44 @@ ${lines}
     const a = document.createElement('a');
     a.href = url;
     a.download = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) + '.md';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('mtcDownloadCsvBtn').addEventListener('click', () => {
+    if (!mtcCases.length) return;
+    const name = document.getElementById('mtcSaveName').value.trim() || 'manual_test_cases';
+    const headers = [
+      'Name', 'Objective', 'Precondition',
+      'Test Script (Step-by-Step) — Step',
+      'Test Script (Step-by-Step) — Test Data',
+      'Test Script (Step-by-Step) — Expected Result',
+    ];
+    const csvEscape = (v) => {
+      const s = String(v == null ? '' : v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const lines = [headers.map(csvEscape).join(',')];
+    mtcCases.forEach(c => {
+      // Same "at least one row per case" rule as the on-screen table -
+      // Name/Objective/Precondition get repeated on every row here since
+      // a flat CSV has no merged-cell concept to lean on instead.
+      const steps = (c.steps && c.steps.length) ? c.steps : [{step: '', test_data: '', expected_result: ''}];
+      steps.forEach(s => {
+        lines.push([c.title, c.objective || '', c.precondition || '', s.step || '', s.test_data || '', s.expected_result || '']
+          .map(csvEscape).join(','));
+      });
+    });
+    // Leading BOM so Excel (which otherwise guesses the system codepage,
+    // not UTF-8) renders the em dashes in the headers correctly instead
+    // of as mangled bytes - Sheets/Numbers/a plain text editor ignore it.
+    const blob = new Blob(['﻿' + lines.join('\r\n')], {type: 'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) + '.csv';
     document.body.appendChild(a);
     a.click();
     a.remove();
