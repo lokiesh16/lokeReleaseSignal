@@ -1,0 +1,232 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>democase - Manual Test Cases</title>
+<style>
+  :root { --ink-line: #E3E5EA; --paper: #171A21; --paper-dim: #6B7280; --ink: #F1F2F5; --ink-raised: #FFFFFF; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 28px 32px 60px;
+         background: var(--ink); color: var(--paper); }
+  h1 { font-size: 21px; margin: 0 0 6px; }
+  .meta { color: var(--paper-dim); font-size: 12.5px; margin-bottom: 4px; }
+  .meta-line { font-size: 13px; margin: 4px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 20px; background: var(--ink-raised);
+          box-shadow: 0 1px 2px rgba(16,20,28,0.04), 0 4px 16px rgba(16,20,28,0.05); border-radius: 10px; overflow: hidden; }
+  th, td { border: 1px solid var(--ink-line); padding: 10px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--ink); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--paper-dim); }
+  tr.case-start td { border-top: 2px solid var(--paper-dim); }
+  .case-name { font-weight: 700; margin-top: 4px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; color: #fff; }
+  .exec-comment { font-size: 12px; color: var(--paper-dim); margin-top: 6px; }
+</style></head>
+<body>
+  <h1>democase</h1>
+  <div class="meta">Generated manual test cases &middot; 18 case(s)</div>
+  <p class="meta-line"><b>Module/Feature:</b> Login</p>
+  
+  <table>
+    <thead><tr>
+      <th>Name</th><th>Objective</th><th>Precondition</th>
+      <th>Test Script (Step-by-Step) — Step</th>
+      <th>Test Script (Step-by-Step) — Test Data</th>
+      <th>Test Script (Step-by-Step) — Expected Result</th>
+      <th>Test Execution</th>
+    </tr></thead>
+    <tbody><tr class="case-start">
+                  <td rowspan="5"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Successful sign in with valid credentials</div></td>
+                  <td rowspan="5">Verify that a user can log in successfully with a valid registered email and password</td>
+                  <td rowspan="5">User has a registered account and is on the Habitnu login screen</td>
+              <td>Tap the Email field</td>
+              <td></td>
+              <td>Email field is focused and keyboard appears</td>
+                  <td rowspan="5"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="">
+              <td>Enter a valid registered email address</td>
+              <td>testuser@example.com</td>
+              <td>Email is entered and no error message is shown</td></tr><tr class="">
+              <td>Tap the Password field</td>
+              <td></td>
+              <td>Password field is focused</td></tr><tr class="">
+              <td>Enter the correct password</td>
+              <td>Password123!</td>
+              <td>Password is entered as masked characters</td></tr><tr class="">
+              <td>Tap the Sign in button</td>
+              <td></td>
+              <td>User is navigated to the home/dashboard screen</td></tr><tr class="case-start">
+                  <td rowspan="2"><span class="badge" style="background:#DC2626">Negative</span>
+                    <div class="case-name">Error shown when email field is empty on sign in</div></td>
+                  <td rowspan="2">Verify that submitting with an empty email field triggers the &#x27;Please enter a valid email id&#x27; error</td>
+                  <td rowspan="2">User is on the Habitnu login screen</td>
+              <td>Leave the Email field empty</td>
+              <td></td>
+              <td>Email field remains empty</td>
+                  <td rowspan="2"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="">
+              <td>Tap the Sign in button</td>
+              <td></td>
+              <td>Email field is highlighted in red with the message &#x27;Please enter a valid email id&#x27;</td></tr><tr class="case-start">
+                  <td rowspan="2"><span class="badge" style="background:#DC2626">Negative</span>
+                    <div class="case-name">Invalid email format shows validation error</div></td>
+                  <td rowspan="2">Verify that entering an email without proper format triggers the email validation error</td>
+                  <td rowspan="2">User is on the Habitnu login screen</td>
+              <td>Tap the Email field and enter an invalid email</td>
+              <td>invalidemail</td>
+              <td>Text is entered in the field</td>
+                  <td rowspan="2"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="">
+              <td>Tap the Sign in button</td>
+              <td></td>
+              <td>Email field is highlighted in red with &#x27;Please enter a valid email id&#x27; error message</td></tr><tr class="case-start">
+                  <td rowspan="2"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Invalid email with missing domain shows error</div></td>
+                  <td rowspan="2">Verify that an email missing the domain part (e.g. user@) is rejected with a validation error</td>
+                  <td rowspan="2">User is on the Habitnu login screen</td>
+              <td>Tap the Email field and enter a partial email</td>
+              <td>user@</td>
+              <td>Text is entered in the field</td>
+                  <td rowspan="2"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="">
+              <td>Tap the Sign in button</td>
+              <td></td>
+              <td>Email field shows &#x27;Please enter a valid email id&#x27; error</td></tr><tr class="case-start">
+                  <td rowspan="3"><span class="badge" style="background:#DC2626">Negative</span>
+                    <div class="case-name">Sign in with valid email but wrong password</div></td>
+                  <td rowspan="3">Verify that entering a correct email but incorrect password shows an authentication error</td>
+                  <td rowspan="3">User is on the Habitnu login screen</td>
+              <td>Enter a valid registered email</td>
+              <td>testuser@example.com</td>
+              <td>Email is accepted with no error</td>
+                  <td rowspan="3"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="">
+              <td>Enter an incorrect password</td>
+              <td>WrongPass999</td>
+              <td>Password is entered as masked characters</td></tr><tr class="">
+              <td>Tap the Sign in button</td>
+              <td></td>
+              <td>An error message is displayed indicating invalid credentials</td></tr><tr class="case-start">
+                  <td rowspan="3"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Password visibility toggle shows and hides password</div></td>
+                  <td rowspan="3">Verify that tapping the eye icon in the password field toggles the password visibility</td>
+                  <td rowspan="3">User is on the Habitnu login screen</td>
+              <td>Tap the Password field and enter a password</td>
+              <td>Password123!</td>
+              <td>Password is displayed as masked dots</td>
+                  <td rowspan="3"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="">
+              <td>Tap the eye/visibility icon on the right of the password field</td>
+              <td></td>
+              <td>Password text becomes visible in plain text</td></tr><tr class="">
+              <td>Tap the eye/visibility icon again</td>
+              <td></td>
+              <td>Password is masked again</td></tr><tr class="case-start">
+                  <td rowspan="3"><span class="badge" style="background:#DC2626">Negative</span>
+                    <div class="case-name">Sign in with empty password field</div></td>
+                  <td rowspan="3">Verify that submitting with a valid email but empty password triggers an appropriate error</td>
+                  <td rowspan="3">User is on the Habitnu login screen</td>
+              <td>Enter a valid email in the Email field</td>
+              <td>testuser@example.com</td>
+              <td>Email is entered without error</td>
+                  <td rowspan="3"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="">
+              <td>Leave the Password field empty</td>
+              <td></td>
+              <td>Password field remains empty</td></tr><tr class="">
+              <td>Tap the Sign in button</td>
+              <td></td>
+              <td>An error or validation message appears prompting the user to enter a password</td></tr><tr class="case-start">
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Forgot password link navigates to password reset screen</div></td>
+                  <td rowspan="1">Verify that tapping &#x27;Forgot password?&#x27; navigates the user to the password reset flow</td>
+                  <td rowspan="1">User is on the Habitnu login screen</td>
+              <td>Tap the &#x27;Forgot password?&#x27; link</td>
+              <td></td>
+              <td>User is navigated to the forgot/reset password screen</td>
+                  <td rowspan="1"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="case-start">
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Sign in with Code button navigates to code-based login</div></td>
+                  <td rowspan="1">Verify that tapping &#x27;Sign in with Code&#x27; takes the user to the code-based authentication screen</td>
+                  <td rowspan="1">User is on the Habitnu login screen</td>
+              <td>Tap the &#x27;Sign in with Code&#x27; button</td>
+              <td></td>
+              <td>User is navigated to the sign-in with code screen</td>
+                  <td rowspan="1"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="case-start">
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Register link navigates to registration screen</div></td>
+                  <td rowspan="1">Verify that tapping the &#x27;Register&#x27; link takes a new user to the account registration screen</td>
+                  <td rowspan="1">User is on the Habitnu login screen</td>
+              <td>Tap the &#x27;Register&#x27; link in the &#x27;Don&#x27;t have an account? Register&#x27; text</td>
+              <td></td>
+              <td>User is navigated to the registration screen</td>
+                  <td rowspan="1"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="case-start">
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Need Help link opens support or help content</div></td>
+                  <td rowspan="1">Verify that tapping &#x27;Need Help?&#x27; opens a help or support page</td>
+                  <td rowspan="1">User is on the Habitnu login screen</td>
+              <td>Tap the &#x27;Need Help?&#x27; link</td>
+              <td></td>
+              <td>A help/support page or contact form is displayed</td>
+                  <td rowspan="1"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="case-start">
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Change language link opens language selection</div></td>
+                  <td rowspan="1">Verify that tapping &#x27;Change language&#x27; allows the user to select a different app language</td>
+                  <td rowspan="1">User is on the Habitnu login screen</td>
+              <td>Tap the &#x27;Change language&#x27; link</td>
+              <td></td>
+              <td>A language selection screen or dropdown is displayed</td>
+                  <td rowspan="1"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="case-start">
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Privacy Policy link opens privacy policy content</div></td>
+                  <td rowspan="1">Verify that tapping &#x27;Privacy Policy&#x27; in the footer opens the privacy policy document</td>
+                  <td rowspan="1">User is on the Habitnu login screen</td>
+              <td>Tap the &#x27;Privacy Policy&#x27; link at the bottom of the screen</td>
+              <td></td>
+              <td>The Privacy Policy page or document is displayed</td>
+                  <td rowspan="1"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="case-start">
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Terms of Use link opens terms content</div></td>
+                  <td rowspan="1">Verify that tapping &#x27;Terms of Use&#x27; in the footer opens the terms of use document</td>
+                  <td rowspan="1">User is on the Habitnu login screen</td>
+              <td>Tap the &#x27;Terms of Use&#x27; link at the bottom of the screen</td>
+              <td></td>
+              <td>The Terms of Use page or document is displayed</td>
+                  <td rowspan="1"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="case-start">
+                  <td rowspan="2"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Email field with special characters shows validation error</div></td>
+                  <td rowspan="2">Verify that an email containing unsupported special characters is rejected</td>
+                  <td rowspan="2">User is on the Habitnu login screen</td>
+              <td>Tap the Email field and enter an email with special characters</td>
+              <td>user!!@@##$$.com</td>
+              <td>Text is entered in the field</td>
+                  <td rowspan="2"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="">
+              <td>Tap the Sign in button</td>
+              <td></td>
+              <td>Email field shows &#x27;Please enter a valid email id&#x27; error</td></tr><tr class="case-start">
+                  <td rowspan="2"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Email field with leading and trailing spaces</div></td>
+                  <td rowspan="2">Verify that emails with surrounding whitespace are either trimmed and accepted or rejected gracefully</td>
+                  <td rowspan="2">User is on the Habitnu login screen</td>
+              <td>Tap the Email field and enter an email with spaces around it</td>
+              <td>testuser@example.com</td>
+              <td>Text is entered in the field</td>
+                  <td rowspan="2"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="">
+              <td>Tap the Sign in button</td>
+              <td></td>
+              <td>App either trims spaces and processes login, or shows a validation error</td></tr><tr class="case-start">
+                  <td rowspan="2"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Very long email address input</div></td>
+                  <td rowspan="2">Verify the app handles a very long email string without crashing</td>
+                  <td rowspan="2">User is on the Habitnu login screen</td>
+              <td>Tap the Email field and enter a very long email address</td>
+              <td>averylongemailaddressthatexceedsnormallimits1234567890@averylongdomainnamethatisunusual.com</td>
+              <td>App either accepts or shows a validation error without crashing</td>
+                  <td rowspan="2"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="">
+              <td>Tap the Sign in button</td>
+              <td></td>
+              <td>App displays an appropriate error or processes the request without freezing</td></tr><tr class="case-start">
+                  <td rowspan="3"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Password with only spaces</div></td>
+                  <td rowspan="3">Verify that a password consisting only of spaces is rejected or handled appropriately</td>
+                  <td rowspan="3">User is on the Habitnu login screen</td>
+              <td>Enter a valid email</td>
+              <td>testuser@example.com</td>
+              <td>Email is accepted</td>
+                  <td rowspan="3"><span class="badge" style="background:#6B7280">Not run</span></td></tr><tr class="">
+              <td>Tap the Password field and enter only spaces</td>
+              <td></td>
+              <td>Spaces are entered in the password field</td></tr><tr class="">
+              <td>Tap the Sign in button</td>
+              <td></td>
+              <td>App shows an error about invalid or missing password</td></tr></tbody>
+  </table>
+</body></html>
