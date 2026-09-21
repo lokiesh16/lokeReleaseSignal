@@ -1615,6 +1615,16 @@
             <button class="copy" id="mtcDownloadBtn" style="background:var(--ink-line); color:var(--paper); flex-shrink:0;">Download (.md)</button>
           </div>
           <div id="mtcSaveStatus" style="font-size:12px; margin-top:6px;"></div>
+
+          <div style="border-top:1px solid var(--ink-line); margin-top:14px; padding-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <input id="mtcModuleName" placeholder="Feature/Module these belong to, e.g. Weight Widget" style="flex:1; min-width:200px;">
+            <button class="copy" id="mtcPushGithubBtn" style="flex-shrink:0;">Push to GitHub</button>
+          </div>
+          <div class="hint" style="font-size:11px; margin-top:5px;">
+            Uses <b>Name this test case set</b> above as the filename, filed under this feature/module - pushes the
+            raw data plus a standalone shareable report page.
+          </div>
+          <div id="mtcPushStatus" style="font-size:12px; margin-top:6px;"></div>
         </div>
       </div>
 
@@ -7336,6 +7346,37 @@ ${lines}
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('mtcPushGithubBtn').addEventListener('click', async () => {
+    const statusEl = document.getElementById('mtcPushStatus');
+    const module = document.getElementById('mtcModuleName').value.trim();
+    const name = document.getElementById('mtcSaveName').value.trim();
+    if (!mtcCases.length) { statusEl.innerHTML = `<span style="color:var(--alert);">No test cases to push yet.</span>`; return; }
+    if (!module) { statusEl.innerHTML = `<span style="color:var(--alert);">Give the feature/module these belong to first.</span>`; return; }
+    if (!name) { statusEl.innerHTML = `<span style="color:var(--alert);">Name this test case set first (above).</span>`; return; }
+
+    const btn = document.getElementById('mtcPushGithubBtn');
+    btn.disabled = true;
+    btn.textContent = 'Pushing…';
+    statusEl.textContent = '';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/manual-test-cases/push-github', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({module, name, context: document.getElementById('mtcContext').value.trim(), cases: mtcCases}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to push to GitHub');
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Pushed.</span> `
+        + `<a href="${escapeHtml(data.html_url)}" target="_blank" rel="noopener">View/share report</a>`
+        + ` &middot; <a href="${escapeHtml(data.json_url)}" target="_blank" rel="noopener">Raw data</a>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Push to GitHub';
+    }
   });
 </script>
 </body>
