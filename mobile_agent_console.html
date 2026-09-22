@@ -3338,6 +3338,13 @@ ${containerEl.innerHTML}
         <input type="text" class="flow-bundle-id" data-slug="${escapeHtml(f.slug)}" value="${escapeHtml(f.bundle_id || '')}" placeholder="or type a custom bundle/package id" style="width:auto; flex:1 1 220px; min-width:160px; font-size:11px; padding:3px 6px;">
       </div>
 
+      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px; font-size:11px;" title="Optional - replays a saved precondition (e.g. login) deterministically, on the same app session, right before this flow's own steps. Aborts before this flow starts if the precondition itself fails.">
+        <span class="hint" style="font-size:11px; flex-shrink:0;">Start from:</span>
+        <select class="flow-precondition" data-slug="${escapeHtml(f.slug)}" data-platform="${escapeHtml(f.platform)}" style="width:auto; flex:1 1 200px; font-size:11px; padding:3px 6px;">
+          ${renderFlowPreconditionOptions(f.platform)}
+        </select>
+      </div>
+
       <div class="hint flow-gen-tests-status" data-gen-status-for="${escapeHtml(f.slug)}" style="font-size:11.5px; margin-top:8px;"></div>
 
       <div style="margin-top:16px;">
@@ -3729,6 +3736,12 @@ ${containerEl.innerHTML}
       const bundleIdInput = document.querySelector(`.flow-bundle-id[data-slug="${CSS.escape(slug)}"]`);
       const bundleIdValue = bundleIdInput ? bundleIdInput.value.trim() : '';
 
+      // Optional - replays a saved precondition (e.g. login) on the same
+      // app session before this flow's own steps run. Blank means "just
+      // this flow's own steps", exactly as it's always worked.
+      const preconditionSelect = document.querySelector(`.flow-precondition[data-slug="${CSS.escape(slug)}"]`);
+      const preconditionValue = preconditionSelect ? preconditionSelect.value : '';
+
       let runId;
       try {
         const res = await fetch(BRIDGE_URL + '/api/flows/' + encodeURIComponent(slug) + '/run', {
@@ -3739,6 +3752,7 @@ ${containerEl.innerHTML}
             email: emailInput ? emailInput.value : undefined,
             password: passwordInput ? passwordInput.value : undefined,
             appium: bundleIdValue ? {bundle_id: bundleIdValue} : undefined,
+            precondition: preconditionValue || undefined,
           }),
         });
         const data = await res.json();
@@ -4227,6 +4241,28 @@ ${containerEl.innerHTML}
   // offering an Android one while running on iOS would just replay the
   // wrong locators against this run's app instead of anything useful.
   let lastLoadedPreconditions = [];
+  // Shared by the Run tab's single #rPrecondition select AND every Saved
+  // Flows card's own "Start from" select (there's one per flow, not one
+  // global) - same filter-by-platform logic either way, just returning a
+  // string instead of writing straight into one specific element.
+  function renderFlowPreconditionOptions(platform, selectedSlug) {
+    const options = ['<option value="">None — just this flow\'s own steps</option>'];
+    for (const p of lastLoadedPreconditions.filter(p => p.platform === platform)) {
+      options.push(`<option value="${escapeHtml(p.slug)}" ${p.slug === selectedSlug ? 'selected' : ''}>${escapeHtml(p.name)} (${p.step_count} step(s))</option>`);
+    }
+    return options.join('');
+  }
+  // loadSavedFlows() and loadPreconditions() both fire at page load and race
+  // each other over the network - if flow cards render first, their "Start
+  // from" selects would otherwise be stuck showing only "None" forever once
+  // lastLoadedPreconditions fills in afterward. Re-populating here (instead
+  // of a full loadSavedFlows() re-fetch) keeps whatever a human already
+  // picked intact.
+  function refreshFlowPreconditionSelects() {
+    document.querySelectorAll('.flow-precondition').forEach(select => {
+      select.innerHTML = renderFlowPreconditionOptions(select.dataset.platform, select.value);
+    });
+  }
   function renderPreconditionOptions() {
     const select = document.getElementById('rPrecondition');
     const previousValue = select.value;
@@ -4247,6 +4283,7 @@ ${containerEl.innerHTML}
       if (!res.ok) throw new Error(data.error || 'failed to load preconditions');
       lastLoadedPreconditions = data.preconditions || [];
       renderPreconditionOptions();
+      refreshFlowPreconditionSelects();
     } catch (e) {
       // Non-fatal - the dropdown just keeps its default "None" option if the
       // bridge server isn't reachable yet (same posture as loadSavedFlows).
