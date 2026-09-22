@@ -1,0 +1,48 @@
+{
+  "name": "HealthExercise",
+  "module": "Health",
+  "context": "",
+  "created_at": "2026-09-22T07:57:50Z",
+  "cases": [
+    {
+      "title": "Explore Health > Execrcise",
+      "category": "happy_path",
+      "objective": "Explore Health > Execrcise",
+      "precondition": "",
+      "steps": [
+        {
+          "step": "Tap the Health tab in the bottom navigation bar.",
+          "test_data": "",
+          "expected_result": "The Health screen is displayed with exercise-related options visible."
+        },
+        {
+          "step": "Tap on the Exercise card in the Health screen to explore the Exercise section.",
+          "test_data": "",
+          "expected_result": "The Exercise detail screen or expanded view is displayed."
+        },
+        {
+          "step": "Tap on the Exercise section in the Health tab to explore its functionality.",
+          "test_data": "",
+          "expected_result": "The Exercise section opens, showing exercise tracking options or a detail screen for adding/viewing exercise data."
+        },
+        {
+          "step": "Enter 5000 steps in the Steps field and tap Save to log an exercise entry.",
+          "test_data": "",
+          "expected_result": "The exercise entry is saved and the Add Exercise dialog closes or confirms the save."
+        },
+        {
+          "step": "Tap on the Exercise section in the Health tab to explore its functionality.",
+          "test_data": "",
+          "expected_result": "The Exercise section opens, showing exercise tracking options or a detail screen for adding/viewing exercise data."
+        },
+        {
+          "step": "Verify that the Exercise entry is visible on the Health screen after being added.",
+          "test_data": "",
+          "expected_result": "The Exercise card shows '42.5 min' with a timestamp, confirming the entry was saved successfully."
+        }
+      ],
+      "execution_status": "pass",
+      "execution_comment": "pass: Successfully explored Health > Exercise. An exercise entry of 42.5 min was added and is now visible on the Health screen with the label 'Exercise 42.5 min Target: Not Set 01:21 PM'."
+    }
+  ]
+}
