@@ -3515,12 +3515,30 @@ ${containerEl.innerHTML}
   // has a third source, 'generate' (AI-written from a CSV + description),
   // which the browse endpoints know nothing about - handled separately in
   // renderScriptPicker.
-  const setupScriptBrowseState = {}; // "target:slug" -> {source: 'local'|'github'|'generate', path: string}
+  const setupScriptBrowseState = {}; // "target:slug" -> {source: <root key>|'github'|'generate', path: string}
   const scriptStateKey = (target, slug) => `${target}:${slug}`;
 
+  // One entry per browsable local project - always at least "primary"
+  // (PYTEST_PROJECT_ROOT), plus whatever SCRIPT_LIBRARY_<N>_PATH configures
+  // in .env (see server.py's _script_library_roots). Loaded once at page
+  // load, same pattern as loadPreconditions() - a "source" value that
+  // isn't "github"/"generate" is one of these roots' own key.
+  let lsScriptLibraryRoots = [{key: 'primary', label: 'Local project'}];
+  async function loadScriptLibraryRoots() {
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/setup-scripts/local-roots');
+      const data = await res.json();
+      if (res.ok && data.roots && data.roots.length) lsScriptLibraryRoots = data.roots;
+    } catch (e) {
+      // Non-fatal - keeps just the default "primary" root if the bridge
+      // server isn't reachable yet (same posture as loadSavedFlows).
+    }
+  }
+  loadScriptLibraryRoots();
+
   function setupScriptListUrl(source, path) {
-    const endpoint = source === 'github' ? '/api/setup-scripts/github' : '/api/setup-scripts/local';
-    return BRIDGE_URL + endpoint + '?path=' + encodeURIComponent(path || '');
+    if (source === 'github') return BRIDGE_URL + '/api/setup-scripts/github?path=' + encodeURIComponent(path || '');
+    return BRIDGE_URL + '/api/setup-scripts/local?root=' + encodeURIComponent(source) + '&path=' + encodeURIComponent(path || '');
   }
 
   async function loadSetupScriptDir(target, slug) {
@@ -3589,7 +3607,7 @@ ${containerEl.innerHTML}
   function renderScriptPicker(target, slug) {
     const key = scriptStateKey(target, slug);
     const container = document.querySelector(`.flow-setup-script-picker[data-slug="${CSS.escape(slug)}"][data-target="${target}"]`);
-    const state = setupScriptBrowseState[key] || (setupScriptBrowseState[key] = {source: 'local', path: ''});
+    const state = setupScriptBrowseState[key] || (setupScriptBrowseState[key] = {source: 'primary', path: ''});
 
     const sourceBtn = (source, label) => `
       <button class="copy setup-script-source-btn" data-slug="${escapeHtml(slug)}" data-target="${target}" data-source="${source}"
@@ -3597,7 +3615,7 @@ ${containerEl.innerHTML}
 
     container.innerHTML = `
       <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
-        ${sourceBtn('local', 'Local project')}
+        ${lsScriptLibraryRoots.map(r => sourceBtn(r.key, escapeHtml(r.label))).join('')}
         ${sourceBtn('github', 'GitHub (automation repo)')}
         ${target === 'api' ? sourceBtn('generate', 'Generate with AI') : ''}
       </div>
@@ -3693,7 +3711,7 @@ ${containerEl.innerHTML}
       const slug = setupSourceBtn.dataset.slug;
       const target = setupSourceBtn.dataset.target;
       const key = scriptStateKey(target, slug);
-      const state = setupScriptBrowseState[key] || (setupScriptBrowseState[key] = {source: 'local', path: ''});
+      const state = setupScriptBrowseState[key] || (setupScriptBrowseState[key] = {source: 'primary', path: ''});
       state.source = setupSourceBtn.dataset.source;
       state.path = '';
       renderScriptPicker(target, slug);
@@ -3716,13 +3734,24 @@ ${containerEl.innerHTML}
       if (setupEntry.dataset.type === 'dir') {
         state.path = setupEntry.dataset.path;
         await loadSetupScriptDir(target, slug);
-      } else if (slug === '__draft__') {
-        // Fresh flow, not saved yet - nothing to PUT to. Stashed locally
-        // and attached once "Save as flow" actually creates the flow (see
-        // saveCapturedSteps / lsDraftScriptFields).
-        lsSetDraftScript(target, {source: state.source, path: setupEntry.dataset.path});
       } else {
-        await saveFlowScript(target, slug, state.source, setupEntry.dataset.path);
+        // state.source is a BROWSE-time value (which tab: 'github', or one
+        // of lsScriptLibraryRoots' own keys, e.g. 'primary'/'root2') - the
+        // SAVE-time contract only ever knows 'local' vs 'github' (see
+        // set_flow_setup_script_route/_script_field_from_payload). Any
+        // non-github root already gets a path that's correctly resolvable
+        // as-is (root-relative for "primary", absolute for any other root
+        // - see list_local_setup_scripts_route), so it's always "local"
+        // from here on, regardless of which root it actually came from.
+        const saveSource = state.source === 'github' ? 'github' : 'local';
+        if (slug === '__draft__') {
+          // Fresh flow, not saved yet - nothing to PUT to. Stashed locally
+          // and attached once "Save as flow" actually creates the flow
+          // (see saveCapturedSteps / lsDraftScriptFields).
+          lsSetDraftScript(target, {source: saveSource, path: setupEntry.dataset.path});
+        } else {
+          await saveFlowScript(target, slug, saveSource, setupEntry.dataset.path);
+        }
       }
       return;
     }
