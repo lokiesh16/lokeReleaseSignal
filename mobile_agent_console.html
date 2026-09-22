@@ -3344,6 +3344,11 @@ ${containerEl.innerHTML}
           ${renderFlowPreconditionOptions(f.platform)}
         </select>
       </div>
+      <div class="flow-precondition-login" data-slug="${escapeHtml(f.slug)}" style="display:none; gap:6px; align-items:center; flex-wrap:wrap; margin-top:6px; font-size:11px;" title="This precondition has its own single login step - override it for just this run. Not saved back to the precondition, so every other flow that starts from it is unaffected.">
+        <span class="hint" style="font-size:11px; flex-shrink:0;">Precondition login:</span>
+        <input type="text" class="flow-precondition-email" data-slug="${escapeHtml(f.slug)}" placeholder="email" style="width:auto; flex:1 1 200px; min-width:120px; font-size:11px; padding:3px 6px;">
+        <input type="password" class="flow-precondition-password" data-slug="${escapeHtml(f.slug)}" placeholder="password" style="width:auto; flex:1 1 130px; min-width:90px; font-size:11px; padding:3px 6px;">
+      </div>
 
       <div class="hint flow-gen-tests-status" data-gen-status-for="${escapeHtml(f.slug)}" style="font-size:11.5px; margin-top:8px;"></div>
 
@@ -3563,9 +3568,28 @@ ${containerEl.innerHTML}
 
   document.getElementById('savedFlowDetail').addEventListener('change', (e) => {
     const envSelect = e.target.closest('.flow-bundle-id-env');
-    if (!envSelect || !envSelect.value) return;
-    const input = document.querySelector(`.flow-bundle-id[data-slug="${CSS.escape(envSelect.dataset.slug)}"]`);
-    if (input) input.value = envSelect.value;
+    if (envSelect && envSelect.value) {
+      const input = document.querySelector(`.flow-bundle-id[data-slug="${CSS.escape(envSelect.dataset.slug)}"]`);
+      if (input) input.value = envSelect.value;
+    }
+
+    const preconditionSelect = e.target.closest('.flow-precondition');
+    if (preconditionSelect) {
+      const slug = preconditionSelect.dataset.slug;
+      const loginBlock = document.querySelector(`.flow-precondition-login[data-slug="${CSS.escape(slug)}"]`);
+      const emailInput = document.querySelector(`.flow-precondition-email[data-slug="${CSS.escape(slug)}"]`);
+      const passwordInput = document.querySelector(`.flow-precondition-password[data-slug="${CSS.escape(slug)}"]`);
+      const picked = lastLoadedPreconditions.find(p => p.slug === preconditionSelect.value);
+      // Only shown when the SELECTED precondition itself has a single
+      // unambiguous login step to override (see _find_single_login_steps) -
+      // "None" or a precondition with no/ambiguous login has nothing to show.
+      const hasLogin = picked && (picked.login_email !== null || picked.login_password !== null);
+      loginBlock.style.display = hasLogin ? 'flex' : 'none';
+      if (hasLogin) {
+        emailInput.value = picked.login_email || '';
+        passwordInput.value = picked.login_password || '';
+      }
+    }
   });
 
   document.getElementById('savedFlowDetail').addEventListener('click', async (e) => {
@@ -3742,6 +3766,14 @@ ${containerEl.innerHTML}
       const preconditionSelect = document.querySelector(`.flow-precondition[data-slug="${CSS.escape(slug)}"]`);
       const preconditionValue = preconditionSelect ? preconditionSelect.value : '';
 
+      // One-off for just this run (not saved back to the precondition -
+      // see server.py's _execute_replay) - only meaningful/visible when the
+      // selected precondition itself has a single login step to override.
+      const preconditionEmailInput = document.querySelector(`.flow-precondition-email[data-slug="${CSS.escape(slug)}"]`);
+      const preconditionPasswordInput = document.querySelector(`.flow-precondition-password[data-slug="${CSS.escape(slug)}"]`);
+      const preconditionLoginBlock = document.querySelector(`.flow-precondition-login[data-slug="${CSS.escape(slug)}"]`);
+      const preconditionLoginVisible = preconditionLoginBlock && preconditionLoginBlock.style.display !== 'none';
+
       let runId;
       try {
         const res = await fetch(BRIDGE_URL + '/api/flows/' + encodeURIComponent(slug) + '/run', {
@@ -3753,6 +3785,8 @@ ${containerEl.innerHTML}
             password: passwordInput ? passwordInput.value : undefined,
             appium: bundleIdValue ? {bundle_id: bundleIdValue} : undefined,
             precondition: preconditionValue || undefined,
+            precondition_email: preconditionLoginVisible && preconditionEmailInput ? preconditionEmailInput.value : undefined,
+            precondition_password: preconditionLoginVisible && preconditionPasswordInput ? preconditionPasswordInput.value : undefined,
           }),
         });
         const data = await res.json();
