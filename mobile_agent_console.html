@@ -1443,6 +1443,17 @@
           <button class="copy" id="lsCreateTestScriptBtn" style="display:none; flex-shrink:0; background:var(--ink-line); color:var(--paper);" title="Converts this same flow.json into a page object + pytest test class, written straight into your project">Create test script</button>
         </div>
         <div id="lsCapturedFlowStatus" style="font-size:12px; margin-top:6px;"></div>
+        <div class="ls-draft-script-block" data-target="setup" style="margin-top:10px; overflow-wrap:anywhere;">
+          <div class="ls-draft-script-summary" data-target="setup"></div>
+          <button class="copy flow-setup-script-toggle-btn" data-slug="__draft__" data-target="setup" style="display:block; margin-top:6px; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">Set setup script</button>
+          <div class="flow-setup-script-picker" data-slug="__draft__" data-target="setup" style="display:none; margin-top:8px; border:1px solid var(--ink-line); border-radius:8px; padding:10px;"></div>
+        </div>
+        <div class="ls-draft-script-block" data-target="api" style="margin-top:10px; overflow-wrap:anywhere;" title="Runs AFTER this flow's own steps finish - validates the backend/API state those steps should have produced.">
+          <div class="ls-draft-script-summary" data-target="api"></div>
+          <button class="copy flow-setup-script-toggle-btn" data-slug="__draft__" data-target="api" style="display:block; margin-top:6px; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">Set API validation script</button>
+          <div class="flow-setup-script-picker" data-slug="__draft__" data-target="api" style="display:none; margin-top:8px; border:1px solid var(--ink-line); border-radius:8px; padding:10px;"></div>
+        </div>
+        <div class="hint" style="font-size:11px; margin-top:6px;">Either script attaches when you hit "Save as flow" below — no need to save first.</div>
       </div>
       <div class="field full" style="margin-top:10px;">
         <label>Or save as a Precondition <span class="opt">e.g. "login" — pick it from "Start from" on future live runs</span></label>
@@ -3619,7 +3630,11 @@ ${containerEl.innerHTML}
     }
   }
 
-  document.getElementById('savedFlowDetail').addEventListener('change', (e) => {
+  // Shared between Saved Flows' detail view AND Test Builder's own "Save as
+  // flow" draft-script pickers (see lsSetDraftScript) - same setup/api
+  // script picking UI works in both places, this handler doesn't care
+  // which container it's attached to.
+  function flowScriptChangeHandler(e) {
     const envSelect = e.target.closest('.flow-bundle-id-env');
     if (envSelect && envSelect.value) {
       const input = document.querySelector(`.flow-bundle-id[data-slug="${CSS.escape(envSelect.dataset.slug)}"]`);
@@ -3643,9 +3658,11 @@ ${containerEl.innerHTML}
         passwordInput.value = picked.login_password || '';
       }
     }
-  });
+  }
+  document.getElementById('savedFlowDetail').addEventListener('change', flowScriptChangeHandler);
+  document.getElementById('panel-scraper').addEventListener('change', flowScriptChangeHandler);
 
-  document.getElementById('savedFlowDetail').addEventListener('click', async (e) => {
+  async function flowScriptClickHandler(e) {
     const runBtn = e.target.closest('.flow-run-btn');
     const editBtn = e.target.closest('.flow-edit-btn');
     const delBtn = e.target.closest('.flow-delete-btn');
@@ -3699,6 +3716,11 @@ ${containerEl.innerHTML}
       if (setupEntry.dataset.type === 'dir') {
         state.path = setupEntry.dataset.path;
         await loadSetupScriptDir(target, slug);
+      } else if (slug === '__draft__') {
+        // Fresh flow, not saved yet - nothing to PUT to. Stashed locally
+        // and attached once "Save as flow" actually creates the flow (see
+        // saveCapturedSteps / lsDraftScriptFields).
+        lsSetDraftScript(target, {source: state.source, path: setupEntry.dataset.path});
       } else {
         await saveFlowScript(target, slug, state.source, setupEntry.dataset.path);
       }
@@ -3743,7 +3765,12 @@ ${containerEl.innerHTML}
     if (apiScriptUseBtn) {
       const slug = apiScriptUseBtn.dataset.slug;
       const previewBlock = document.querySelector(`.api-script-preview-block[data-slug="${CSS.escape(slug)}"]`);
-      await saveFlowScript('api', slug, 'local', previewBlock.dataset.scriptPath);
+      if (slug === '__draft__') {
+        lsSetDraftScript('api', {source: 'local', path: previewBlock.dataset.scriptPath});
+        previewBlock.style.display = 'none';
+      } else {
+        await saveFlowScript('api', slug, 'local', previewBlock.dataset.scriptPath);
+      }
       return;
     }
 
@@ -3992,7 +4019,9 @@ ${containerEl.innerHTML}
         alert('Could not delete flow: ' + err.message);
       }
     }
-  });
+  }
+  document.getElementById('savedFlowDetail').addEventListener('click', flowScriptClickHandler);
+  document.getElementById('panel-scraper').addEventListener('click', flowScriptClickHandler);
 
   // ---------- Test Scripts: run an existing pytest file as-is ----------
   // A completely different execution engine from Saved Flows above (a
@@ -5798,6 +5827,59 @@ ${containerEl.innerHTML}
       `<span style="color:var(--circuit);">✓ Locked in "${escapeHtml(description || '(no description)')}" for the ${lsCapturedSteps.length} step(s) so far. Pick or type the next test case's description, then keep capturing.</span>`;
   });
 
+  // Test Builder's own draft setup/api script - a fresh flow has no slug
+  // to PUT a script onto yet (that endpoint needs an existing saved flow),
+  // so a picked/generated script here is just stashed locally until "Save
+  // as flow" actually creates the flow, at which point it's sent along in
+  // that same request (see lsDraftScriptFields) and _build_flow_from_payload
+  // attaches it in one step - no separate "now go set the script" pass
+  // needed after saving.
+  let lsDraftScripts = {setup: null, api: null}; // target -> {source, path} | null
+
+  function renderLsDraftScriptSummary(target) {
+    const el = document.querySelector(`.ls-draft-script-summary[data-target="${target}"]`);
+    const val = lsDraftScripts[target];
+    const label = target === 'api' ? 'API validation script' : 'Setup script';
+    el.innerHTML = val
+      ? `<span class="hint" style="font-size:11px;">${escapeHtml(label)}: <code style="font-size:10.5px;">${escapeHtml(val.path)}</code> <a href="#" class="ls-draft-script-clear" data-target="${target}" style="margin-left:6px;">clear</a></span>`
+      : `<span class="hint" style="font-size:11px;">No ${label.toLowerCase()} selected yet.</span>`;
+  }
+  renderLsDraftScriptSummary('setup');
+  renderLsDraftScriptSummary('api');
+
+  function lsSetDraftScript(target, value) {
+    lsDraftScripts[target] = value;
+    renderLsDraftScriptSummary(target);
+    const picker = document.querySelector(`.flow-setup-script-picker[data-slug="__draft__"][data-target="${target}"]`);
+    if (picker) picker.style.display = 'none'; // collapse back down now that a pick was made
+  }
+
+  document.getElementById('panel-scraper').addEventListener('click', (e) => {
+    const clearLink = e.target.closest('.ls-draft-script-clear');
+    if (clearLink) {
+      e.preventDefault();
+      lsSetDraftScript(clearLink.dataset.target, null);
+    }
+  });
+
+  // {setup_script_source, setup_script_path, api_script_source,
+  // api_script_path} for whichever of lsDraftScripts is actually set -
+  // matches what _build_flow_from_payload's _script_field_from_payload
+  // reads, same {source, path} shape set_flow_setup_script_route/
+  // set_flow_api_script_route already use once a flow exists.
+  function lsDraftScriptFields() {
+    const fields = {};
+    if (lsDraftScripts.setup) {
+      fields.setup_script_source = lsDraftScripts.setup.source;
+      fields.setup_script_path = lsDraftScripts.setup.path;
+    }
+    if (lsDraftScripts.api) {
+      fields.api_script_source = lsDraftScripts.api.source;
+      fields.api_script_path = lsDraftScripts.api.path;
+    }
+    return fields;
+  }
+
   async function saveCapturedSteps(endpoint, nameInputId, statusElId, btnId) {
     const btn = document.getElementById(btnId);
     const statusEl = document.getElementById(statusElId);
@@ -5847,8 +5929,8 @@ ${containerEl.innerHTML}
       } else {
         const hasSplits = lsCapturedSteps.some(s => s.splitBefore);
         const body = hasSplits
-          ? {name, tests: lsGroupCapturedStepsIntoTests(description), appium: buildAppiumPayloadFromScraperForm()}
-          : {name, description, steps: lsCapturedSteps.filter(s => s.action !== 'note').map(lsCleanStep), appium: buildAppiumPayloadFromScraperForm()};
+          ? {name, tests: lsGroupCapturedStepsIntoTests(description), appium: buildAppiumPayloadFromScraperForm(), ...lsDraftScriptFields()}
+          : {name, description, steps: lsCapturedSteps.filter(s => s.action !== 'note').map(lsCleanStep), appium: buildAppiumPayloadFromScraperForm(), ...lsDraftScriptFields()};
         res = await fetch(BRIDGE_URL + endpoint, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
@@ -5868,6 +5950,9 @@ ${containerEl.innerHTML}
         // what's already saved.
         lsCapturedSteps = [];
         lsResetSplitState();
+        lsDraftScripts = {setup: null, api: null};
+        renderLsDraftScriptSummary('setup');
+        renderLsDraftScriptSummary('api');
         document.getElementById('lsCapturedDescription').value = '';
         // Whichever loaded case was picked for THIS chunk is spoken for -
         // mark it ✓ and reset the picker to its placeholder so the next
