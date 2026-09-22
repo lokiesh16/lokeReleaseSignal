@@ -5223,6 +5223,7 @@ ${containerEl.innerHTML}
     compute: {fg: '#4338CA', bg: '#E0E7FF'},
     switch_app: {fg: '#B45309', bg: '#FDE9C8'},
     note: {fg: '#0F766E', bg: '#CCFBF1'},
+    run_api_script: {fg: '#0F766E', bg: '#CCFBF1'},
   };
   const LS_ACTION_ACCENT_DEFAULT = {fg: '#57606A', bg: '#F1F2F4'};
   function lsActionAccent(action) { return LS_ACTION_ACCENTS[action] || LS_ACTION_ACCENT_DEFAULT; }
@@ -5262,8 +5263,10 @@ ${containerEl.innerHTML}
           <option value="wait">wait</option>
           <option value="swipe-up">scroll up</option>
           <option value="swipe-down">scroll down</option>
+          <option value="run_api_script">run API validation script</option>
         </select>
         <input class="ls-insert-seconds" data-insert-at="${insertAt}" type="number" step="0.5" value="2" style="width:auto; flex:0 0 80px;">
+        <span class="ls-insert-api-script-note" data-insert-at="${insertAt}" style="display:none; font-size:11px; color:var(--paper-dim);"></span>
         <button class="copy ls-insert-confirm" data-insert-at="${insertAt}" style="padding:4px 10px; font-size:11px;">Insert</button>
         <button class="copy ls-insert-cancel" data-insert-at="${insertAt}" style="background:var(--ink-line); color:var(--paper); padding:4px 10px; font-size:11px;">Cancel</button>
       </div>`;
@@ -5281,6 +5284,7 @@ ${containerEl.innerHTML}
           (s.x != null && s.y != null) ? `by position (${s.x}, ${s.y}) — no locator` : '',
         s.reason ? `AI: ${s.reason}` : '',
         s.action === 'note' && s.expected_result ? `✓ ${s.expected_result}` : '',
+        s.action === 'run_api_script' && s.api_script ? `script: ${typeof s.api_script === 'string' ? s.api_script : s.api_script.path}` : '',
       ].filter(Boolean).join(' · ');
       const canExport = !!((s.strategy && s.value != null) || (s.x != null && s.y != null));
       const splitLabel = s.description ? `New test case: ${s.description}` : 'New test case starts here';
@@ -5488,7 +5492,20 @@ ${containerEl.innerHTML}
     });
     listEl.querySelectorAll('.ls-insert-type').forEach(sel => {
       const secondsInput = listEl.querySelector(`.ls-insert-seconds[data-insert-at="${sel.dataset.insertAt}"]`);
-      const applyVisibility = () => { secondsInput.style.display = sel.value === 'wait' ? 'inline-block' : 'none'; };
+      const apiScriptNote = listEl.querySelector(`.ls-insert-api-script-note[data-insert-at="${sel.dataset.insertAt}"]`);
+      const confirmBtn = listEl.querySelector(`.ls-insert-confirm[data-insert-at="${sel.dataset.insertAt}"]`);
+      const applyVisibility = () => {
+        secondsInput.style.display = sel.value === 'wait' ? 'inline-block' : 'none';
+        if (sel.value === 'run_api_script') {
+          const resolved = lsResolvedApiScript();
+          apiScriptNote.style.display = 'inline';
+          apiScriptNote.textContent = resolved ? `Uses: ${resolved.path}` : 'Set an API validation script first (below), then come back to insert this.';
+          confirmBtn.disabled = !resolved;
+        } else {
+          apiScriptNote.style.display = 'none';
+          confirmBtn.disabled = false;
+        }
+      };
       sel.addEventListener('change', applyVisibility);
       applyVisibility();
     });
@@ -5505,6 +5522,13 @@ ${containerEl.innerHTML}
         if (type === 'wait') {
           const seconds = parseFloat(listEl.querySelector(`.ls-insert-seconds[data-insert-at="${insertAt}"]`).value || '2');
           step = {action: 'wait', seconds, label: `wait ${seconds}s`};
+        } else if (type === 'run_api_script') {
+          const resolved = lsResolvedApiScript();
+          if (!resolved) return; // Insert is disabled in this state, but guard anyway
+          const scriptValue = resolved.source === 'github'
+            ? {source: 'github', repo: resolved.repo, branch: resolved.branch, path: resolved.path}
+            : resolved.path;
+          step = {action: 'run_api_script', label: 'Run API validation script', api_script: scriptValue};
         } else {
           const direction = type === 'swipe-up' ? 'up' : 'down';
           step = {action: 'swipe', direction, label: `scroll ${direction}`};
@@ -5675,7 +5699,7 @@ ${containerEl.innerHTML}
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed to load');
       const tests = data.tests && data.tests.length ? data.tests : [{description: '', steps: data.steps || []}];
-      lsEditFlowCache = {kind, slug, name: data.name || slug, tests};
+      lsEditFlowCache = {kind, slug, name: data.name || slug, tests, api_script: data.api_script};
 
       const testCaseField = document.getElementById('lsEditTestCaseField');
       const testCaseSelect = document.getElementById('lsEditTestCaseSelect');
@@ -5835,6 +5859,28 @@ ${containerEl.innerHTML}
   // attaches it in one step - no separate "now go set the script" pass
   // needed after saving.
   let lsDraftScripts = {setup: null, api: null}; // target -> {source, path} | null
+
+  // Whichever API validation script is currently known for THIS flow - the
+  // in-progress draft (Test Builder, not saved yet) takes priority over an
+  // already-saved value (editing an existing flow), same precedence used
+  // elsewhere in this file. Returns the raw {source, path} shape, or null
+  // if neither exists yet - used both by the draft-script summary above
+  // and by the "insert a run_api_script step" option below, so both agree
+  // on the same script.
+  function lsResolvedApiScript() {
+    // Only a LOCAL draft has everything needed to embed directly into a
+    // step - a draft GitHub pick has no repo/branch info client-side yet
+    // (that's only known once the flow is actually saved - see
+    // set_flow_api_script_route, which fills it in server-side). An
+    // already-saved flow's own api_script always has the complete shape
+    // either way, straight from disk, so that path has no such limit.
+    if (lsDraftScripts.api && lsDraftScripts.api.source === 'local') return lsDraftScripts.api;
+    if (lsEditFlowCache && lsEditFlowCache.api_script) {
+      const v = lsEditFlowCache.api_script;
+      return typeof v === 'string' ? {source: 'local', path: v} : v;
+    }
+    return null;
+  }
 
   function renderLsDraftScriptSummary(target) {
     const el = document.querySelector(`.ls-draft-script-summary[data-target="${target}"]`);
