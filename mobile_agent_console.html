@@ -3319,8 +3319,18 @@ ${containerEl.innerHTML}
           <input type="checkbox" class="flow-run-setup-checkbox" data-slug="${escapeHtml(f.slug)}" style="width:auto; flex-shrink:0;">
           <span>Run setup script first — <code style="font-size:10.5px;">${escapeHtml(f.setup_script)}</code></span>
         </label>` : `<span class="hint" style="font-size:11px;">No setup script set for this flow.</span>`}
-        <button class="copy flow-setup-script-toggle-btn" data-slug="${escapeHtml(f.slug)}" style="display:block; margin-top:6px; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">${f.setup_script ? 'Change setup script' : 'Set setup script'}</button>
-        <div class="flow-setup-script-picker" data-slug="${escapeHtml(f.slug)}" style="display:none; margin-top:8px; border:1px solid var(--ink-line); border-radius:8px; padding:10px;"></div>
+        <button class="copy flow-setup-script-toggle-btn" data-slug="${escapeHtml(f.slug)}" data-target="setup" style="display:block; margin-top:6px; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">${f.setup_script ? 'Change setup script' : 'Set setup script'}</button>
+        <div class="flow-setup-script-picker" data-slug="${escapeHtml(f.slug)}" data-target="setup" style="display:none; margin-top:8px; border:1px solid var(--ink-line); border-radius:8px; padding:10px;"></div>
+      </div>
+
+      <div class="flow-api-script-block" style="margin-top:12px; overflow-wrap:anywhere;" title="Runs AFTER this flow's own steps finish - validates the backend/API state those steps should have produced, independent of anything the accessibility tree can see.">
+        ${f.api_script ? `
+        <label style="display:flex; align-items:center; gap:5px; font-size:11px; cursor:pointer; flex-wrap:wrap;" title="${escapeHtml(f.api_script)}">
+          <input type="checkbox" class="flow-run-api-script-checkbox" data-slug="${escapeHtml(f.slug)}" style="width:auto; flex-shrink:0;">
+          <span>Run API validation script after this flow — <code style="font-size:10.5px;">${escapeHtml(f.api_script)}</code></span>
+        </label>` : `<span class="hint" style="font-size:11px;">No API validation script set for this flow.</span>`}
+        <button class="copy flow-setup-script-toggle-btn" data-slug="${escapeHtml(f.slug)}" data-target="api" style="display:block; margin-top:6px; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">${f.api_script ? 'Change API validation script' : 'Set API validation script'}</button>
+        <div class="flow-setup-script-picker" data-slug="${escapeHtml(f.slug)}" data-target="api" style="display:none; margin-top:8px; border:1px solid var(--ink-line); border-radius:8px; padding:10px;"></div>
       </div>
 
       ${f.login_email !== null && f.login_email !== undefined ? `
@@ -3486,18 +3496,29 @@ ${containerEl.innerHTML}
   // whole panel's innerHTML on every flow selection anyway - state lives
   // in setupScriptBrowseState, keyed by slug, so switching away and back
   // to a flow mid-browse doesn't lose your place. --------
-  const setupScriptBrowseState = {}; // slug -> {source: 'local'|'github', path: string}
+  // Shared by BOTH setup_script and api_script pickers - keyed by
+  // "target:slug" (target is 'setup' or 'api') since a flow can be
+  // mid-browse on both at once. Local/GitHub browsing is identical either
+  // way (same two endpoints, same .py file tree) - only WHERE the picked
+  // file gets saved differs (see saveFlowScript below). api_script also
+  // has a third source, 'generate' (AI-written from a CSV + description),
+  // which the browse endpoints know nothing about - handled separately in
+  // renderScriptPicker.
+  const setupScriptBrowseState = {}; // "target:slug" -> {source: 'local'|'github'|'generate', path: string}
+  const scriptStateKey = (target, slug) => `${target}:${slug}`;
 
   function setupScriptListUrl(source, path) {
     const endpoint = source === 'github' ? '/api/setup-scripts/github' : '/api/setup-scripts/local';
     return BRIDGE_URL + endpoint + '?path=' + encodeURIComponent(path || '');
   }
 
-  async function loadSetupScriptDir(slug) {
-    const state = setupScriptBrowseState[slug];
-    const crumbsEl = document.querySelector(`.setup-script-crumbs[data-slug="${CSS.escape(slug)}"]`);
-    const entriesEl = document.querySelector(`.setup-script-entries[data-slug="${CSS.escape(slug)}"]`);
-    const statusEl = document.querySelector(`.setup-script-picker-status[data-slug="${CSS.escape(slug)}"]`);
+  async function loadSetupScriptDir(target, slug) {
+    const key = scriptStateKey(target, slug);
+    const state = setupScriptBrowseState[key];
+    const sel = (cls) => `.${cls}[data-slug="${CSS.escape(slug)}"][data-target="${target}"]`;
+    const crumbsEl = document.querySelector(sel('setup-script-crumbs'));
+    const entriesEl = document.querySelector(sel('setup-script-entries'));
+    const statusEl = document.querySelector(sel('setup-script-picker-status'));
     if (!crumbsEl) return; // picker got closed/torn down mid-fetch
     statusEl.textContent = '';
     entriesEl.innerHTML = 'Loading…';
@@ -3509,16 +3530,16 @@ ${containerEl.innerHTML}
 
       const segments = state.path.split('/').filter(Boolean);
       let acc = '';
-      let crumbHtml = `<a href="#" class="setup-script-crumb" data-slug="${escapeHtml(slug)}" data-path="">root</a>`;
+      let crumbHtml = `<a href="#" class="setup-script-crumb" data-slug="${escapeHtml(slug)}" data-target="${target}" data-path="">root</a>`;
       segments.forEach(seg => {
         acc = acc ? acc + '/' + seg : seg;
-        crumbHtml += ` / <a href="#" class="setup-script-crumb" data-slug="${escapeHtml(slug)}" data-path="${escapeHtml(acc)}">${escapeHtml(seg)}</a>`;
+        crumbHtml += ` / <a href="#" class="setup-script-crumb" data-slug="${escapeHtml(slug)}" data-target="${target}" data-path="${escapeHtml(acc)}">${escapeHtml(seg)}</a>`;
       });
       crumbsEl.innerHTML = crumbHtml;
 
       const entries = data.entries || [];
       entriesEl.innerHTML = entries.length ? entries.map(entry => `
-        <div class="setup-script-entry" data-slug="${escapeHtml(slug)}" data-path="${escapeHtml(entry.path)}" data-type="${entry.type}"
+        <div class="setup-script-entry" data-slug="${escapeHtml(slug)}" data-target="${target}" data-path="${escapeHtml(entry.path)}" data-type="${entry.type}"
              style="padding:5px 8px; border-radius:6px; cursor:pointer; font-size:12px; display:flex; align-items:center; gap:6px;">
           <span>${entry.type === 'dir' ? '📁' : '🐍'}</span><span>${escapeHtml(entry.name)}</span>
         </div>`).join('') : '<div class="empty-hint" style="font-size:11.5px;">Empty folder.</div>';
@@ -3529,37 +3550,69 @@ ${containerEl.innerHTML}
     }
   }
 
-  function renderSetupScriptPicker(slug) {
-    const container = document.querySelector(`.flow-setup-script-picker[data-slug="${CSS.escape(slug)}"]`);
-    const state = setupScriptBrowseState[slug] || (setupScriptBrowseState[slug] = {source: 'local', path: ''});
+  function renderGenerateApiScriptForm(slug) {
+    const statusEl = document.querySelector(`.setup-script-picker-status[data-slug="${CSS.escape(slug)}"][data-target="api"]`);
+    statusEl.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div>
+          <label style="font-size:11px; color:var(--paper-dim); display:block; margin-bottom:3px;">API details (CSV)</label>
+          <input type="file" class="api-script-csv-input" data-slug="${escapeHtml(slug)}" accept=".csv" style="font-size:11px;">
+        </div>
+        <div>
+          <label style="font-size:11px; color:var(--paper-dim); display:block; margin-bottom:3px;">What should this validate?</label>
+          <textarea class="api-script-description" data-slug="${escapeHtml(slug)}" rows="3" placeholder="e.g. Confirm the logged exercise's minutes value matches what was entered, via the exercise-history API." style="width:100%; font-size:12px; padding:6px 8px;"></textarea>
+        </div>
+        <button class="copy api-script-generate-btn" data-slug="${escapeHtml(slug)}" style="align-self:flex-start; padding:5px 12px; font-size:11.5px;">Generate</button>
+        <div class="api-script-generate-status" data-slug="${escapeHtml(slug)}" style="font-size:11.5px;"></div>
+        <div class="api-script-preview-block" data-slug="${escapeHtml(slug)}" style="display:none;">
+          <label style="font-size:11px; color:var(--paper-dim); display:block; margin-bottom:3px;">Generated script</label>
+          <pre class="api-script-preview" data-slug="${escapeHtml(slug)}" style="max-height:260px; overflow:auto; font-size:11px; background:var(--paper); color:var(--ink); padding:8px; border-radius:6px; white-space:pre-wrap;"></pre>
+          <div style="display:flex; gap:8px; margin-top:6px;">
+            <button class="copy api-script-use-btn" data-slug="${escapeHtml(slug)}" style="padding:5px 12px; font-size:11.5px;">Use this script</button>
+            <button class="copy api-script-discard-btn" data-slug="${escapeHtml(slug)}" style="padding:5px 12px; font-size:11.5px; background:var(--ink-line); color:var(--paper);">Discard</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderScriptPicker(target, slug) {
+    const key = scriptStateKey(target, slug);
+    const container = document.querySelector(`.flow-setup-script-picker[data-slug="${CSS.escape(slug)}"][data-target="${target}"]`);
+    const state = setupScriptBrowseState[key] || (setupScriptBrowseState[key] = {source: 'local', path: ''});
 
     const sourceBtn = (source, label) => `
-      <button class="copy setup-script-source-btn" data-slug="${escapeHtml(slug)}" data-source="${source}"
+      <button class="copy setup-script-source-btn" data-slug="${escapeHtml(slug)}" data-target="${target}" data-source="${source}"
               style="padding:4px 10px; font-size:11px; background:${state.source === source ? 'var(--signal)' : 'var(--ink-line)'}; color:${state.source === source ? '#1a1204' : 'var(--paper)'};">${label}</button>`;
 
     container.innerHTML = `
       <div style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;">
         ${sourceBtn('local', 'Local project')}
         ${sourceBtn('github', 'GitHub (automation repo)')}
+        ${target === 'api' ? sourceBtn('generate', 'Generate with AI') : ''}
       </div>
-      <div class="setup-script-crumbs" data-slug="${escapeHtml(slug)}" style="font-size:11px; color:var(--paper-dim); margin-bottom:6px;"></div>
-      <div class="setup-script-entries" data-slug="${escapeHtml(slug)}" style="max-height:220px; overflow-y:auto;"></div>
-      <div class="setup-script-picker-status" data-slug="${escapeHtml(slug)}" style="font-size:11px; margin-top:6px;"></div>
+      <div class="setup-script-crumbs" data-slug="${escapeHtml(slug)}" data-target="${target}" style="font-size:11px; color:var(--paper-dim); margin-bottom:6px;"></div>
+      <div class="setup-script-entries" data-slug="${escapeHtml(slug)}" data-target="${target}" style="max-height:220px; overflow-y:auto;"></div>
+      <div class="setup-script-picker-status" data-slug="${escapeHtml(slug)}" data-target="${target}" style="font-size:11px; margin-top:6px;"></div>
     `;
-    loadSetupScriptDir(slug);
+    if (state.source === 'generate') {
+      renderGenerateApiScriptForm(slug);
+    } else {
+      loadSetupScriptDir(target, slug);
+    }
   }
 
-  async function saveFlowSetupScript(slug, source, path) {
-    const statusEl = document.querySelector(`.setup-script-picker-status[data-slug="${CSS.escape(slug)}"]`);
+  async function saveFlowScript(target, slug, source, path) {
+    const statusEl = document.querySelector(`.setup-script-picker-status[data-slug="${CSS.escape(slug)}"][data-target="${target}"]`);
     statusEl.textContent = 'Saving…';
     try {
-      const res = await fetch(BRIDGE_URL + '/api/flows/' + encodeURIComponent(slug) + '/setup-script', {
+      const endpoint = target === 'api' ? '/api-script' : '/setup-script';
+      const res = await fetch(BRIDGE_URL + '/api/flows/' + encodeURIComponent(slug) + endpoint, {
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({source, path}),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'failed to set setup script');
+      if (!res.ok) throw new Error(data.error || `failed to set ${target === 'api' ? 'API validation' : 'setup'} script`);
       await loadSavedFlows(); // re-renders this same flow's detail with the new value
     } catch (e) {
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
@@ -3605,42 +3658,99 @@ ${containerEl.innerHTML}
     const setupSourceBtn = e.target.closest('.setup-script-source-btn');
     const setupCrumb = e.target.closest('.setup-script-crumb');
     const setupEntry = e.target.closest('.setup-script-entry');
+    const apiScriptGenerateBtn = e.target.closest('.api-script-generate-btn');
+    const apiScriptUseBtn = e.target.closest('.api-script-use-btn');
+    const apiScriptDiscardBtn = e.target.closest('.api-script-discard-btn');
 
     if (setupToggleBtn) {
       const slug = setupToggleBtn.dataset.slug;
-      const picker = document.querySelector(`.flow-setup-script-picker[data-slug="${CSS.escape(slug)}"]`);
+      const target = setupToggleBtn.dataset.target;
+      const picker = document.querySelector(`.flow-setup-script-picker[data-slug="${CSS.escape(slug)}"][data-target="${target}"]`);
       const opening = picker.style.display === 'none';
       picker.style.display = opening ? 'block' : 'none';
-      if (opening) renderSetupScriptPicker(slug);
+      if (opening) renderScriptPicker(target, slug);
       return;
     }
 
     if (setupSourceBtn) {
       const slug = setupSourceBtn.dataset.slug;
-      const state = setupScriptBrowseState[slug] || (setupScriptBrowseState[slug] = {source: 'local', path: ''});
+      const target = setupSourceBtn.dataset.target;
+      const key = scriptStateKey(target, slug);
+      const state = setupScriptBrowseState[key] || (setupScriptBrowseState[key] = {source: 'local', path: ''});
       state.source = setupSourceBtn.dataset.source;
       state.path = '';
-      renderSetupScriptPicker(slug);
+      renderScriptPicker(target, slug);
       return;
     }
 
     if (setupCrumb) {
       e.preventDefault();
       const slug = setupCrumb.dataset.slug;
-      setupScriptBrowseState[slug].path = setupCrumb.dataset.path;
-      await loadSetupScriptDir(slug);
+      const target = setupCrumb.dataset.target;
+      setupScriptBrowseState[scriptStateKey(target, slug)].path = setupCrumb.dataset.path;
+      await loadSetupScriptDir(target, slug);
       return;
     }
 
     if (setupEntry) {
       const slug = setupEntry.dataset.slug;
-      const state = setupScriptBrowseState[slug];
+      const target = setupEntry.dataset.target;
+      const state = setupScriptBrowseState[scriptStateKey(target, slug)];
       if (setupEntry.dataset.type === 'dir') {
         state.path = setupEntry.dataset.path;
-        await loadSetupScriptDir(slug);
+        await loadSetupScriptDir(target, slug);
       } else {
-        await saveFlowSetupScript(slug, state.source, setupEntry.dataset.path);
+        await saveFlowScript(target, slug, state.source, setupEntry.dataset.path);
       }
+      return;
+    }
+
+    if (apiScriptGenerateBtn) {
+      const slug = apiScriptGenerateBtn.dataset.slug;
+      const statusEl = document.querySelector(`.api-script-generate-status[data-slug="${CSS.escape(slug)}"]`);
+      const csvInput = document.querySelector(`.api-script-csv-input[data-slug="${CSS.escape(slug)}"]`);
+      const descInput = document.querySelector(`.api-script-description[data-slug="${CSS.escape(slug)}"]`);
+      const csvFile = csvInput.files[0];
+      const description = descInput.value.trim();
+      if (!csvFile) { statusEl.innerHTML = '<span style="color:var(--signal);">Choose a CSV file first</span>'; return; }
+      if (!description) { statusEl.innerHTML = '<span style="color:var(--signal);">Describe what to validate first</span>'; return; }
+      apiScriptGenerateBtn.disabled = true;
+      apiScriptGenerateBtn.textContent = 'Generating…';
+      statusEl.textContent = '';
+      try {
+        const csvText = await csvFile.text();
+        const res = await fetch(BRIDGE_URL + '/api/generate-api-script', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({slug, csv_text: csvText, description}),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'failed to generate script');
+        const previewBlock = document.querySelector(`.api-script-preview-block[data-slug="${CSS.escape(slug)}"]`);
+        const preview = document.querySelector(`.api-script-preview[data-slug="${CSS.escape(slug)}"]`);
+        preview.textContent = data.script_source;
+        previewBlock.dataset.scriptPath = data.script_path;
+        previewBlock.style.display = 'block';
+      } catch (err) {
+        statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(err.message)}</span>`;
+      } finally {
+        apiScriptGenerateBtn.disabled = false;
+        apiScriptGenerateBtn.textContent = 'Generate';
+      }
+      return;
+    }
+
+    if (apiScriptUseBtn) {
+      const slug = apiScriptUseBtn.dataset.slug;
+      const previewBlock = document.querySelector(`.api-script-preview-block[data-slug="${CSS.escape(slug)}"]`);
+      await saveFlowScript('api', slug, 'local', previewBlock.dataset.scriptPath);
+      return;
+    }
+
+    if (apiScriptDiscardBtn) {
+      const slug = apiScriptDiscardBtn.dataset.slug;
+      const previewBlock = document.querySelector(`.api-script-preview-block[data-slug="${CSS.escape(slug)}"]`);
+      previewBlock.style.display = 'none';
       return;
     }
 
@@ -3745,6 +3855,9 @@ ${containerEl.innerHTML}
         logEl.textContent = flowRunState[slug].logs[0];
       }
 
+      const apiScriptCheckbox = document.querySelector(`.flow-run-api-script-checkbox[data-slug="${CSS.escape(slug)}"]`);
+      const runApiScript = apiScriptCheckbox ? apiScriptCheckbox.checked : false;
+
       // Only present when _find_single_login_steps found exactly one
       // unambiguous login step to point at (see server.py) - pre-filled
       // with the flow's current account, sent as-is unless the human
@@ -3787,6 +3900,7 @@ ${containerEl.innerHTML}
             precondition: preconditionValue || undefined,
             precondition_email: preconditionLoginVisible && preconditionEmailInput ? preconditionEmailInput.value : undefined,
             precondition_password: preconditionLoginVisible && preconditionPasswordInput ? preconditionPasswordInput.value : undefined,
+            run_api_script: runApiScript,
           }),
         });
         const data = await res.json();
