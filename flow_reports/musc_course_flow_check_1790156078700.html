@@ -1,0 +1,860 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>musc_course_flow_check</title>
+<style>
+  :root {
+    /* Bright, "premium studio" palette - variable NAMES kept as-is
+       (--ink/--paper etc. are used as background/foreground roles
+       throughout this file's CSS and inline JS-generated styles, not
+       literal "ink"/"paper" colors), only the VALUES changed, so every
+       existing var(--x) reference across hundreds of inline styles
+       repaints correctly with zero markup changes. Amber stays the one
+       bold accent color; --alert stays red since that's a semantic
+       fail/error color, not a brand choice. Values reused from the
+       UI/UX scan report's own already-light palette (see its embedded
+       <style> further down) rather than inventing a second one. */
+    --ink: #F1F2F5;          /* page background + input/select/textarea fill */
+    --ink-raised: #FFFFFF;   /* card / elevated-surface background */
+    --ink-line: #E3E5EA;     /* borders */
+    --paper: #171A21;        /* primary text */
+    --paper-dim: #6B7280;    /* secondary/muted text */
+    --signal: #D97706;       /* amber accent - active tab, primary buttons, ribbons */
+    --signal-dim: rgba(217,119,6,0.12); /* translucent amber tint - selected-row backgrounds etc. */
+    --circuit: #0D9488;      /* teal accent - success/glow */
+    --alert: #DC2626;        /* red - fail/danger only, not used decoratively */
+    --mono: 'SF Mono', 'JetBrains Mono', 'Menlo', ui-monospace, monospace;
+    --sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  /* "Pastel Gradient Background 001" - fixed to the viewport (not the
+     page) so it reads as a backdrop the app floats on rather than
+     something that scrolls away with the content. Two soft radial blobs
+     over a diagonal base gradient, all in the same mint/cream family, is
+     what gives it the "aurora" look rather than a flat two-stop fade.
+     Background ONLY per this change - --ink/--paper etc. (card fills,
+     text, the amber accent) are untouched, so this is purely what shows
+     through the gaps around/between the existing white cards.
+     On `html`, not `body`: background-attachment:fixed on `body` mispaints
+     once the page is scrolled and `body` itself has padding (confirmed
+     live - scrolling down left a plain white band where the gradient
+     should be, because the "fixed" image was being measured against
+     body's own padded box instead of the viewport). `html` has no
+     padding/sizing of its own, so this paints correctly at any scroll
+     position. */
+  html {
+    background:
+      radial-gradient(circle at 88% 12%, rgba(151,214,175,0.55) 0%, rgba(151,214,175,0) 45%),
+      radial-gradient(circle at 8% 92%, rgba(214,209,140,0.5) 0%, rgba(214,209,140,0) 45%),
+      linear-gradient(135deg, #D7F0DD 0%, #FBF3D6 50%, #D9EEDD 100%);
+    background-attachment: fixed;
+  }
+
+  body {
+    margin: 0;
+    padding: 20px;
+    color: var(--paper);
+    font-family: var(--sans);
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+
+  .app-shell { display: flex; gap: 20px; min-height: calc(100vh - 40px); width: 100%; }
+
+  .side-nav {
+    width: 250px;
+    flex-shrink: 0;
+    background: var(--ink-raised);
+    border: 1px solid var(--ink-line);
+    border-radius: 18px;
+    box-shadow: 0 1px 2px rgba(16,20,28,0.04), 0 4px 16px rgba(16,20,28,0.05);
+    padding: 28px 18px;
+    position: sticky;
+    top: 20px;
+    height: calc(100vh - 40px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    transition: width 0.15s ease, padding 0.15s ease;
+  }
+
+  /* Collapsed = icons only, more room for whatever tab you're actually
+     on (a wide table, a phone screenshot, ...) - state persisted in
+     localStorage the same way the auth gate remembers itself, so it
+     doesn't spring back open on every reload. */
+  .side-nav.collapsed { width: 64px; padding-left: 10px; padding-right: 10px; }
+  .side-nav.collapsed .side-nav-title,
+  .side-nav.collapsed .tab-group-label,
+  .side-nav.collapsed .tab-label { display: none; }
+  .side-nav.collapsed .side-nav-header { justify-content: center; }
+  .side-nav.collapsed .tab { justify-content: center; padding-left: 0; padding-right: 0; }
+  .side-nav.collapsed #sideNavToggleBtn svg { transform: rotate(180deg); }
+
+  .side-nav-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 26px;
+    padding: 0 6px;
+  }
+
+  .side-nav-header .dot { margin-top: 7px; }
+  .side-nav-title { flex: 1; min-width: 0; }
+
+  #sideNavToggleBtn {
+    flex-shrink: 0;
+    width: 24px; height: 24px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--ink); border: 1px solid var(--ink-line); color: var(--paper-dim);
+    cursor: pointer; transition: background-color 0.15s, color 0.15s;
+  }
+  #sideNavToggleBtn:hover { background: var(--ink-line); color: var(--paper); }
+  #sideNavToggleBtn svg { transition: transform 0.15s ease; }
+
+  .content {
+    flex: 1;
+    min-width: 0;
+    padding: 32px clamp(20px, 3vw, 56px) 80px;
+    box-sizing: border-box;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--circuit);
+    box-shadow: 0 0 8px var(--circuit);
+    flex-shrink: 0;
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  h1 {
+    font-size: 23px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+
+  .sub {
+    color: var(--signal);
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 4px 0 0;
+  }
+
+  .tabs {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .tab {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    background: none;
+    border: none;
+    color: var(--paper-dim);
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: 500;
+    text-align: left;
+    padding: 7px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+
+  /* Every nav row's icon sits in its own small rounded "chip" rather than
+     floating bare next to the label - reads as a deliberately designed
+     control instead of a plain text link, and gives the active/hover
+     states a second thing (the chip's own background) to animate besides
+     just the row's text color. */
+  .tab-icon {
+    width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--ink); color: var(--paper-dim);
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .tab:hover { color: var(--paper); background: var(--ink); }
+  .tab:hover .tab-icon { background: var(--ink-raised); color: var(--paper); }
+
+  .tab.active {
+    color: var(--paper);
+    font-weight: 600;
+    background: var(--signal-dim);
+  }
+  .tab.active .tab-icon { background: var(--signal); color: #1a1204; }
+
+  /* "Test Library" isn't a page of its own - it's just a heading over its
+     two real destinations (Saved Flows, Test Scripts) below it, indented
+     to read as children of it rather than siblings of the other tabs. */
+  .tab-group-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--paper-dim);
+    padding: 12px 12px 2px 12px;
+  }
+
+  .tab-child {
+    padding-left: 20px;
+    font-size: 13px;
+  }
+  .tab-child .tab-icon { width: 22px; height: 22px; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .mode-toggle-opt { border: 1.5px solid var(--ink-line); transition: border-color 0.15s, background 0.15s; }
+  .mode-toggle-opt.on { border-color: var(--circuit); background: rgba(13,148,136,0.08); }
+  #panel-scraper.ai-mode-active .human-mode-only { display: none !important; }
+  #panel-scraper:not(.ai-mode-active) .ai-mode-only { display: none !important; }
+
+  /* ---------- "Streaming service" row/poster-carousel (Saved Flows,
+     From team) - a horizontally scrolling strip of text-as-poster-art
+     cards, since these are test flows with no real thumbnail art to
+     show. Genre convention is a bold ribbon + bottom pill on a colored
+     backdrop; kept here, minus the usual signature red. ---------- */
+  .row-header {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .row-title { font-size: 20px; font-weight: 700; color: var(--paper); }
+
+  .poster-row {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+  }
+  .poster-row::-webkit-scrollbar { height: 8px; }
+  .poster-row::-webkit-scrollbar-thumb { background: var(--ink-line); border-radius: 8px; }
+
+  /* Card layout below (icon tile + title + subtitle + a plain counts
+     footer) replaces an earlier "movie poster" version: a full-bleed
+     color gradient with the name centered over it in light text + a dark
+     drop-shadow. That treatment assumed a dark page background it no
+     longer has - on the bright theme, raw dark-cased/underscored flow
+     names wrapped across 2-3 centered lines over a pastel gradient read
+     as noise, not a name. This version keeps the same per-card accent
+     (still cycling through POSTER_ACCENTS) but only as a small icon
+     tint, so the accent still gives the shelf visual variety without
+     fighting with the text for contrast. */
+  .poster-card {
+    position: relative;
+    flex: 0 0 210px;
+    min-height: 188px;
+    box-sizing: border-box;
+    border-radius: 14px;
+    background: var(--ink-raised);
+    border: 1.5px solid var(--ink-line);
+    cursor: pointer;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 0 1px 2px rgba(16,20,28,0.04);
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .poster-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(16,20,28,0.08); }
+  .poster-card.selected { border-color: var(--signal); box-shadow: 0 0 0 2px var(--signal-dim); }
+
+  .poster-ribbon {
+    align-self: flex-start;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 5px;
+    background: var(--ink); color: var(--paper-dim);
+  }
+
+  .poster-icon {
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Flow names are often one long underscore_joined_token with no spaces
+     (e.g. "apple_health_sync_exercise_steps") - browsers only wrap at
+     whitespace by default, so a plain single-line/no-wrap span just runs
+     the text straight off the edge of the card. Display text is also
+     humanized first (see humanizeFlowName) so this is wrapping actual
+     words, not one long screaming-case token. overflow-wrap:anywhere
+     is the fallback for the rare name still too long even as words, and
+     line-clamp caps it at 2 lines with an ellipsis past that. */
+  .poster-title-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-align: left;
+    font-size: 14px; font-weight: 700; line-height: 1.3;
+    color: var(--paper);
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .poster-subtitle {
+    font-size: 11.5px; color: var(--paper-dim); line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .poster-badge {
+    margin-top: auto;
+    font-size: 11px; font-weight: 600; color: var(--paper-dim);
+    padding-top: 10px; border-top: 1px solid var(--ink-line);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .poster-badge.status-pass { color: var(--circuit); border-top-color: var(--circuit); }
+  .poster-badge.status-fail { color: var(--alert); border-top-color: var(--alert); }
+  .poster-badge.status-running { color: var(--signal); border-top-color: var(--signal); }
+
+  .import-card {
+    flex: 0 0 180px; height: 90px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--ink-raised), var(--ink-line));
+    border: 1px solid var(--ink-line);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; padding: 10px; text-align: center;
+  }
+  .import-card .name { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+  /* ---------- Test Builder's step indicator - orientation, not a
+     gate (see the HTML comment above where this renders). Plain bordered
+     segments rather than the reference's angled/chevron shapes - same
+     sequential idea, without clip-path arrow math. ---------- */
+  .ls-stepper {
+    display: flex; gap: 2px; margin-bottom: 18px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--ink-line);
+  }
+  .ls-step {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px; background: var(--ink-raised);
+    border-right: 1px solid var(--ink-line);
+  }
+  .ls-step:last-child { border-right: none; }
+  .ls-step-num {
+    width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+    background: var(--ink-line); color: var(--paper-dim);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px;
+  }
+  .ls-step-text { min-width: 0; font-size: 13px; font-weight: 700; color: var(--paper); }
+  .ls-step-text .hint { display: block; font-size: 10.5px; font-weight: 400; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ls-step.active { background: var(--signal-dim); }
+  .ls-step.active .ls-step-num { background: var(--signal); color: #2B1D00; }
+  .ls-step.done .ls-step-num { background: var(--circuit); color: #0A2E2A; }
+  .ls-step.done .ls-step-text { color: var(--paper-dim); }
+  @media (max-width: 900px) {
+    .ls-stepper { flex-wrap: wrap; }
+    .ls-step { flex: 1 1 45%; border-bottom: 1px solid var(--ink-line); }
+  }
+
+  /* Live screenshot. Plain (.phone-frame alone) is Generate Manual Test
+     Cases' - no bezel, just the picture, since that column is narrower
+     and the space saved goes to the test case table beside it instead.
+     Test Builder adds .phone-frame-bezel on top for the device-bezel
+     look (dark frame + notch) - the two cards intentionally look
+     different for that one reason, not an inconsistency. text-align:
+     center matters either way: the image is height-capped (see the
+     click-handler note on the wrapper div below), so it's narrower than
+     this column and needs centering. */
+  .phone-frame { text-align: center; }
+  .phone-frame img { border-radius: 12px; display: block; margin: 0 auto; border: 1px solid var(--ink-line); box-shadow: 0 4px 16px rgba(16,20,28,0.1); }
+  .phone-frame-bezel { background: #0a0d12; border-radius: 26px; padding: 10px 10px 14px; box-shadow: inset 0 0 0 2px rgba(255,255,255,0.03); }
+  .phone-frame-bezel .phone-notch { width: 60px; height: 5px; border-radius: 4px; background: rgba(255,255,255,0.14); margin: 0 auto 8px; }
+  .phone-frame-bezel img { border: none; box-shadow: none; }
+
+  /* Tap/Swipe action tiles - a bigger, colorful icon-card look (icon in
+     a compact, minimal button - icon + label side by side, same size
+     class as any other small button in this app, not a big card - the
+     screenshot itself should be the thing that draws the eye here.
+     Each tile still just wraps a hidden radio (.mode-toggle-opt above
+     uses the same trick) - clicking the label natively checks its radio
+     and fires the existing 'change' listener untouched, so none of the
+     tap/swipe recording logic needed to change, only how the two
+     options are presented. Per-tile accent color (icon only) comes from
+     the --accent custom property set inline on each tile. */
+  .ls-mode-tile {
+    display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--ink-line);
+    cursor: pointer; transition: border-color 0.15s, background-color 0.15s;
+    background: var(--ink-raised); font-size: 12px; font-weight: 700; color: var(--paper-dim);
+  }
+  .ls-mode-tile svg { color: var(--accent); flex-shrink: 0; }
+  .ls-mode-tile.on { border-color: var(--accent); background: var(--accent-bg); color: var(--paper); }
+
+  /* Both tiles + their own confirm button, stacked in the margin beside
+     the screenshot instead of their own full-width rows below it - the
+     screenshot is height-capped and rarely fills this column's full
+     width, so that side space would otherwise just sit empty while
+     everything needed to act on the screen scrolls further down than
+     it has to. */
+  .ls-mode-stack { display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: 84px; flex-shrink: 0; }
+  .ls-mode-stack button.copy { padding: 7px 4px; font-size: 10.5px; white-space: normal; line-height: 1.3; }
+
+  .card {
+    background: var(--ink-raised);
+    border: 1px solid var(--ink-line);
+    border-radius: 14px;
+    padding: 24px 26px;
+    margin-bottom: 18px;
+    box-shadow: 0 1px 2px rgba(16,20,28,0.04), 0 4px 16px rgba(16,20,28,0.05);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 16px;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--paper-dim);
+    font-weight: 600;
+  }
+
+  label .opt { text-transform: none; letter-spacing: 0; font-weight: 400; opacity: 0.7; }
+
+  input, select, textarea {
+    background: var(--ink);
+    border: 1px solid var(--ink-line);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    width: 100%;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  textarea { resize: vertical; min-height: 60px; }
+
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--signal);
+    box-shadow: 0 0 0 3px rgba(217,119,6,0.15);
+  }
+
+  input::placeholder, textarea::placeholder { color: var(--paper-dim); opacity: 0.7; }
+
+  .checkline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--paper-dim);
+  }
+  .checkline input { width: auto; }
+
+  .terminal {
+    background: #0A0D13;
+    border: 1px solid var(--ink-line);
+    border-radius: 10px;
+    padding: 18px 18px 16px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--circuit);
+    white-space: pre-wrap;
+    word-break: break-word;
+    position: relative;
+    min-height: 60px;
+  }
+
+  .terminal .prompt { color: var(--signal); }
+  .terminal .flag { color: var(--paper-dim); }
+  .terminal .val { color: var(--paper); }
+  .cursor {
+    display: inline-block;
+    width: 7px; height: 15px;
+    background: var(--circuit);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .copybar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+  }
+
+  .hint { font-size: 12px; color: var(--paper-dim); }
+
+  button.copy {
+    background: var(--signal);
+    color: #1a1204;
+    border: none;
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 12.5px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(16,20,28,0.08);
+    transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  }
+  button.copy:hover { filter: brightness(1.05); box-shadow: 0 2px 6px rgba(16,20,28,0.12); }
+  button.copy:active { transform: translateY(1px); box-shadow: 0 1px 1px rgba(16,20,28,0.08); }
+  button.copy.copied { background: var(--circuit); color: #ffffff; }
+  button.copy:disabled { opacity: 0.55; cursor: default; filter: none; box-shadow: none; }
+
+  /* Collapsed-by-default tool sections (Switch app / Compare captured values
+     / Build & test a locator) - a breadcrumb-style title row with a chevron,
+     everything else (the "why", the actual controls) hidden until opened. */
+  details.ls-tool > summary {
+    cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 600; color: var(--paper);
+  }
+  details.ls-tool > summary::-webkit-details-marker { display: none; }
+  details.ls-tool > summary .ls-chevron { display: inline-block; color: var(--paper-dim); transition: transform 0.15s ease; }
+  details.ls-tool[open] > summary .ls-chevron { transform: rotate(90deg); }
+  details.ls-tool > .ls-tool-body { margin-top: 10px; }
+
+  /* Quiet icon-only button for inline row actions (captured-steps edit/
+     export/remove) - deliberately NOT button.copy's bold amber CTA style,
+     since a row of these next to each recorded step should read as small
+     utility controls, not a wall of primary buttons competing for
+     attention. --ls-icon-hover (set per-button) tints both the icon and
+     the hover wash to match what the action means (teal=export, red=
+     remove), rather than every icon looking identical regardless of what
+     it does. */
+  .ls-icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; padding: 0; border-radius: 6px;
+    background: none; border: 1px solid transparent; color: var(--paper-dim);
+    cursor: pointer; transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+  }
+  .ls-icon-btn:hover { background: color-mix(in srgb, var(--ls-icon-hover, var(--paper)) 12%, transparent); color: var(--ls-icon-hover, var(--paper)); border-color: color-mix(in srgb, var(--ls-icon-hover, var(--paper)) 30%, transparent); }
+  .ls-icon-btn:active { transform: translateY(1px); }
+
+  .note {
+    font-size: 12px;
+    color: var(--paper-dim);
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--ink-line);
+  }
+  .note b { color: var(--signal); font-weight: 600; }
+
+  /* --- report viewer --- */
+  .dropzone {
+    border: 1px dashed var(--ink-line);
+    border-radius: 10px;
+    padding: 28px;
+    text-align: center;
+    color: var(--paper-dim);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .dropzone.drag { border-color: var(--signal); color: var(--paper); }
+  .dropzone input[type=file] { display: none; }
+
+  .status-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 20px;
+  }
+  .status-pass { background: rgba(45,212,191,0.15); color: var(--circuit); }
+  .status-fail { background: rgba(229,72,77,0.15); color: var(--alert); }
+  .status-stuck, .status-error { background: rgba(240,162,2,0.15); color: var(--signal); }
+  .status-skip { background: rgba(154,161,175,0.15); color: var(--paper-dim); }
+
+  .test-group { border-top: 1px solid var(--ink-line); padding: 10px 0; }
+  .test-group:first-child { border-top: none; }
+  .test-group-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .test-group-desc { font-size: 13.5px; font-weight: 600; }
+  .test-group-meta { font-size: 11px; color: var(--paper-dim); margin-top: 2px; }
+
+  .report-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  .report-goal { font-size: 14px; line-height: 1.5; }
+
+  .step {
+    border-left: 2px solid var(--ink-line);
+    padding: 2px 0 14px 16px;
+    margin-left: 6px;
+    position: relative;
+  }
+  .step::before {
+    content: '';
+    position: absolute;
+    left: -5px; top: 4px;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--ink-line);
+  }
+  .step.flagged::before { background: var(--alert); }
+  .step-head {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--paper-dim);
+    margin-bottom: 3px;
+  }
+  .step-head .n { color: var(--signal); font-weight: 700; }
+  .step-reason { font-size: 13px; margin-bottom: 4px; }
+  .flag-box {
+    background: rgba(229,72,77,0.08);
+    border: 1px solid rgba(229,72,77,0.3);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12.5px;
+    color: #991B1B;
+    margin-top: 6px;
+  }
+  .flag-box b { color: var(--alert); }
+
+  .empty-hint { color: var(--paper-dim); font-size: 13px; text-align: center; padding: 20px 0; }
+
+  /* Generate Manual Test Cases' table - Name/Objective/Precondition are
+     rowspan'd across every step row of their own case (one real HTML
+     table row per step) rather than repeated in each row, so the table
+     itself shows which rows belong to the same case without extra
+     styling; the CSV export still repeats them per row since a flat CSV
+     has no merged-cell concept. */
+  .mtc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .mtc-table th, .mtc-table td { border: 1px solid var(--ink-line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  .mtc-table th { background: var(--ink); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--paper-dim); font-weight: 700; }
+  .mtc-table tr.mtc-case-start td { border-top: 2px solid var(--paper-dim); }
+  .mtc-table .mtc-remove-btn { padding: 3px 8px; font-size: 10.5px; background: var(--ink-line); color: var(--paper); white-space: nowrap; }
+  .mtc-execution-cell { min-width: 140px; }
+  .mtc-exec-status { width: 100%; font-size: 11px; font-weight: 700; padding: 3px 4px; margin-bottom: 5px; background: var(--ink-raised); }
+  .mtc-exec-comment { width: 100%; font-size: 11.5px; padding: 5px 6px; resize: vertical; min-height: 40px; box-sizing: border-box; }
+
+  /* Casual-visitor deterrent, not real security - a passcode hash sitting
+     in this page's own source can always be read by whoever opens dev
+     tools, so anyone determined can get past this. What it DOES stop is
+     the console being usable by someone who just stumbles onto the link
+     (or opens the local file) without ever meaning to touch it. */
+  #authGate {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(20,24,20,0.35); backdrop-filter: blur(6px);
+  }
+  #authGateCard {
+    width: 320px; background: var(--ink-raised); border: 1px solid var(--ink-line);
+    border-radius: 16px; padding: 28px; box-shadow: 0 20px 60px rgba(16,20,28,0.25);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div style="max-width:900px; margin:0 auto;">
+<div class="card">
+      <div class="report-meta">
+        <div class="report-goal"><b>Goal:</b> musc_course_flow_check</div>
+        <span class="status-badge status-pass">pass</span>
+      </div>
+      <div style="font-size:13px; color:var(--paper-dim); margin-bottom:4px;">all 11 test(s) passed (30 step(s) total)</div>
+      <div style="font-size:12px; color:var(--paper-dim);">30 steps · 0 judge flags</div>
+    </div><div class="card"><div class="test-group">
+          <div class="test-group-head">
+            <div class="test-group-desc">#1 (untitled test)</div>
+            <span class="status-badge status-pass">pass</span>
+          </div>
+          <div class="test-group-meta">10 step(s)</div></div><div class="test-group">
+          <div class="test-group-head">
+            <div class="test-group-desc">#2 Validate Learn Disclaimer content</div>
+            <span class="status-badge status-pass">pass</span>
+          </div>
+          <div class="test-group-meta">4 step(s)</div></div><div class="test-group">
+          <div class="test-group-head">
+            <div class="test-group-desc">#3 Validate user can CLOSE disclaimer</div>
+            <span class="status-badge status-pass">pass</span>
+          </div>
+          <div class="test-group-meta">1 step(s)</div></div><div class="test-group">
+          <div class="test-group-head">
+            <div class="test-group-desc">#4 Verify 'This week' tag is displayed</div>
+            <span class="status-badge status-pass">pass</span>
+          </div>
+          <div class="test-group-meta">1 step(s)</div></div><div class="test-group">
+          <div class="test-group-head">
+            <div class="test-group-desc">#5 Verify 'All weeks' tag is displayed</div>
+            <span class="status-badge status-pass">pass</span>
+          </div>
+          <div class="test-group-meta">1 step(s)</div></div><div class="test-group">
+          <div class="test-group-head">
+            <div class="test-group-desc">#6 Validate course name is same as published course name in coach portal</div>
+            <span class="status-badge status-pass">pass</span>
+          </div>
+          <div class="test-group-meta">1 step(s)</div></div><div class="test-group">
+          <div class="test-group-head">
+            <div class="test-group-desc">#7 Validate content details are same as published course_content name in coach portal</div>
+            <span class="status-badge status-pass">pass</span>
+          </div>
+          <div class="test-group-meta">1 step(s)</div></div><div class="test-group">
+          <div class="test-group-head">
+            <div class="test-group-desc">#8 verify only '1 handout' is displayed as per the course set up</div>
+            <span class="status-badge status-pass">pass</span>
+          </div>
+          <div class="test-group-meta">1 step(s)</div></div><div class="test-group">
+          <div class="test-group-head">
+            <div class="test-group-desc">#9 Validate tapping 'Browse all courses' navigates to Available courses page</div>
+            <span class="status-badge status-pass">pass</span>
+          </div>
+          <div class="test-group-meta">6 step(s)</div></div><div class="test-group">
+          <div class="test-group-head">
+            <div class="test-group-desc">#10 Validate All Weeks section expected course and its related chapter &amp; Content</div>
+            <span class="status-badge status-pass">pass</span>
+          </div>
+          <div class="test-group-meta">2 step(s)</div></div><div class="test-group">
+          <div class="test-group-head">
+            <div class="test-group-desc">#11 Validate tapping Chapter name opens up and displays content name</div>
+            <span class="status-badge status-pass">pass</span>
+          </div>
+          <div class="test-group-meta">2 step(s)</div></div></div><div class="card"><div class="step ">
+          <div class="step-head"><span class="n">#1</span> run_api_script → Run API validation script</div>
+          <div class="step-reason">Set up course with unchecking 'require enrolment' and adding course to the cohort</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_1.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_1.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#2</span> wait → wait 10s</div>
+          <div class="step-reason">wait 10s</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_2.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_2.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#3</span> type_text → Enter your email</div>
+          <div class="step-reason">Enter your email</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_3.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_3.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#4</span> type_text → Enter your password</div>
+          <div class="step-reason">Enter your password</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_4.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_4.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#5</span> tap → Done</div>
+          <div class="step-reason">Done</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_5.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_5.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#6</span> tap → Sign in</div>
+          <div class="step-reason">Sign in</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_6.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_6.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#7</span> wait → wait 10s</div>
+          <div class="step-reason">wait 10s</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_7.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_7.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#8</span> wait → wait 10s</div>
+          <div class="step-reason">wait 10s</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_8.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_8.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#9</span> tap → Learn</div>
+          <div class="step-reason">Verify Learn title is displayed on Learn page</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_9.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_9.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#10</span> assert_visible → Learn</div>
+          <div class="step-reason">Learn</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_10.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_10.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#11</span> wait → wait 20s</div>
+          <div class="step-reason">wait 20s</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_11.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_11.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#12</span> tap → screen point (107, 232)</div>
+          <div class="step-reason">Validate Learn Disclaimer content</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_12.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_12.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#13</span> assert_visible → Disclaimer</div>
+          <div class="step-reason">Disclaimer</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_13.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_13.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#14</span> assert_visible → The podcasts in this section were created using artificial intelligence. The voices are simulated to help illustrate key</div>
+          <div class="step-reason">The podcasts in this section were created using artificial intelligence. The voices are simulated to help illustrate key</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_14.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_14.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#15</span> tap → Close</div>
+          <div class="step-reason">Validate user can CLOSE disclaimer</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_15.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_15.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#16</span> assert_visible → This week</div>
+          <div class="step-reason">Verify 'This week' tag is displayed</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_16.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_16.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#17</span> assert_visible → All Weeks</div>
+          <div class="step-reason">Verify 'All weeks' tag is displayed</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_17.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_17.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#18</span> assert_value → AutoTest_abdul</div>
+          <div class="step-reason">Validate course name is same as published course name in coach portal</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_18.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_18.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#19</span> assert_visible → automation doc66 PDF Handout Vertical scroll bar, 1 page</div>
+          <div class="step-reason">Validate content details are same as published course_content name in coach portal</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_19.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_19.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#20</span> assert_value → 1  Handout</div>
+          <div class="step-reason">verify only '1 handout' is displayed as per the course set up</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_20.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_20.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#21</span> assert_visible → EXPLORE COURSES Browse all courses</div>
+          <div class="step-reason">Validate tapping 'Browse all courses' navigates to Available courses page</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_21.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_21.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#22</span> assert_visible → Boost your success with other helpful programs &amp; courses.</div>
+          <div class="step-reason">Boost your success with other helpful programs &amp; courses.</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_22.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_22.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#23</span> tap → screen point (301, 552)</div>
+          <div class="step-reason">screen point (301, 552)</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_23.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_23.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#24</span> assert_visible → Available Courses</div>
+          <div class="step-reason">Available Courses</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_24.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_24.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#25</span> assert_visible → Introduction to Mindfulness 2 modules • 7 lessons Course length: 1 week</div>
+          <div class="step-reason">Validate 'Introduction to Mindfulness 2 modules • 7 lessons Course length: 1 week' is displayed in Available courses</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_25.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_25.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#26</span> tap → screen point (27, 93)</div>
+          <div class="step-reason">screen point (27, 93)</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_26.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_26.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#27</span> tap → All Weeks</div>
+          <div class="step-reason">Validate All Weeks section expected course and its related chapter &amp; Content</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_27.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_27.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#28</span> assert_value → for autom 1  Handout</div>
+          <div class="step-reason">for autom 1  Handout</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_28.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_28.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#29</span> tap → for autom 1  Handout</div>
+          <div class="step-reason">Validate tapping Chapter name opens up and displays content name</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_29.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_29.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div><div class="step ">
+          <div class="step-head"><span class="n">#30</span> assert_value → 1  Handout automation doc66 PDF Handout Vertical scroll bar, 1 page</div>
+          <div class="step-reason">1  Handout automation doc66 PDF Handout Vertical scroll bar, 1 page</div><a href="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_30.png" target="_blank" title="Open full-size screenshot">
+            <img src="http://localhost:5055/api/report-screenshot/screenshots/b5db9bd038c2/step_30.png" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
+          </a></div></div>
+</div>
+</body>
+</html>
