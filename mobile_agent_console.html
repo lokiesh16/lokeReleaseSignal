@@ -3094,6 +3094,14 @@
     // THIS browser tab right now, though (same origin fetches already used
     // elsewhere in this file), so fetch each one now and swap it for a
     // self-contained data: URI before the HTML is serialized/shipped out.
+    // Report screenshots are full device-resolution PNGs (e.g. 1178x2556,
+    // 200-800KB each) but only ever DISPLAYED at max 160x320 in the report -
+    // embedding them at native size/format bloated a ~30-screenshot report
+    // to 20MB+. Downscaling to MAX_WIDTH and re-encoding as JPEG keeps them
+    // legible (this is a QA report, not a pixel-diffing tool) while cutting
+    // that by roughly 10x.
+    const MAX_WIDTH = 720;
+    const JPEG_QUALITY = 0.72;
     const prefix = BRIDGE_URL + '/api/report-screenshot/';
     const imgs = Array.from(containerClone.querySelectorAll(`img[src^="${prefix}"]`));
     await Promise.all(imgs.map(async (img) => {
@@ -3101,21 +3109,33 @@
         const res = await fetch(img.src);
         if (!res.ok) return;
         const blob = await res.blob();
-        const dataUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(blob);
-        });
-        img.src = dataUrl;
+        const bitmap = await createImageBitmap(blob);
+        const scale = Math.min(1, MAX_WIDTH / bitmap.width);
+        const w = Math.round(bitmap.width * scale);
+        const h = Math.round(bitmap.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+        img.src = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+        // The wrapping <a href> "open full-size screenshot" link pointed at
+        // the same (now-dead) localhost URL - rather than embedding a
+        // SECOND copy of the image data into its href (literally doubling
+        // the file size for zero benefit, since it'd just show the same
+        // downscaled image), drop the link. A right-click on the <img>
+        // itself still offers "Open image in new tab"/"Save image as" in
+        // every major browser, which is the same capability.
         const anchor = img.closest('a');
-        if (anchor && anchor.getAttribute('href') && anchor.getAttribute('href').startsWith(prefix)) {
-          anchor.href = dataUrl;
+        if (anchor) {
+          anchor.removeAttribute('href');
+          anchor.removeAttribute('target');
+          anchor.style.cursor = 'default';
         }
       } catch (e) {
-        // Leave the original localhost URL if the fetch itself failed -
-        // still viewable locally while the bridge is running, same as
-        // before this existed; not worth failing the whole export over.
+        // Leave the original localhost URL if the fetch/decode itself
+        // failed - still viewable locally while the bridge is running,
+        // same as before this existed; not worth failing the whole
+        // export over.
       }
     }));
   }
