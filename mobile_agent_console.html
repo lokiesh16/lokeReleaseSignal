@@ -3083,10 +3083,50 @@
   // same self-contained document either way, one just gets pushed to a
   // real hosted URL instead of saved to disk. Returns null if there's
   // nothing to build yet (no report loaded for this slug).
-  function lsBuildFlowReportHtml(slug) {
+  async function lsInlineScreenshotsForExport(containerClone) {
+    // Screenshots render live via <img src="http://localhost:5055/api/
+    // report-screenshot/...">, which only ever resolves on the machine
+    // running the bridge server, while it's running, while the console
+    // itself is open there - the whole reason it works today for the
+    // in-app report view. A downloaded/published report is opened on a
+    // DIFFERENT device (or no bridge running at all), so that URL is dead
+    // on arrival there - the bridge itself is still up and reachable from
+    // THIS browser tab right now, though (same origin fetches already used
+    // elsewhere in this file), so fetch each one now and swap it for a
+    // self-contained data: URI before the HTML is serialized/shipped out.
+    const prefix = BRIDGE_URL + '/api/report-screenshot/';
+    const imgs = Array.from(containerClone.querySelectorAll(`img[src^="${prefix}"]`));
+    await Promise.all(imgs.map(async (img) => {
+      try {
+        const res = await fetch(img.src);
+        if (!res.ok) return;
+        const blob = await res.blob();
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        });
+        img.src = dataUrl;
+        const anchor = img.closest('a');
+        if (anchor && anchor.getAttribute('href') && anchor.getAttribute('href').startsWith(prefix)) {
+          anchor.href = dataUrl;
+        }
+      } catch (e) {
+        // Leave the original localhost URL if the fetch itself failed -
+        // still viewable locally while the bridge is running, same as
+        // before this existed; not worth failing the whole export over.
+      }
+    }));
+  }
+
+  async function lsBuildFlowReportHtml(slug) {
     const data = flowReportDataBySlug[slug];
     const containerEl = document.querySelector(`.flow-report[data-report-for="${CSS.escape(slug)}"]`);
     if (!data || !containerEl) return null;
+
+    const clone = containerEl.cloneNode(true);
+    await lsInlineScreenshotsForExport(clone);
 
     const styles = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('\n');
     const title = data.goal || slug;
@@ -3099,15 +3139,15 @@ ${styles}
 </head>
 <body>
 <div style="max-width:900px; margin:0 auto;">
-${containerEl.innerHTML}
+${clone.innerHTML}
 </div>
 </body>
 </html>`;
     return {doc, title};
   }
 
-  function downloadReportHtml(slug) {
-    const built = lsBuildFlowReportHtml(slug);
+  async function downloadReportHtml(slug) {
+    const built = await lsBuildFlowReportHtml(slug);
     if (!built) return;
     const {doc, title} = built;
 
@@ -3125,15 +3165,17 @@ ${containerEl.innerHTML}
   async function publishFlowReport(slug) {
     const statusEl = document.querySelector(`.flow-report-publish-status[data-slug="${CSS.escape(slug)}"]`);
     const btn = document.querySelector(`.flow-publish-report-btn[data-slug="${CSS.escape(slug)}"]`);
-    const built = lsBuildFlowReportHtml(slug);
-    if (!built) return;
+    const originalLabel = btn ? btn.textContent : 'Publish to GitHub';
+    if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
+    if (statusEl) statusEl.textContent = '';
+    const built = await lsBuildFlowReportHtml(slug);
+    if (!built) {
+      if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
+      return;
+    }
     const {doc, title} = built;
     const filename = (title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'report')
       + '_' + Date.now() + '.html';
-    const originalLabel = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Publishing…';
-    statusEl.textContent = '';
     try {
       const res = await fetch(BRIDGE_URL + '/api/publish-flow-report', {
         method: 'POST',
