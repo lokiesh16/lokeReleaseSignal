@@ -3079,10 +3079,14 @@
   // <style> block as this page, so it looks identical) and triggers a
   // browser download - a self-contained file you can email/Slack to
   // someone who doesn't have this console open, unlike the raw JSON report.
-  function downloadReportHtml(slug) {
+  // Shared by the local download AND the "Publish to GitHub" button below -
+  // same self-contained document either way, one just gets pushed to a
+  // real hosted URL instead of saved to disk. Returns null if there's
+  // nothing to build yet (no report loaded for this slug).
+  function lsBuildFlowReportHtml(slug) {
     const data = flowReportDataBySlug[slug];
     const containerEl = document.querySelector(`.flow-report[data-report-for="${CSS.escape(slug)}"]`);
-    if (!data || !containerEl) return;
+    if (!data || !containerEl) return null;
 
     const styles = Array.from(document.querySelectorAll('style')).map(s => s.outerHTML).join('\n');
     const title = data.goal || slug;
@@ -3099,6 +3103,13 @@ ${containerEl.innerHTML}
 </div>
 </body>
 </html>`;
+    return {doc, title};
+  }
+
+  function downloadReportHtml(slug) {
+    const built = lsBuildFlowReportHtml(slug);
+    if (!built) return;
+    const {doc, title} = built;
 
     const blob = new Blob([doc], {type: 'text/html'});
     const url = URL.createObjectURL(blob);
@@ -3109,6 +3120,35 @@ ${containerEl.innerHTML}
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  }
+
+  async function publishFlowReport(slug) {
+    const statusEl = document.querySelector(`.flow-report-publish-status[data-slug="${CSS.escape(slug)}"]`);
+    const btn = document.querySelector(`.flow-publish-report-btn[data-slug="${CSS.escape(slug)}"]`);
+    const built = lsBuildFlowReportHtml(slug);
+    if (!built) return;
+    const {doc, title} = built;
+    const filename = (title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'report')
+      + '_' + Date.now() + '.html';
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Publishing…';
+    statusEl.textContent = '';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/publish-flow-report', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename, html: doc}),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'publish failed');
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Published: <a href="${result.url}" target="_blank" rel="noopener">${escapeHtml(result.url)}</a></span>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
   }
 
   // Master-detail layout: the left list only ever shows compact rows (name,
@@ -3379,12 +3419,14 @@ ${containerEl.innerHTML}
         ${!hasLog ? '<div class="empty-hint" style="font-size:11.5px;">No run yet — click Run to see the live trace here.</div>' : ''}
       </div>
 
-      <div class="flow-report-actions" data-report-actions-for="${escapeHtml(f.slug)}" style="display:${state && state.reportPath ? 'flex' : 'none'}; margin-top:8px; gap:8px;">
+      <div class="flow-report-actions" data-report-actions-for="${escapeHtml(f.slug)}" style="display:${state && state.reportPath ? 'flex' : 'none'}; margin-top:8px; gap:8px; flex-wrap:wrap; align-items:center;">
         <button class="copy flow-download-report-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download HTML report</button>
         <button class="copy flow-download-csv-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download CSV summary</button>
         <button class="copy flow-download-pdf-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download PDF summary</button>
+        <button class="copy flow-publish-report-btn" data-slug="${escapeHtml(f.slug)}" title="Pushes this same report to lokeReleaseSignal (GitHub Pages) for a real shareable link - a downloaded .html file usually just shows raw source when opened on a phone." style="padding:6px 10px; font-size:12px;">Publish to GitHub</button>
         <span class="hint flow-report-path" data-report-path-for="${escapeHtml(f.slug)}" style="font-size:11px;"></span>
       </div>
+      <div class="hint flow-report-publish-status" data-slug="${escapeHtml(f.slug)}" style="font-size:11.5px; margin-top:4px;"></div>
       <div class="flow-report" data-report-for="${escapeHtml(f.slug)}" style="margin-top:8px;"></div>
     `;
 
@@ -3689,6 +3731,7 @@ ${containerEl.innerHTML}
     const downloadBtn = e.target.closest('.flow-download-report-btn');
     const downloadCsvBtn = e.target.closest('.flow-download-csv-btn');
     const downloadPdfBtn = e.target.closest('.flow-download-pdf-btn');
+    const publishReportBtn = e.target.closest('.flow-publish-report-btn');
     const setupToggleBtn = e.target.closest('.flow-setup-script-toggle-btn');
     const setupSourceBtn = e.target.closest('.setup-script-source-btn');
     const setupCrumb = e.target.closest('.setup-script-crumb');
@@ -3874,6 +3917,10 @@ ${containerEl.innerHTML}
     }
     if (downloadPdfBtn) {
       downloadServerFile(downloadPdfBtn.dataset.slug, 'pdf');
+      return;
+    }
+    if (publishReportBtn) {
+      publishFlowReport(publishReportBtn.dataset.slug);
       return;
     }
     if (editBtn) {
@@ -4126,11 +4173,13 @@ ${containerEl.innerHTML}
         ${!hasLog ? '<div class="empty-hint" style="font-size:11.5px;">No run yet — click Run to see the live trace here.</div>' : ''}
       </div>
 
-      <div class="flow-report-actions" data-report-actions-for="${escapeHtml(slug)}" style="display:${state && state.reportPath ? 'flex' : 'none'}; margin-top:8px; gap:8px;">
+      <div class="flow-report-actions" data-report-actions-for="${escapeHtml(slug)}" style="display:${state && state.reportPath ? 'flex' : 'none'}; margin-top:8px; gap:8px; flex-wrap:wrap; align-items:center;">
         <button class="copy flow-download-report-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download HTML report</button>
         <button class="copy flow-download-csv-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download CSV summary</button>
         <button class="copy flow-download-pdf-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download PDF summary</button>
+        <button class="copy flow-publish-report-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Publish to GitHub</button>
         <span class="hint flow-report-path" data-report-path-for="${escapeHtml(slug)}" style="font-size:11px;"></span>
+        <div class="hint flow-report-publish-status" data-slug="${escapeHtml(slug)}" style="font-size:11px;"></div>
       </div>
       <div class="flow-report" data-report-for="${escapeHtml(slug)}" style="margin-top:8px;"></div>
     `;
@@ -4376,11 +4425,13 @@ ${containerEl.innerHTML}
     const downloadBtn = e.target.closest('.flow-download-report-btn');
     const downloadCsvBtn = e.target.closest('.flow-download-csv-btn');
     const downloadPdfBtn = e.target.closest('.flow-download-pdf-btn');
+    const publishReportBtn = e.target.closest('.flow-publish-report-btn');
     const runBtn = e.target.closest('.ts-run-btn');
 
     if (downloadBtn) { downloadReportHtml(downloadBtn.dataset.slug); return; }
     if (downloadCsvBtn) { downloadServerFile(downloadCsvBtn.dataset.slug, 'csv'); return; }
     if (downloadPdfBtn) { downloadServerFile(downloadPdfBtn.dataset.slug, 'pdf'); return; }
+    if (publishReportBtn) { publishFlowReport(publishReportBtn.dataset.slug); return; }
     if (!runBtn) return;
 
     await runTestTarget(runBtn.dataset.path, runBtn.dataset.slug, runBtn);
