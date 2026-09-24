@@ -2,54 +2,108 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Habi's Final Run</title>
+<title>Habi Final Run Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    /* Bright, "premium studio" palette - variable NAMES kept as-is
-       (--ink/--paper etc. are used as background/foreground roles
-       throughout this file's CSS and inline JS-generated styles, not
-       literal "ink"/"paper" colors), only the VALUES changed, so every
-       existing var(--x) reference across hundreds of inline styles
-       repaints correctly with zero markup changes. Amber stays the one
-       bold accent color; --alert stays red since that's a semantic
-       fail/error color, not a brand choice. Values reused from the
-       UI/UX scan report's own already-light palette (see its embedded
-       <style> further down) rather than inventing a second one. */
-    --ink: #F1F2F5;          /* page background + input/select/textarea fill */
-    --ink-raised: #FFFFFF;   /* card / elevated-surface background */
-    --ink-line: #E3E5EA;     /* borders */
-    --paper: #171A21;        /* primary text */
-    --paper-dim: #6B7280;    /* secondary/muted text */
-    --signal: #D97706;       /* amber accent - active tab, primary buttons, ribbons */
-    --signal-dim: rgba(217,119,6,0.12); /* translucent amber tint - selected-row backgrounds etc. */
-    --circuit: #0D9488;      /* teal accent - success/glow */
-    --alert: #DC2626;        /* red - fail/danger only, not used decoratively */
+    /* Palette matched exactly to the approved "Mobile Agent Console"
+       reference mockup - variable NAMES kept as-is (--ink/--paper etc.
+       are roles, not literal colors), only VALUES changed, same as every
+       prior repaint of this token block. --ink-line is now a translucent
+       mint-tinted hairline (not a solid dark border) per the reference -
+       that glowing-hairline look, not opaque panels, is what reads as
+       "glassmorphism" here; there's no backdrop-filter in the reference
+       either, so the existing blur() declarations elsewhere in this file
+       are harmless no-ops against these now-opaque --ink-raised surfaces,
+       not worth stripping out one by one. --ink-line-strong/--up/
+       --circuit-ink are new tokens for concepts the reference has that
+       didn't exist in this file's token set before (a stronger-contrast
+       border variant, the stat tiles' "trend up" green, and dark text
+       for sitting on top of a mint-filled button/pill). The reference
+       has no amber/warning hue at all - --signal now sits in the same
+       mint family as --circuit (a slightly duller shade), reserved for
+       the handful of narrow spots that need to read as "secondary" next
+       to a primary --circuit element, not a separate brand color. */
+    --ink: #07110F;             /* page background */
+    --ink-raised: #0E1D1A;      /* card/panel background */
+    --ink-raised-2: #112420;    /* secondary surface - hover/nested backgrounds, gradient stops */
+    --ink-line: rgba(120,230,200,0.10); /* hairline borders */
+    --ink-line-strong: rgba(120,230,200,0.22); /* stronger border variant - active states, kbd, dividers */
+    --paper: #EEF5F3;           /* primary text */
+    --paper-dim: #9FB3AD;       /* secondary text */
+    --paper-faint: #6F837E;     /* muted/tertiary text */
+    --signal: #3DD9A8;          /* secondary mint accent - narrow "stuck"/secondary-highlight spots */
+    --signal-dim: rgba(61,217,168,0.16); /* translucent tint - selected-row backgrounds etc. */
+    --circuit: #5CF0C2;         /* primary mint accent - dominant brand color, active states, success */
+    --circuit-bright: #7FF5D0;  /* bright accent - hover/glow highlights, gradient top-stops */
+    --circuit-ink: #062A20;     /* dark text sitting on a mint-filled button/pill */
+    --up: #4BE3A3;              /* stat tiles' "trend up" green */
+    --alert: #FF5A5A;           /* error/danger only, not a brand choice */
     --mono: 'SF Mono', 'JetBrains Mono', 'Menlo', ui-monospace, monospace;
     --sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
   }
 
+  /* Real (not decorative) light theme, toggled by the util bar's sun
+     icon - see THEME_KEY in the script below. These are the same values
+     this file used the last time it ran a light "premium studio" palette,
+     restored here as a togglable alternative instead of the dark palette
+     simply overwriting it. --ink-raised is intentionally opaque (not
+     rgba) here: the glassmorphism blur rules still apply structurally
+     (same selectors), they just have nothing translucent to blur against
+     on a plain white surface, which is fine - light mode was never meant
+     to look "glassy" like the dark theme. */
+  :root[data-theme="light"] {
+    --ink: #F3F8F6;
+    --ink-raised: #FFFFFF;
+    --ink-raised-2: #F7FBFA;
+    --ink-line: rgba(10,60,45,0.10);
+    --ink-line-strong: rgba(10,60,45,0.2);
+    --paper: #0D1F1A;
+    --paper-dim: #5D716B;
+    --paper-faint: #7D8F8A;
+    --signal: #0F9D6C;
+    --signal-dim: rgba(15,157,108,0.12);
+    --circuit: #12A77A;
+    --circuit-bright: #12A77A;
+    /* --circuit-ink intentionally NOT overridden here: .btn.primary's own
+       mint-gradient background gets overridden to plain white by the
+       `.btn{background:#fff}` light-theme rule below (same as the
+       reference mockup - that rule's higher specificity wins over
+       .btn.primary's), so the dark-mode --circuit-ink value (a dark
+       green) is exactly what's needed for readable text on that now-white
+       button - a light value here would go invisible-on-white. */
+    --up: #0F9D6C;
+    --alert: #DC2626;
+  }
+  html[data-theme="light"] {
+    background: #F3F8F6;
+  }
+  html[data-theme="light"] .hero-phone-glow,
+  html[data-theme="light"] .dot { box-shadow: none; }
+  html[data-theme="light"] .side-nav { background: #FFFFFF; }
+  html[data-theme="light"] .util-search input::placeholder { color: var(--paper-dim); }
+  html[data-theme="light"] .device-card { background: linear-gradient(180deg, #EAF6F2, #FFFFFF); }
+  html[data-theme="light"] .btn { background: #FFFFFF; }
+  html[data-theme="light"] .pill { color: #0B6B4D; }
+
   * { box-sizing: border-box; }
 
-  /* "Pastel Gradient Background 001" - fixed to the viewport (not the
-     page) so it reads as a backdrop the app floats on rather than
-     something that scrolls away with the content. Two soft radial blobs
-     over a diagonal base gradient, all in the same mint/cream family, is
-     what gives it the "aurora" look rather than a flat two-stop fade.
-     Background ONLY per this change - --ink/--paper etc. (card fills,
-     text, the amber accent) are untouched, so this is purely what shows
-     through the gaps around/between the existing white cards.
-     On `html`, not `body`: background-attachment:fixed on `body` mispaints
-     once the page is scrolled and `body` itself has padding (confirmed
-     live - scrolling down left a plain white band where the gradient
-     should be, because the "fixed" image was being measured against
-     body's own padded box instead of the viewport). `html` has no
-     padding/sizing of its own, so this paints correctly at any scroll
+  /* Subtle emerald-glow backdrop (per the "Futuristic Glassmorphism"
+     spec) - two soft, low-opacity teal/green radial blobs over a
+     near-black base, dim enough to stay out of the way of foreground
+     text but present enough to give the glass panels' backdrop-filter
+     blur something to actually blur. Kept on `html` (not `body`) for the
+     same reason the prior gradients lived here: background-attachment:
+     fixed on `body` mispaints once the page scrolls and `body` has its
+     own padding; `html` has none, so it paints correctly at any scroll
      position. */
   html {
     background:
-      radial-gradient(circle at 88% 12%, rgba(151,214,175,0.55) 0%, rgba(151,214,175,0) 45%),
-      radial-gradient(circle at 8% 92%, rgba(214,209,140,0.5) 0%, rgba(214,209,140,0) 45%),
-      linear-gradient(135deg, #D7F0DD 0%, #FBF3D6 50%, #D9EEDD 100%);
+      radial-gradient(circle at 85% 8%, rgba(0,230,195,0.12) 0%, rgba(0,230,195,0) 45%),
+      radial-gradient(circle at 8% 92%, rgba(0,184,148,0.10) 0%, rgba(0,184,148,0) 50%),
+      linear-gradient(135deg, #050D0B 0%, #071310 50%, #050D0B 100%);
     background-attachment: fixed;
   }
 
@@ -67,10 +121,12 @@
   .side-nav {
     width: 250px;
     flex-shrink: 0;
-    background: var(--ink-raised);
+    background: linear-gradient(180deg, #0A1714, #081310);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
     border: 1px solid var(--ink-line);
     border-radius: 18px;
-    box-shadow: 0 1px 2px rgba(16,20,28,0.04), 0 4px 16px rgba(16,20,28,0.05);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2), 0 8px 32px rgba(0,230,195,0.06);
     padding: 28px 18px;
     position: sticky;
     top: 20px;
@@ -104,6 +160,12 @@
   .side-nav-header .dot { margin-top: 7px; }
   .side-nav-title { flex: 1; min-width: 0; }
 
+  .brand-logo {
+    width: 42px; height: 42px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .side-nav.collapsed .brand-logo { margin: 0 auto; }
+
   #sideNavToggleBtn {
     flex-shrink: 0;
     width: 24px; height: 24px; border-radius: 7px;
@@ -130,8 +192,8 @@
 
   .dot {
     width: 9px; height: 9px; border-radius: 50%;
-    background: var(--circuit);
-    box-shadow: 0 0 8px var(--circuit);
+    background: var(--circuit-bright);
+    box-shadow: 0 0 10px var(--circuit-bright), 0 0 20px rgba(0,230,195,0.35);
     flex-shrink: 0;
     animation: pulse 2.4s ease-in-out infinite;
   }
@@ -142,16 +204,16 @@
   }
 
   h1 {
-    font-size: 23px;
+    font-size: 17px;
     font-weight: 700;
     letter-spacing: -0.02em;
     margin: 0;
   }
 
   .sub {
-    color: var(--signal);
-    font-size: 13.5px;
-    font-weight: 700;
+    color: var(--paper-dim);
+    font-size: 12px;
+    font-weight: 600;
     letter-spacing: -0.01em;
     margin: 4px 0 0;
   }
@@ -167,7 +229,7 @@
     align-items: center;
     gap: 11px;
     background: none;
-    border: none;
+    border: 1px solid transparent;
     color: var(--paper-dim);
     font-family: var(--sans);
     font-size: 13.5px;
@@ -191,15 +253,17 @@
     transition: background-color 0.15s ease, color 0.15s ease;
   }
 
-  .tab:hover { color: var(--paper); background: var(--ink); }
+  .tab:hover { color: var(--paper); background: var(--ink-raised-2); }
   .tab:hover .tab-icon { background: var(--ink-raised); color: var(--paper); }
 
   .tab.active {
     color: var(--paper);
     font-weight: 600;
-    background: var(--signal-dim);
+    background: linear-gradient(180deg, rgba(76,230,180,0.16), rgba(76,230,180,0.07));
+    border: 1px solid rgba(92,240,194,0.35);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 0 18px rgba(92,240,194,0.08);
   }
-  .tab.active .tab-icon { background: var(--signal); color: #1a1204; }
+  .tab.active .tab-icon { background: none; color: var(--circuit); width: 22px; height: 22px; }
 
   /* "Test Library" isn't a page of its own - it's just a heading over its
      two real destinations (Saved Flows, Test Scripts) below it, indented
@@ -248,6 +312,147 @@
   .poster-row::-webkit-scrollbar { height: 8px; }
   .poster-row::-webkit-scrollbar-thumb { background: var(--ink-line); border-radius: 8px; }
 
+  /* List view - same cards/data as the default grid/shelf layout above,
+     just re-flowed: full-width rows, icon+title inline instead of
+     stacked, no horizontal scrolling. Toggled by adding this one class
+     to #savedFlowsList (see savedFlowsViewToggle JS) rather than a
+     second card template. */
+  .poster-row.list-view { flex-direction: column; overflow-x: visible; }
+  .poster-row.list-view .poster-card {
+    flex: 1 1 auto; flex-direction: row; align-items: center; min-height: 0; gap: 14px;
+  }
+  .poster-row.list-view .poster-icon { margin-bottom: 0; }
+  .poster-row.list-view .poster-title-text { -webkit-line-clamp: 1; }
+  .poster-row.list-view .poster-subtitle { display: none; }
+  .poster-row.list-view .poster-badge { margin-top: 0; border-top: none; padding-top: 0; flex-shrink: 0; }
+  .poster-row.list-view .poster-ribbon { position: absolute; top: 10px; left: 14px; }
+  .poster-row.list-view .poster-fav-btn { top: 50%; transform: translateY(-50%); }
+
+  .view-toggle { display: flex; gap: 2px; background: var(--ink); border: 1px solid var(--ink-line); border-radius: 8px; padding: 2px; }
+  .view-toggle-btn {
+    width: 26px; height: 24px; border: none; border-radius: 6px; background: none; color: var(--paper-dim);
+    display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.15s, color 0.15s;
+  }
+  .view-toggle-btn:hover { color: var(--paper); }
+  .view-toggle-btn.on { background: var(--ink-raised-2); color: var(--circuit-bright); }
+
+  /* ---------- Saved Flows page: header/tabs/toolbar/grid, matched to the
+     approved "Saved Flows redesign" reference. Colors sampled directly
+     from that reference (iOS/Android badge tints, active-pill tint,
+     "known failing" orange) rather than reused from elsewhere, since
+     those are page-specific accents, not global tokens. ---------- */
+  .flows-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+  .flows-title { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--paper); }
+  .flows-create-btn { padding: 9px 18px; font-size: 13px; border-radius: 999px; flex-shrink: 0; }
+
+  .flows-tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--ink-line); margin-bottom: 18px; }
+  .flows-tab {
+    display: flex; align-items: center; gap: 8px; background: none; border: none; cursor: pointer;
+    padding: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--paper-dim); font-family: var(--sans);
+    border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s, border-color 0.15s;
+  }
+  .flows-tab:hover { color: var(--paper); }
+  .flows-tab.active { color: var(--paper); border-bottom-color: var(--circuit); }
+  .flows-tab-count {
+    font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+    background: var(--ink-raised-2); color: var(--paper-dim);
+  }
+  .flows-tab.active .flows-tab-count { background: var(--signal-dim); color: var(--circuit); }
+
+  .flows-subheader { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+
+  .flows-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .flows-search { flex: 0 1 260px; height: 36px; padding: 0 10px; }
+  .flows-search input { font-size: 12.5px; }
+  .flows-filter-pills { display: flex; gap: 4px; background: var(--ink); border: 1px solid var(--ink-line); border-radius: 8px; padding: 3px; }
+  .flows-filter-pill {
+    padding: 5px 12px; font-size: 12px; font-weight: 600; border-radius: 6px; background: none; border: none;
+    color: var(--paper-dim); cursor: pointer; font-family: var(--sans); white-space: nowrap;
+    transition: background-color 0.15s, color 0.15s;
+  }
+  .flows-filter-pill:hover { color: var(--paper); }
+  .flows-filter-pill.active { background: rgba(76,230,170,0.14); color: var(--paper); }
+  .flows-icon-btn { border: 1px solid var(--ink-line); }
+
+  .flows-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 16px; }
+  .flows-grid-compact { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  @media (max-width: 1400px) { .flows-grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+  @media (max-width: 1000px) { .flows-grid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+  .flow-card {
+    position: relative;
+    background: var(--ink-raised); border: 1px solid var(--ink-line); border-radius: 12px; padding: 16px;
+    cursor: pointer; transition: border-color 0.15s, transform 0.15s;
+    display: flex; flex-direction: column; gap: 4px; min-height: 176px;
+  }
+  .flow-card:hover { border-color: var(--circuit); transform: translateY(-1px); }
+  .flow-card.selected { border-color: var(--circuit); box-shadow: 0 0 0 2px var(--signal-dim); }
+  .flow-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px; }
+  .flow-card-badge { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
+  .flow-card-badge.ios { background: #15283D; color: #9CCBFF; }
+  .flow-card-badge.android { background: #1E2C14; color: #B7E38A; }
+  .flow-card-fav { background: none; border: none; cursor: pointer; color: var(--paper-faint); font-size: 16px; line-height: 1; padding: 2px; }
+  .flow-card-fav.on { color: var(--signal); }
+  .flow-card-title { font-size: 15px; font-weight: 700; color: var(--paper); line-height: 1.3; }
+  .flow-card-slug { font-family: var(--mono); font-size: 11px; color: var(--paper-dim); margin-top: 2px; }
+  .flow-card-desc {
+    font-size: 12.5px; color: var(--paper-dim); margin-top: 6px; line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .flow-card-footer {
+    margin-top: auto; padding-top: 12px; border-top: 1px solid var(--ink-line);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .flow-card-last-run { font-size: 11.5px; color: var(--paper-dim); display: flex; align-items: center; gap: 6px; }
+  .flow-card-last-run .flow-card-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--paper-faint); flex-shrink: 0; }
+  .flow-card-last-run.failing { color: #FFB27A; }
+  .flow-card-last-run.failing .flow-card-status-dot { background: #FFB27A; }
+  .flow-card-last-run.pass { color: var(--circuit); }
+  .flow-card-last-run.pass .flow-card-status-dot { background: var(--circuit); }
+  .flow-card-stats { display: flex; gap: 12px; font-size: 11.5px; color: var(--paper-dim); text-align: center; }
+  .flow-card-stats b { display: block; font-size: 13px; color: var(--paper); font-weight: 700; }
+  .flow-card-play {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; border: none; cursor: pointer;
+    background: var(--circuit); color: #04120F; display: flex; align-items: center; justify-content: center;
+  }
+  .flow-card-play:hover { background: var(--circuit-bright); }
+
+  /* List view: same cards, re-flowed into single-column rows. */
+  .flows-grid.list-view { grid-template-columns: 1fr; }
+  .flows-grid.list-view .flow-card { flex-direction: row; align-items: center; min-height: 0; gap: 16px; }
+  .flows-grid.list-view .flow-card-top { flex-direction: column; align-items: flex-start; margin-bottom: 0; gap: 8px; }
+  .flows-grid.list-view .flow-card-desc { display: none; }
+  .flows-grid.list-view .flow-card-footer { margin-top: 0; padding-top: 0; border-top: none; flex-shrink: 0; }
+
+  .flows-more-tile {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    background: var(--ink-raised); border: 1px solid var(--ink-line); border-radius: 12px; padding: 16px;
+    min-height: 176px; color: var(--paper-dim); font-size: 13px;
+  }
+  .flows-new-tile {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    background: none; border: 1.5px dashed var(--ink-line-strong); border-radius: 12px; padding: 16px;
+    min-height: 176px; color: var(--paper-dim); font-size: 13px; cursor: pointer; font-family: var(--sans);
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .flows-new-tile:hover { border-color: var(--circuit); color: var(--paper); }
+  .flows-new-tile svg { color: var(--circuit); }
+
+  .precondition-card { display: flex; flex-direction: column; gap: 8px; min-height: 140px; cursor: default; }
+  .precondition-card-footer { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--ink-line); display: flex; align-items: center; justify-content: space-between; }
+
+  .flows-team-list { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+  @media (max-width: 1000px) { .flows-team-list { grid-template-columns: 1fr; } }
+  .flows-team-row {
+    display: flex; align-items: center; gap: 12px; background: var(--ink-raised); border: 1px solid var(--ink-line);
+    border-radius: 10px; padding: 10px 14px;
+  }
+  .flows-team-row-icon {
+    width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    background: var(--ink-raised-2); color: var(--circuit);
+  }
+  .flows-team-row-name { flex: 1; min-width: 0; font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--paper); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
   /* Card layout below (icon tile + title + subtitle + a plain counts
      footer) replaces an earlier "movie poster" version: a full-bleed
      color gradient with the name centered over it in light text + a dark
@@ -265,17 +470,32 @@
     box-sizing: border-box;
     border-radius: 14px;
     background: var(--ink-raised);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
     border: 1.5px solid var(--ink-line);
     cursor: pointer;
     padding: 14px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    box-shadow: 0 1px 2px rgba(16,20,28,0.04);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
     transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
   }
-  .poster-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(16,20,28,0.08); }
+  .poster-card:hover { transform: translateY(-2px); border-color: var(--circuit); box-shadow: 0 6px 20px rgba(0,230,195,0.12); }
   .poster-card.selected { border-color: var(--signal); box-shadow: 0 0 0 2px var(--signal-dim); }
+
+  /* Client-only favorite star (see FAVORITE_FLOWS_KEY) - sits in the
+     card's own top-right corner since .poster-card is already
+     position:relative for the ribbon. Dim/outline by default so a shelf
+     of un-favorited cards doesn't read as "half-broken" gold stars. */
+  .poster-fav-btn {
+    position: absolute; top: 10px; right: 10px; z-index: 1;
+    background: none; border: none; cursor: pointer; padding: 2px;
+    font-size: 16px; line-height: 1; color: var(--paper-dim); opacity: 0.6;
+    transition: color 0.15s ease, opacity 0.15s ease;
+  }
+  .poster-fav-btn:hover { opacity: 1; }
+  .poster-fav-btn.on { color: var(--signal); opacity: 1; }
 
   .poster-ribbon {
     align-self: flex-start;
@@ -325,11 +545,195 @@
   .import-card {
     flex: 0 0 180px; height: 90px; border-radius: 10px;
     background: linear-gradient(135deg, var(--ink-raised), var(--ink-line));
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
     border: 1px solid var(--ink-line);
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 8px; padding: 10px; text-align: center;
   }
   .import-card .name { font-size: 12.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+  /* ---------- Dashboard hero: greeting+quote+stats on the left, a live
+     device panel on the right - matched to the approved reference
+     mockup's .hero/.greet/.quote/.stats/.device markup almost verbatim.
+     Kept this file's own class names where JS/other code already depends
+     on them (.dash-greeting, .stat-tile-row, .stat-tile, .dash-quote),
+     adopted the mockup's own class names for the genuinely new pieces
+     (.beams, .device, .device-card, .halo, .stage, .phone, .device-info,
+     .pill, .meta) since nothing in this file used those names before.
+     Dropped the mockup's own Details/Stop-Server buttons from this card
+     (no .device-actions/.btn here) - real user feedback on the running
+     app was that a second set of those controls a few dozen pixels below
+     the persistent top status bar's own Details/Start/Stop read as
+     confusing duplication, not a helpful shortcut; the top bar remains
+     the one place those actions live, reachable from every tab, not just
+     Dashboard. ---------- */
+  .dash-top-grid { position: relative; display: grid; grid-template-columns: minmax(0,1fr) 336px; gap: 0; align-items: stretch; margin-bottom: 18px; }
+  .dash-top-left { position: relative; z-index: 2; min-width: 0; padding-right: 14px; }
+  .greet { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 26px; padding-top: 18px; }
+  .dash-greeting { margin: 0 0 14px; font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
+  .dash-greeting .name { color: var(--circuit); }
+
+  .dash-quote { font-style: italic; color: #d7e2df; font-size: 14px; line-height: 1.35; margin-right: 30px; flex-shrink: 0; }
+  .dash-quote span { display: block; }
+  .dash-quote span:nth-child(2) { padding-left: 14px; }
+  .dash-quote span:nth-child(3) { padding-left: 18px; }
+  .dash-quote cite { display: block; font-style: normal; font-size: 11.5px; color: var(--paper-dim); margin-top: 12px; padding-left: 66px; }
+
+  .stat-tile-row { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 12px; margin-bottom: 0; }
+  .stat-tile {
+    background: linear-gradient(180deg, var(--ink-raised-2), var(--ink-raised));
+    border: 1px solid var(--ink-line);
+    border-radius: 12px;
+    padding: 16px 10px 14px;
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    column-gap: 12px;
+    min-height: 98px;
+  }
+  .stat-tile-icon { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+  .stat-tile-icon.violet { background: rgba(139,92,246,0.22); }
+  .stat-tile-icon.blue   { background: rgba(59,130,246,0.18); }
+  .stat-tile-icon.green  { background: rgba(74,222,128,0.14); }
+  .stat-tile-icon.teal   { background: rgba(52,211,153,0.16); }
+  .stat-tile-icon.indigo { background: rgba(59,130,246,0.2); }
+  .stat-tile-value { display: block; font-size: 19px; font-weight: 600; margin-top: 2px; color: var(--paper); }
+  .stat-tile-value.accent { color: var(--circuit); }
+  .stat-tile-label { display: block; font-size: 12.5px; color: #c8d4d1; margin-top: 3px; font-weight: 400; text-transform: none; letter-spacing: normal; }
+  .stat-tile-trend { white-space: nowrap; font-size: 12px; color: var(--paper-dim); margin-top: 13px; min-height: 14px; }
+  .stat-tile-trend.up { color: var(--up); }
+  .stat-tile-trend.down { color: var(--alert); }
+
+  /* Light beams behind the device - purely decorative, skewed gradient
+     streaks, matching the reference's .beams exactly. */
+  .beams { position: absolute; inset: -22px -24px -24px auto; width: 640px; pointer-events: none; z-index: 0; overflow: hidden; }
+  .beams::before {
+    content: ""; position: absolute; left: 150px; top: -60px; bottom: -60px; width: 110px; transform: skewX(-30deg);
+    background: linear-gradient(90deg, transparent, rgba(90,230,185,0.10) 35%, rgba(110,240,200,0.16) 55%, transparent);
+  }
+  .beams::after {
+    content: ""; position: absolute; left: 170px; top: -10px; width: 170px; height: 60px; transform: skewX(-40deg);
+    background: linear-gradient(180deg, rgba(90,200,165,0.10), transparent);
+  }
+
+  /* ---------- Device card: the live device panel itself, a true CSS 3D
+     phone pair (perspective + rotateY + translateZ, real side faces -
+     not a flat gradient standing in for depth) tilted and cropped by the
+     card's own bottom/right edge. All the actual status text (name/OS/
+     bridge/last-synced) is real data - see loadDashboardDeviceCard()/
+     mirrorBridgeStatus() JS, unchanged by this markup rework. ---------- */
+  .device { position: relative; z-index: 1; min-height: 228px; }
+  .device-card {
+    position: absolute; inset: 0 0 0 72px; border: 1px solid var(--ink-line); border-radius: 12px;
+    background:
+      radial-gradient(120% 90% at 0% 100%, rgba(70,230,180,0.10), transparent 55%),
+      linear-gradient(180deg, rgba(18,40,35,0.9), rgba(10,24,21,0.95));
+    overflow: hidden;
+  }
+  .device-info { position: absolute; right: 0; top: 0; bottom: 0; width: 176px; padding: 20px 16px 16px 0; display: flex; flex-direction: column; z-index: 3; }
+  .device-info h3 { margin: 0 0 8px; font-size: 17px; font-weight: 600; color: var(--paper); }
+  .pill {
+    align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: #b6f7de;
+    background: rgba(76,230,170,0.14); border: 1px solid rgba(92,240,194,0.16); padding: 4px 10px; border-radius: 6px; margin-bottom: 14px;
+  }
+  .pill i { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--up); box-shadow: 0 0 8px var(--up); }
+  .meta { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #d4dfdc; margin-bottom: 14px; }
+  .meta svg { flex-shrink: 0; }
+  .meta.sync { color: var(--paper-dim); margin-bottom: 0; }
+
+  /* Phones */
+  .stage {
+    position: absolute; left: 0; right: 150px; top: -40px; bottom: 0; overflow: hidden; z-index: 2;
+    perspective: 560px; perspective-origin: 30% 45%;
+  }
+  .phone { position: absolute; transform-style: preserve-3d; }
+  .phone .front {
+    position: absolute; inset: 0; border-radius: 24px; padding: 3px; transform: translateZ(var(--t));
+    background: linear-gradient(90deg, #2a3033, #0d1011 30%, #050606 70%, #3a4245);
+    box-shadow: 0 0 0 1px #000;
+  }
+  .phone .glass { position: relative; width: 100%; height: 100%; border-radius: 21px; overflow: hidden; background: #030505; }
+  .phone .side {
+    position: absolute; left: 0; top: 0; bottom: 0; width: var(--t); border-radius: 12px;
+    transform-origin: left center; transform: rotateY(-90deg);
+    background: linear-gradient(90deg, #07090a 0%, #22292c 16%, #8f9a9e 23%, #2a3134 30%, #0c0f10 48%, #151a1c 66%, #6f7a7e 76%, #1d2326 84%, #07090a 100%);
+  }
+  .phone .side::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255,255,255,0.35), transparent 8%, transparent 92%, rgba(0,0,0,0.4));
+  }
+  .phone .side i {
+    position: absolute; left: 30%; right: 30%; border-radius: 2px;
+    background: linear-gradient(90deg, #0e1213, #5d686c 45%, #15191b); box-shadow: 0 0 0 1px rgba(0,0,0,0.6);
+  }
+  .phone .side i:nth-child(1) { top: 58px; height: 12px; }
+  .phone .side i:nth-child(2) { top: 86px; height: 28px; }
+  .phone .side i:nth-child(3) { top: 122px; height: 28px; }
+  .phone .notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 36%; height: 13px; background: #000;
+    border-radius: 0 0 11px 11px; z-index: 5;
+  }
+  .phone .notch::before, .phone .notch::after { content: ""; position: absolute; top: 0; width: 8px; height: 8px; }
+  .phone .notch::before { left: -8px; background: radial-gradient(circle at 0 100%, transparent 7.5px, #000 8px); }
+  .phone .notch::after { right: -8px; background: radial-gradient(circle at 100% 100%, transparent 7.5px, #000 8px); }
+  .phone .notch i { position: absolute; right: 26%; top: 5px; width: 5px; height: 5px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #2d3f5a, #030406 70%); }
+  .phone.back .glass {
+    background:
+      radial-gradient(90% 60% at 20% 30%, rgba(60,140,110,0.18), transparent 70%),
+      linear-gradient(180deg, #0b1714, #040807 60%);
+  }
+  .phone.back .glass::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(115deg, rgba(255,255,255,0.08) 0 30%, transparent 31%);
+  }
+  .phone.fore .glass {
+    background:
+      linear-gradient(128deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.06) 34%, transparent 34.6%),
+      linear-gradient(180deg, #272b2d 0%, #0d0f10 38%, #040505 60%, #03110c 100%);
+  }
+  .phone.fore .glass::before {
+    content: ""; position: absolute; left: -70%; right: -30%; top: 26%; height: 120%; border-radius: 50%;
+    border-top: 2px solid rgba(140,255,215,0.75);
+    box-shadow: 0 -4px 16px rgba(90,255,200,0.45), inset 0 18px 40px rgba(70,230,175,0.30); transform: rotate(-16deg);
+  }
+  .phone.fore .glass::after {
+    content: ""; position: absolute; left: -30%; right: -70%; top: 36%; height: 120%; border-radius: 50%;
+    border-top: 1.5px solid rgba(120,255,205,0.45);
+    background: radial-gradient(60% 40% at 50% 20%, rgba(60,230,170,0.35), transparent 70%); transform: rotate(-22deg);
+  }
+  .phone .shine {
+    position: absolute; inset: 0; border-radius: 21px; z-index: 4; pointer-events: none;
+    background: linear-gradient(90deg, rgba(255,255,255,0.10), transparent 12%);
+  }
+  .phone.back { --t: 20px; width: 92px; height: 340px; left: 24px; top: 30px; transform: rotateY(38deg); }
+  .phone.fore { --t: 18px; width: 98px; height: 320px; left: 66px; top: 66px; transform: rotateY(34deg); }
+  .halo {
+    position: absolute; left: -30px; top: 10px; width: 260px; height: 260px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(60,220,165,0.18), transparent 65%); z-index: 1; pointer-events: none;
+  }
+
+  @media (max-width: 1180px) {
+    .dash-top-grid { grid-template-columns: 1fr; }
+    .device { margin-top: 28px; max-width: 400px; }
+    .beams { display: none; }
+    .stat-tile-row { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  }
+  @media (max-width: 760px) {
+    .greet { flex-direction: column; }
+    .dash-quote { margin: 0; }
+    .stat-tile-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  }
+
+  .data-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .data-table th, .data-table td { border-bottom: 1px solid var(--ink-line); padding: 8px 10px; text-align: left; vertical-align: middle; }
+  .data-table th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--paper-dim); font-weight: 700; }
+  .data-table tr:last-child td { border-bottom: none; }
+
+  .device-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--ink-line);
+  }
+  .device-row:last-child { border-bottom: none; }
 
   /* ---------- Test Builder's step indicator - orientation, not a
      gate (see the HTML comment above where this renders). Plain bordered
@@ -407,11 +811,85 @@
 
   .card {
     background: var(--ink-raised);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
     border: 1px solid var(--ink-line);
     border-radius: 14px;
     padding: 24px 26px;
     margin-bottom: 18px;
-    box-shadow: 0 1px 2px rgba(16,20,28,0.04), 0 4px 16px rgba(16,20,28,0.05);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2), 0 8px 28px rgba(0,230,195,0.05);
+  }
+
+  /* ---------- Global utility bar (search / notifications / theme /
+     user menu) - see the HTML comment above .util-bar for what's real
+     vs. decorative in here. ---------- */
+  .util-bar { display: none; align-items: center; gap: 16px; margin-bottom: 18px; }
+  .util-search {
+    flex: 1; max-width: 520px; min-width: 0; height: 40px; display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid var(--ink-line); border-radius: 10px; padding: 0 8px 0 14px; color: var(--paper-dim);
+  }
+  .util-search svg { flex-shrink: 0; }
+  .util-search input {
+    flex: 1; min-width: 0; border: none; background: none; outline: none;
+    color: var(--paper); font-family: var(--sans); font-size: 12.5px;
+  }
+  .util-search input::placeholder { color: #b8c7c3; }
+  .util-search kbd {
+    flex-shrink: 0; font-size: 11.5px; color: #cfdbd8;
+    border: 1px solid var(--ink-line-strong); background: rgba(255,255,255,0.03); border-radius: 6px; padding: 4px 8px;
+  }
+  .util-actions { display: flex; align-items: center; gap: 26px; margin-left: auto; flex-shrink: 0; }
+  .util-popover { position: relative; }
+  .util-icon-btn {
+    position: relative; width: auto; height: auto; border-radius: 0;
+    display: flex; align-items: center; justify-content: center; padding: 4px;
+    background: none; border: none; color: #cfdbd8; cursor: pointer;
+    transition: color 0.15s;
+  }
+  .util-icon-btn:hover { color: var(--paper); }
+  .util-notif-dot {
+    position: absolute; top: 3px; right: 4px; width: 7px; height: 7px; border-radius: 50%;
+    background: #ff5a5a; box-shadow: 0 0 0 2px var(--ink);
+  }
+  .util-divider { width: 1px; height: 30px; background: var(--ink-line); flex-shrink: 0; }
+  .util-user {
+    display: flex; align-items: center; gap: 12px; cursor: pointer;
+    padding: 0; border-radius: 10px; transition: opacity 0.15s;
+  }
+  .util-user:hover { opacity: 0.85; }
+  .util-avatar {
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 500; font-size: 14px; color: #fff;
+    background: linear-gradient(180deg, #f472b6, #a855f7);
+  }
+  .util-user-name { font-size: 14px; font-weight: 600; color: var(--paper); }
+  .util-user svg { color: var(--paper-dim); flex-shrink: 0; }
+  .util-dropdown {
+    position: absolute; top: calc(100% + 10px); right: 0; z-index: 60;
+    background: var(--ink-raised);
+    backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid var(--ink-line); border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+    padding: 6px;
+  }
+  .util-dropdown-title { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--paper-dim); padding: 8px 10px 6px; }
+  .util-dropdown-body { max-height: 260px; overflow-y: auto; }
+  .util-dropdown-item {
+    display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+    padding: 9px 10px; font-size: 13px; color: var(--paper); font-family: var(--sans); border-radius: 8px;
+  }
+  .util-dropdown-item:hover { background: var(--ink-raised-2); color: var(--circuit-bright); }
+  .util-notif-row {
+    display: block; padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  }
+  .util-notif-row:hover { background: var(--ink-raised-2); }
+  .util-notif-row .util-notif-flow { font-size: 12.5px; font-weight: 600; color: var(--paper); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .util-notif-row .util-notif-meta { font-size: 11px; color: var(--paper-dim); margin-top: 2px; }
+  @media (max-width: 900px) {
+    .util-bar { flex-wrap: wrap; }
+    .util-search { max-width: none; order: 2; flex: 1 1 100%; }
   }
 
   .grid {
@@ -661,11 +1139,13 @@
   #authGate {
     position: fixed; inset: 0; z-index: 1000;
     display: flex; align-items: center; justify-content: center;
-    background: rgba(20,24,20,0.35); backdrop-filter: blur(6px);
+    background: rgba(3,5,8,0.6); backdrop-filter: blur(6px);
   }
   #authGateCard {
-    width: 320px; background: var(--ink-raised); border: 1px solid var(--ink-line);
-    border-radius: 16px; padding: 28px; box-shadow: 0 20px 60px rgba(16,20,28,0.25);
+    width: 320px; background: var(--ink-raised);
+    backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid var(--ink-line);
+    border-radius: 16px; padding: 28px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
     text-align: center;
   }
 </style>
@@ -675,8 +1155,9 @@
 <div id="authGate">
   <div id="authGateCard">
     <div class="dot" style="margin:0 auto 12px;"></div>
-    <div style="font-size:16px; font-weight:700; margin-bottom:4px;">Habi's Final Run</div>
-    <div class="hint" style="margin-bottom:16px;">Enter the team passcode to continue</div>
+    <div style="font-size:16px; font-weight:700; margin-bottom:4px;">Mobile Agent Console</div>
+    <div class="hint" id="authGateSubtitle" style="margin-bottom:16px;">Enter your name and the team passcode to continue</div>
+    <input type="text" id="authGateNameInput" placeholder="Your name" autocomplete="off" style="text-align:center; margin-bottom:10px;">
     <input type="password" id="authGateInput" placeholder="Passcode" autocomplete="off" style="text-align:center; margin-bottom:10px;">
     <button class="copy" id="authGateBtn" style="width:100%; padding:10px;">Unlock</button>
     <div id="authGateError" style="color:var(--alert); font-size:12px; margin-top:10px; min-height:14px;"></div>
@@ -686,10 +1167,20 @@
 <div class="app-shell" id="appShell" style="display:none;">
   <nav class="side-nav" id="sideNav">
     <header class="side-nav-header">
-      <span class="dot"></span>
+      <span class="brand-logo" aria-hidden="true">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+          <line x1="20" y1="4" x2="20" y2="10" stroke="#5cf0c2" stroke-width="2.4" stroke-linecap="round"/>
+          <circle cx="20" cy="4" r="2.6" fill="#5cf0c2"/>
+          <rect x="7" y="10" width="26" height="22" rx="7" fill="#5cf0c2"/>
+          <rect x="3" y="17" width="4" height="9" rx="2" fill="#5cf0c2"/>
+          <rect x="33" y="17" width="4" height="9" rx="2" fill="#5cf0c2"/>
+          <rect x="11" y="15" width="18" height="11" rx="4" fill="#07110f"/>
+          <circle cx="16" cy="20.5" r="2.2" fill="#5cf0c2"/><circle cx="24" cy="20.5" r="2.2" fill="#5cf0c2"/>
+        </svg>
+      </span>
       <div class="side-nav-title">
-        <h1>Habi's Final Run</h1>
-        <p class="sub">Guide it once. Then I will handle every re-test after.</p>
+        <h1>Habi Final Run</h1>
+        <p class="sub">Console</p>
       </div>
       <button id="sideNavToggleBtn" title="Collapse sidebar">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -697,12 +1188,16 @@
     </header>
 
     <div class="tabs">
+      <button class="tab active" data-tab="dashboard" title="Dashboard">
+        <span class="tab-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+        <span class="tab-label">Dashboard</span>
+      </button>
       <button class="tab" data-tab="scraper" title="Test Builder">
         <span class="tab-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z"/></svg></span>
         <span class="tab-label">Test Builder</span>
       </button>
-      <div class="tab-group-label">Test Library</div>
-      <button class="tab tab-child" data-tab="library-flows" title="Saved Flows">
+      <div class="tab-group-label">Library</div>
+      <button class="tab tab-child" data-tab="library-flows" id="navSavedFlows" title="Saved Flows">
         <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>
         <span class="tab-label">Saved Flows</span>
       </button>
@@ -710,24 +1205,96 @@
         <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg></span>
         <span class="tab-label">Test Scripts</span>
       </button>
-      <button class="tab" data-tab="manual" title="Manual API Capture">
-        <span class="tab-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></span>
+      <button class="tab tab-child" data-tab="library-flows" id="navPreconditions" title="Preconditions">
+        <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+        <span class="tab-label">Preconditions</span>
+      </button>
+      <div class="tab-group-label">Capture</div>
+      <button class="tab tab-child" data-tab="manual" title="Manual API Capture">
+        <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></span>
         <span class="tab-label">Manual API Capture</span>
       </button>
-      <button class="tab" data-tab="mtc" title="Generate Manual Test Cases">
-        <span class="tab-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg></span>
-        <span class="tab-label">Generate Manual Test Cases</span>
+      <button class="tab tab-child" data-tab="mtc" title="Generate Manual Test Cases">
+        <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg></span>
+        <span class="tab-label">Generate Test Cases</span>
       </button>
-      <button class="tab active" data-tab="run" title="AI Eye">
-        <span class="tab-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
+      <button class="tab tab-child" data-tab="run" title="AI Eye">
+        <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
         <span class="tab-label">AI Eye</span>
+      </button>
+      <div class="tab-group-label">Execution</div>
+      <button class="tab tab-child" data-tab="recent-runs" title="Recent Runs">
+        <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+        <span class="tab-label">Recent Runs</span>
+      </button>
+      <button class="tab tab-child" data-tab="test-reports" title="Test Reports">
+        <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+        <span class="tab-label">Test Reports</span>
+      </button>
+      <button class="tab tab-child" data-tab="device-lab" title="Device Lab">
+        <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg></span>
+        <span class="tab-label">Device Lab</span>
       </button>
       <button class="tab" data-tab="build" style="display:none;">Build Command</button>
       <button class="tab" data-tab="report" style="display:none;">View Run Report</button>
     </div>
+
+    <div class="tabs" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--ink-line);">
+      <button class="tab" data-tab="settings" title="Settings">
+        <span class="tab-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+        <span class="tab-label">Settings</span>
+      </button>
+    </div>
   </nav>
 
   <main class="content">
+
+  <!-- Global utility bar - search live-filters the Saved Flows cards
+       (Dashboard preview + full Saved Flows page, same cards/data, no
+       second dataset); the bell is real (lists actual recent fail/error
+       runs from the same /api/dashboard-stats fetch the Dashboard already
+       makes, see loadUtilNotifications below - not decorative); the sun
+       icon is a real light/dark toggle (swaps :root token values via
+       [data-theme], persisted in localStorage - see THEME_KEY below); the
+       user menu's two actions are both real (Settings is just this app's
+       own Settings tab; "Lock console" clears the auth-gate's storage key
+       and reloads, reusing the existing passcode gate rather than a
+       second auth system). -->
+  <div class="util-bar">
+    <div class="util-search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="utilSearchInput" placeholder="Search flows, tests, devices, or tags…">
+      <kbd>⌘ K</kbd>
+    </div>
+    <div class="util-actions">
+      <div class="util-popover">
+        <button type="button" class="util-icon-btn" id="utilNotifBtn" title="Recent failures">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="util-notif-dot" id="utilNotifDot" style="display:none;"></span>
+        </button>
+        <div id="utilNotifPanel" class="util-dropdown" style="display:none; width:300px;">
+          <div class="util-dropdown-title">Recent failures</div>
+          <div id="utilNotifList" class="util-dropdown-body"><div class="empty-hint" style="font-size:12px; padding:10px 14px;">Loading…</div></div>
+        </div>
+      </div>
+      <button type="button" class="util-icon-btn" id="utilThemeBtn" title="Toggle light/dark theme">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
+      <span class="util-divider"></span>
+      <div class="util-popover">
+        <div class="util-user" id="utilUserMenuBtn">
+          <span class="util-avatar" id="utilAvatar">?</span>
+          <span class="util-user-name" id="utilUserName">there</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="utilUserMenu" class="util-dropdown" style="display:none; width:170px;">
+          <button type="button" class="util-dropdown-item" id="utilUserSettingsBtn">Settings</button>
+          <button type="button" class="util-dropdown-item" id="utilUserEditNameBtn">Edit name</button>
+          <button type="button" class="util-dropdown-item" id="utilUserLockBtn">Lock console</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Bridge server status - lives here, outside every .panel, so it's
        visible no matter which tab you're on. Every tab needs the bridge
@@ -738,16 +1305,16 @@
        it's now permanently on screen instead of appearing on one tab only -
        the one-time-setup note moved into "Details" so it doesn't repeat
        itself under every tab. -->
-  <div id="bridgeStatusCard" style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; background:var(--ink-raised); border:1px solid var(--ink-line); border-radius:10px; padding:8px 14px; margin-bottom:18px;">
+  <div id="bridgeStatusCard" style="position:relative; z-index:50; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; background:var(--ink-raised); backdrop-filter:blur(16px) saturate(140%); -webkit-backdrop-filter:blur(16px) saturate(140%); border:1px solid var(--ink-line); border-radius:10px; padding:8px 14px; margin-bottom:18px;">
     <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; min-width:0;">
       <span class="dot" id="bridgeDot" style="background:var(--paper-dim); box-shadow:none; flex-shrink:0;"></span>
       <span id="bridgeStatusText">Checking for local bridge server…</span>
       <span id="bridgeActionStatus" style="font-size:11.5px;"></span>
     </div>
     <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
-      <details style="font-size:11px;">
+      <details id="bridgeDetailsToggle" style="font-size:11px;">
         <summary class="hint" style="cursor:pointer; display:inline;">Details</summary>
-        <div class="hint" style="position:absolute; z-index:5; margin-top:6px; right:0; width:340px; padding:10px 12px; background:var(--ink-raised); border:1px solid var(--ink-line); border-radius:8px; font-size:11.5px; line-height:1.5; box-shadow:0 4px 16px rgba(16,20,28,0.2);">
+        <div class="hint" style="position:absolute; z-index:5; margin-top:6px; right:0; width:340px; padding:10px 12px; background:var(--ink-raised); backdrop-filter:blur(16px) saturate(140%); -webkit-backdrop-filter:blur(16px) saturate(140%); border:1px solid var(--ink-line); border-radius:8px; font-size:11.5px; line-height:1.5; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
           Already have this project's Python code checked out? One-time setup, then never touch the
           terminal again: run <code>python -m mobile_agent.launcher</code> once and just leave it running
           in the background. After that, use the Start/Stop buttons here whenever you want.
@@ -771,8 +1338,8 @@
              back later after actually forgetting these steps sees it
              again instead of it staying hidden forever from one earlier
              dismissal. -->
-        <div id="bridgeDownloadNote" style="position:absolute; z-index:6; top:calc(100% + 10px); right:0; width:260px; padding:12px 14px; background:#FFFBEB; border:1px solid #FDE68A; border-radius:10px; font-size:11.5px; line-height:1.55; color:var(--paper); box-shadow:0 6px 20px rgba(16,20,28,0.15);">
-          <div style="position:absolute; top:-6px; right:22px; width:11px; height:11px; background:#FFFBEB; border-left:1px solid #FDE68A; border-top:1px solid #FDE68A; transform:rotate(45deg);"></div>
+        <div id="bridgeDownloadNote" style="position:absolute; z-index:6; top:calc(100% + 10px); right:0; width:260px; padding:12px 14px; background:rgba(42,33,9,0.85); backdrop-filter:blur(16px) saturate(140%); -webkit-backdrop-filter:blur(16px) saturate(140%); border:1px solid #4A3B18; border-radius:10px; font-size:11.5px; line-height:1.55; color:var(--paper); box-shadow:0 6px 24px rgba(0,0,0,0.35);">
+          <div style="position:absolute; top:-6px; right:22px; width:11px; height:11px; background:#2A2109; border-left:1px solid #4A3B18; border-top:1px solid #4A3B18; transform:rotate(45deg);"></div>
           <button id="bridgeDownloadNoteClose" title="Dismiss" style="position:absolute; top:6px; right:8px; background:none; border:none; cursor:pointer; color:var(--paper-dim); font-size:14px; line-height:1; padding:2px;">&times;</button>
           <b>After it downloads:</b>
           <ol style="margin:6px 0 0; padding-left:16px;">
@@ -785,6 +1352,214 @@
       </div>
       <button class="copy" id="bridgeStartBtn" style="display:none; padding:5px 12px; font-size:11.5px;">Start server</button>
       <button class="copy" id="bridgeStopBtn" style="display:none; background:var(--ink-line); color:var(--paper); padding:5px 12px; font-size:11.5px;">Stop server</button>
+    </div>
+  </div>
+
+  <!-- ============ DASHBOARD (new default-active home panel) ============ -->
+  <div class="panel active" id="panel-dashboard">
+
+    <div class="dash-top-grid">
+      <div class="beams" aria-hidden="true"></div>
+
+      <div class="dash-top-left">
+        <div class="greet">
+          <div>
+            <h2 class="dash-greeting" id="dashGreeting">Hi there</h2>
+            <p class="hint" style="margin:0; font-size:16px; color:#c9d6d2;">Here's where things stand right now.</p>
+          </div>
+          <!-- Pure decorative branding copy (not data, unlike everything
+               else on this page). -->
+          <blockquote class="dash-quote" aria-hidden="true">
+            <span>&ldquo;Better tests.</span><span>Healthier users.</span><span>A healthier world.&rdquo;</span>
+            <cite>— HabitNu</cite>
+          </blockquote>
+        </div>
+
+        <div class="stat-tile-row">
+          <div class="stat-tile">
+            <div class="stat-tile-icon violet"><svg width="22" height="22" viewBox="0 0 24 24" fill="#a78bfa"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h4l2 2h7A2.5 2.5 0 0 1 21 8.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/></svg></div>
+            <div>
+              <div class="stat-tile-value" id="dashStatFlowsTotal">—</div>
+              <div class="stat-tile-label">Saved Flows</div>
+              <div class="stat-tile-trend" id="dashStatFlowsTotalTrend"></div>
+            </div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-tile-icon blue"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg></div>
+            <div>
+              <div class="stat-tile-value" id="dashStatFlowsIOS">—</div>
+              <div class="stat-tile-label">iOS Flows</div>
+              <div class="stat-tile-trend" id="dashStatFlowsIOSTrend"></div>
+            </div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-tile-icon green"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#86efac" stroke-width="2"><rect x="4" y="5" width="16" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+            <div>
+              <div class="stat-tile-value" id="dashStatFlowsAndroid">—</div>
+              <div class="stat-tile-label">Android Flows</div>
+              <div class="stat-tile-trend" id="dashStatFlowsAndroidTrend"></div>
+            </div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-tile-icon teal"><svg width="22" height="22" viewBox="0 0 24 24" fill="#4ade9f"><rect x="4" y="13" width="4" height="7" rx="1.2"/><rect x="10" y="9" width="4" height="11" rx="1.2"/><rect x="16" y="4" width="4" height="16" rx="1.2"/></svg></div>
+            <div>
+              <div class="stat-tile-value accent" id="dashStatPassRate">—</div>
+              <div class="stat-tile-label">Pass Rate <span class="opt" title="Over the most recent runs scanned, not a full historical ledger">(recent)</span></div>
+              <div class="stat-tile-trend" id="dashStatPassRateTrend"></div>
+            </div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-tile-icon indigo"><svg width="22" height="22" viewBox="0 0 24 24" fill="#4f9bff"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg></div>
+            <div>
+              <div class="stat-tile-value" id="dashStatRunsToday">—</div>
+              <div class="stat-tile-label">Runs Today</div>
+              <div class="stat-tile-trend" id="dashStatRunsTodayTrend"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero "live device" panel - a true CSS 3D phone pair (perspective
+           + rotateY + translateZ side faces, not a flat gradient standing
+           in for depth), tilted and cropped by the card's own edge. All
+           the actual status text (name/OS/bridge/last-synced) is real
+           data from the same fetchDevices()/checkBridge() the plain
+           Device Lab page already uses - see loadDashboardDeviceCard()/
+           mirrorBridgeStatus() JS, unchanged by this markup. -->
+      <div class="device" id="heroDeviceCard">
+        <div class="device-card"></div>
+        <div class="halo"></div>
+        <div class="stage" aria-hidden="true">
+          <div class="phone back">
+            <div class="side"><i></i><i></i><i></i></div>
+            <div class="front"><div class="glass"><span class="notch"><i></i></span><span class="shine"></span></div></div>
+          </div>
+          <div class="phone fore">
+            <div class="side"><i></i><i></i><i></i></div>
+            <div class="front"><div class="glass"><span class="notch"><i></i></span><span class="shine"></span></div></div>
+          </div>
+        </div>
+
+        <div class="device-info">
+          <h3 id="heroDeviceName">No device connected</h3>
+          <span class="pill"><i id="heroDeviceDot"></i><span id="heroDeviceStatusText">Checking…</span></span>
+          <div class="meta"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2.5" width="12" height="19" rx="3"/></svg><span id="heroDeviceOS"></span></div>
+          <div class="meta"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span id="heroBridgeText">Bridge server — checking…</span></div>
+          <div class="meta sync" id="heroLastSynced">Not synced yet</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row-header">
+        <div class="row-title" style="font-size:16px;">Device &amp; Bridge</div>
+      </div>
+      <div id="dashDeviceCard">
+        <div class="empty-hint" style="font-size:12.5px;">Loading device info…</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row-header">
+        <div class="row-title" style="font-size:16px;">Recent Runs</div>
+        <a href="#" id="dashViewAllRuns" class="hint" style="font-weight:700; text-decoration:none; color:var(--circuit); flex-shrink:0;">View all →</a>
+      </div>
+      <div id="dashRecentRunsTable"><div class="empty-hint">Loading…</div></div>
+    </div>
+
+    <div class="card" id="dashReportViewerCard" style="display:none;">
+      <div class="row-header">
+        <div class="row-title" style="font-size:16px;">Run report</div>
+        <button class="copy" id="dashReportCloseBtn" style="padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">Close</button>
+      </div>
+      <div id="dashReportViewer"></div>
+    </div>
+
+  </div>
+
+  <!-- ============ RECENT RUNS (new standalone panel) ============ -->
+  <div class="panel" id="panel-recent-runs">
+    <div class="card">
+      <div class="row-header">
+        <div class="row-title">Recent Runs</div>
+        <button class="copy" id="refreshRecentRunsBtn" style="padding:6px 12px; font-size:11px; background:var(--ink-line); color:var(--paper);">Refresh</button>
+      </div>
+      <div id="recentRunsTable"><div class="empty-hint">Loading…</div></div>
+    </div>
+    <div class="card" id="recentRunsReportCard" style="display:none;">
+      <div class="row-header">
+        <div class="row-title" style="font-size:16px;">Run report</div>
+        <button class="copy" id="recentRunsReportCloseBtn" style="padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">Close</button>
+      </div>
+      <div id="recentRunsReportViewer"></div>
+    </div>
+  </div>
+
+  <!-- ============ TEST REPORTS (new standalone panel) ============ -->
+  <div class="panel" id="panel-test-reports">
+    <div class="card">
+      <div class="row-header">
+        <div class="row-title">Test Reports</div>
+        <button class="copy" id="refreshTestReportsBtn" style="padding:6px 12px; font-size:11px; background:var(--ink-line); color:var(--paper);">Refresh</button>
+      </div>
+      <div id="testReportsList"><div class="empty-hint">Loading…</div></div>
+    </div>
+    <div class="card" id="testReportsViewerCard" style="display:none;">
+      <div class="row-header">
+        <div class="row-title" style="font-size:16px;" id="testReportsViewerTitle">Report</div>
+        <button class="copy" id="testReportsViewerCloseBtn" style="padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">Close</button>
+      </div>
+      <div id="testReportsViewer"></div>
+    </div>
+  </div>
+
+  <!-- ============ DEVICE LAB (new standalone panel) ============ -->
+  <div class="panel" id="panel-device-lab">
+    <div class="card">
+      <div class="row-header">
+        <div class="row-title">Bridge status</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; font-size:13px;">
+        <span class="dot" id="deviceLabBridgeDot" style="background:var(--paper-dim); box-shadow:none;"></span>
+        <span id="deviceLabBridgeText">Checking…</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row-header">
+        <div class="row-title">iOS devices</div>
+        <button class="copy" id="refreshIosDevicesBtn" style="padding:6px 12px; font-size:11px; background:var(--ink-line); color:var(--paper);">Refresh</button>
+      </div>
+      <div id="deviceLabIosList"><div class="empty-hint">Loading…</div></div>
+    </div>
+    <div class="card">
+      <div class="row-header">
+        <div class="row-title">Android devices</div>
+        <button class="copy" id="refreshAndroidDevicesBtn" style="padding:6px 12px; font-size:11px; background:var(--ink-line); color:var(--paper);">Refresh</button>
+      </div>
+      <div id="deviceLabAndroidList"><div class="empty-hint">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- ============ SETTINGS (new standalone panel) ============ -->
+  <div class="panel" id="panel-settings">
+    <div class="card">
+      <div class="row-title" style="margin-bottom:10px; font-size:16px;">Bridge server</div>
+      <div class="hint" style="line-height:1.6;">
+        Already have this project's Python code checked out? One-time setup, then never touch the
+        terminal again: run <code>python -m mobile_agent.launcher</code> once and just leave it running
+        in the background. After that, use the Start/Stop buttons in the top status bar whenever you want.
+      </div>
+      <div class="hint" style="margin-top:10px; line-height:1.6;">
+        Nothing set up at all? Use <b>Download app</b> in the top status bar instead - a standalone build, no
+        Python or install needed. A browser can't run it for you automatically, so after it downloads: unzip
+        it, then right-click the extracted app and choose <b>Open</b> once to approve it (Gatekeeper blocks
+        unsigned apps by default - a plain double-click's warning has no Open option). Leave it running - the
+        bridge status bar turns green on its own once it's up.
+      </div>
+    </div>
+    <div class="card">
+      <div class="row-title" style="margin-bottom:10px; font-size:16px;">About</div>
+      <div class="hint">Mobile Agent Console — build, run and ship mobile test automation.</div>
     </div>
   </div>
 
@@ -862,7 +1637,7 @@
   </div>
 
   <!-- ============ RUN IN BROWSER TAB ============ -->
-  <div class="panel active" id="panel-run">
+  <div class="panel" id="panel-run">
 
     <div class="card">
       <div class="field full">
@@ -979,48 +1754,66 @@
   </div>
 
   <!-- ============ TEST LIBRARY TAB: SAVED FLOWS (child) ============ -->
+  <!-- Redesigned to match the approved "Saved Flows redesign" reference:
+       one page, three tabs (My flows / Preconditions / From team) instead
+       of three always-visible stacked cards, a proper card grid instead
+       of a horizontally-scrolling shelf, and a real "N more flows / Show
+       all" pagination tile instead of an unbounded row. Every tab still
+       drives from the exact same fetches/state this file already had
+       (loadSavedFlows/loadPreconditionsList/loadSharedFlows,
+       favoriteFlowSlugs, flowRunState, selectFlow/renderFlowDetail) - only
+       the card markup and page chrome are new. -->
   <div class="panel" id="panel-library-flows">
 
-    <div class="card row-card">
-      <div class="row-header">
-        <div>
-          <div class="row-title">Saved Flows</div>
-          <div class="hint" style="font-size:10.5px; margin-top:2px;">deterministic replay — no LLM calls</div>
-        </div>
-        <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
-          <div id="savedFlowsPlatformFilter" style="display:flex; gap:4px;"></div>
-          <button class="copy" id="refreshFlowsBtn" style="padding:6px 12px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Refresh</button>
-        </div>
+    <div class="flows-header">
+      <div>
+        <h1 class="flows-title">Saved flows</h1>
+        <p class="hint" style="margin:2px 0 0; font-size:13.5px;">Recorded flows replay step by step, with no LLM calls.</p>
       </div>
-      <div id="savedFlowsList" class="poster-row">Loading…</div>
-      <div id="savedFlowsPager" class="hint" style="margin-top:8px; font-size:11px;"></div>
+      <button type="button" class="copy flows-create-btn" id="createFlowBtn">+ Create flow</button>
     </div>
 
-    <div class="card row-card">
-      <div class="row-header">
-        <div>
-          <div class="row-title" style="font-size:16px;">Preconditions</div>
-          <div class="hint" style="font-size:10.5px; margin-top:2px;">replayed automatically at the start of a run via "Start from" - e.g. login</div>
-        </div>
-        <button class="copy" id="refreshPreconditionsListBtn" style="padding:6px 12px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Refresh</button>
-      </div>
-      <div id="preconditionsList" class="poster-row">Loading…</div>
+    <div class="flows-tabs">
+      <button type="button" class="flows-tab active" data-flows-tab="my-flows">My flows <span class="flows-tab-count" id="flowsTabCountMy">0</span></button>
+      <button type="button" class="flows-tab" data-flows-tab="preconditions">Preconditions <span class="flows-tab-count" id="flowsTabCountPre">0</span></button>
+      <button type="button" class="flows-tab" data-flows-tab="from-team">From team <span class="flows-tab-count" id="flowsTabCountTeam">0</span></button>
     </div>
 
-    <div class="card row-card">
-      <div class="row-header">
-        <div>
-          <div class="row-title" style="font-size:16px;">From team</div>
-          <div class="hint" style="font-size:10.5px; margin-top:2px;">published by teammates — import to run it locally</div>
+    <div class="flows-tab-panel active" id="flowsTabPanel-my-flows">
+      <div class="flows-toolbar">
+        <div class="util-search flows-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="savedFlowsSearchInput" placeholder="Search flows">
         </div>
-        <button class="copy" id="refreshSharedFlowsBtn" style="padding:6px 12px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Refresh</button>
+        <div id="savedFlowsPlatformFilter" class="flows-filter-pills"></div>
+        <div class="view-toggle" id="savedFlowsViewToggle">
+          <button type="button" class="view-toggle-btn on" data-view="grid" title="Grid view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+          <button type="button" class="view-toggle-btn" data-view="list" title="List view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg></button>
+        </div>
+        <button type="button" class="util-icon-btn flows-icon-btn" id="refreshFlowsBtn" title="Refresh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
       </div>
-      <div id="sharedFlowsList" class="poster-row">Loading…</div>
+      <div id="savedFlowsList" class="flows-grid">Loading…</div>
+
+      <div class="card" id="savedFlowDetailCard" style="margin-top:18px;">
+        <div id="savedFlowDetailEmpty" class="empty-hint">Select a flow above to view its details, run it, and see its execution trace.</div>
+        <div id="savedFlowDetail" style="display:none;"></div>
+      </div>
     </div>
 
-    <div class="card" id="savedFlowDetailCard">
-      <div id="savedFlowDetailEmpty" class="empty-hint">Select a flow above to view its details, run it, and see its execution trace.</div>
-      <div id="savedFlowDetail" style="display:none;"></div>
+    <div class="flows-tab-panel" id="flowsTabPanel-preconditions" style="display:none;">
+      <div class="flows-subheader">
+        <p class="hint" style="margin:0; font-size:13.5px;">Preconditions replay automatically at the start of a run when you pick them in "Start from", for example to log in first.</p>
+        <button type="button" class="util-icon-btn flows-icon-btn" id="refreshPreconditionsListBtn" title="Refresh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+      </div>
+      <div id="preconditionsList" class="flows-grid flows-grid-compact">Loading…</div>
+    </div>
+
+    <div class="flows-tab-panel" id="flowsTabPanel-from-team" style="display:none;">
+      <div class="flows-subheader">
+        <p class="hint" style="margin:0; font-size:13.5px;">Flows your teammates published. Import one to run it locally.</p>
+        <button type="button" class="util-icon-btn flows-icon-btn" id="refreshSharedFlowsBtn" title="Refresh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+      </div>
+      <div id="sharedFlowsList" class="flows-team-list">Loading…</div>
     </div>
 
   </div>
@@ -1746,6 +2539,13 @@
   // passcode with the team, hash it, replace the constant below.
   const AUTH_GATE_HASH = 'a19ec0d4058b4a13fd1af0b3a7ee33c8584dfb734489877d170250713121d050';
   const AUTH_GATE_STORAGE_KEY = 'habiConsoleUnlocked';
+  // Captured once at unlock time (or via "Edit name" in the user menu),
+  // not re-asked every visit - same "remember it" pattern as the passcode
+  // itself, just a separate key so rotating the passcode doesn't also
+  // wipe someone's name.
+  const USER_NAME_KEY = 'habiUserName';
+  function getUserName() { return (localStorage.getItem(USER_NAME_KEY) || '').trim(); }
+  function setUserName(name) { try { localStorage.setItem(USER_NAME_KEY, name); } catch (e) {} }
 
   async function sha256Hex(text) {
     const bytes = new TextEncoder().encode(text);
@@ -1753,36 +2553,73 @@
     return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
+  // Single source of truth for every place the signed-in person's name
+  // shows up (Dashboard greeting, top bar avatar/name) - called from
+  // showApp() (so it's correct the instant someone unlocks, not just on
+  // their next reload) and from the "Edit name" user-menu action below.
+  function applyUserIdentity() {
+    const name = getUserName() || 'there';
+    const hour = new Date().getHours();
+    // Only 3 buckets (morning/afternoon/evening), so midnight-through-
+    // predawn (0-4) has to land somewhere - "evening" reads far less
+    // wrong at 1am than "morning" does, so it takes both ends of the
+    // clock rather than getting a 4th "night" bucket of its own.
+    const part = hour < 5 ? 'evening' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+    const greetingEl = document.getElementById('dashGreeting');
+    if (greetingEl) greetingEl.innerHTML = `Good ${part}, <span class="name">${escapeHtml(name)}</span> 👋`;
+    const nameEl = document.getElementById('utilUserName');
+    if (nameEl) nameEl.textContent = name;
+    const avatarEl = document.getElementById('utilAvatar');
+    if (avatarEl) avatarEl.textContent = name[0] ? name[0].toUpperCase() : '?';
+  }
+
   function showApp() {
     document.getElementById('authGate').style.display = 'none';
     document.getElementById('appShell').style.display = 'flex';
+    applyUserIdentity();
   }
 
-  if (localStorage.getItem(AUTH_GATE_STORAGE_KEY) === AUTH_GATE_HASH) {
+  if (localStorage.getItem(AUTH_GATE_STORAGE_KEY) === AUTH_GATE_HASH && getUserName()) {
     // Keyed by the hash itself, not just "1" - rotating the passcode
     // above automatically re-locks everyone out (their stored value no
     // longer matches the new hash) instead of needing a separate
     // "bump this version number" step every time it changes.
     showApp();
   } else {
+    const passcodeAlreadyOk = localStorage.getItem(AUTH_GATE_STORAGE_KEY) === AUTH_GATE_HASH;
+    const nameInput = document.getElementById('authGateNameInput');
     const input = document.getElementById('authGateInput');
     const errorEl = document.getElementById('authGateError');
+    const subtitleEl = document.getElementById('authGateSubtitle');
+    if (passcodeAlreadyOk) {
+      // Already unlocked from before this name field existed - just need
+      // the name this once, not the passcode again.
+      input.style.display = 'none';
+      subtitleEl.textContent = "What's your name?";
+      document.getElementById('authGateBtn').textContent = 'Continue';
+    }
     const attempt = async () => {
-      const value = input.value;
-      if (!value) return;
-      const hash = await sha256Hex(value);
-      if (hash === AUTH_GATE_HASH) {
+      const name = nameInput.value.trim();
+      if (!name) { errorEl.textContent = 'Enter your name to continue.'; nameInput.focus(); return; }
+      if (!passcodeAlreadyOk) {
+        const value = input.value;
+        if (!value) { errorEl.textContent = 'Enter the passcode to continue.'; input.focus(); return; }
+        const hash = await sha256Hex(value);
+        if (hash !== AUTH_GATE_HASH) {
+          errorEl.textContent = 'Wrong passcode - try again.';
+          input.value = '';
+          input.focus();
+          return;
+        }
         localStorage.setItem(AUTH_GATE_STORAGE_KEY, hash);
-        showApp();
-      } else {
-        errorEl.textContent = 'Wrong passcode - try again.';
-        input.value = '';
-        input.focus();
       }
+      setUserName(name);
+      showApp();
     };
     document.getElementById('authGateBtn').addEventListener('click', attempt);
+    nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') attempt(); });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') attempt(); });
-    input.focus();
+    nameInput.focus();
   }
 
   // ---------- collapsible sidebar ----------
@@ -2198,6 +3035,46 @@
     document.getElementById('bridgeDownloadNote').style.display = 'none';
   });
 
+  // "Last synced" (Dashboard's Device & Bridge card, Device Lab) is
+  // purely this poll's own timestamp on the client - there's no
+  // server-tracked field for it (see the Dashboard's "known v1
+  // simplifications"). Every successful /api/health poll here just
+  // updates this one variable instead of a second poll loop existing
+  // anywhere else in the file.
+  let lastBridgeSyncAt = null;
+
+  // Mirrors the same connected/off state this poll already computed onto
+  // the Device Lab panel's own dot/text and the Dashboard's "last synced"
+  // line, without either of them running their own /api/health fetch.
+  function mirrorBridgeStatus(online) {
+    const labDot = document.getElementById('deviceLabBridgeDot');
+    const labText = document.getElementById('deviceLabBridgeText');
+    if (labDot) {
+      labDot.style.background = online ? 'var(--circuit)' : 'var(--alert)';
+      labDot.style.boxShadow = online ? '0 0 8px var(--circuit)' : 'none';
+    }
+    if (labText) labText.textContent = online ? 'Bridge server connected — ready to run.' : 'Bridge server is off.';
+    const syncedEl = document.getElementById('dashBridgeLastSynced');
+    if (syncedEl) syncedEl.textContent = lastBridgeSyncAt ? ('Last synced ' + timeAgo(lastBridgeSyncAt)) : 'Not synced yet';
+
+    // Same online/off state, mirrored a third place onto the Dashboard's
+    // hero device card - its dot/bridge-line/last-synced fields, not its
+    // device name/OS (that's real device data, set by
+    // loadDashboardDeviceCard() below from the same fetchDevices() call
+    // the plain Device & Bridge card and Device Lab already use).
+    const heroDot = document.getElementById('heroDeviceDot');
+    const heroStatusText = document.getElementById('heroDeviceStatusText');
+    const heroBridgeText = document.getElementById('heroBridgeText');
+    const heroSynced = document.getElementById('heroLastSynced');
+    if (heroDot) {
+      heroDot.style.background = online ? 'var(--circuit)' : 'var(--alert)';
+      heroDot.style.boxShadow = online ? '0 0 8px var(--circuit)' : 'none';
+    }
+    if (heroStatusText) heroStatusText.textContent = online ? 'Connected' : 'Disconnected';
+    if (heroBridgeText) heroBridgeText.textContent = online ? 'Bridge server running' : 'Bridge server is off';
+    if (heroSynced) heroSynced.textContent = lastBridgeSyncAt ? ('Last synced ' + timeAgo(lastBridgeSyncAt)) : 'Not synced yet';
+  }
+
   async function checkBridge() {
     const dot = document.getElementById('bridgeDot');
     const text = document.getElementById('bridgeStatusText');
@@ -2207,12 +3084,14 @@
     try {
       const res = await fetch(BRIDGE_URL + '/api/health');
       if (res.ok) {
+        lastBridgeSyncAt = new Date();
         dot.style.background = 'var(--circuit)';
         dot.style.boxShadow = '0 0 8px var(--circuit)';
         text.textContent = 'Bridge server connected — ready to run.';
         card.style.borderLeft = '3px solid var(--circuit)';
         startBtn.style.display = 'none';
         stopBtn.style.display = 'inline-block';
+        mirrorBridgeStatus(true);
         return true;
       }
     } catch (e) {}
@@ -2222,6 +3101,7 @@
     card.style.borderLeft = '3px solid var(--alert)';
     startBtn.style.display = 'inline-block';
     stopBtn.style.display = 'none';
+    mirrorBridgeStatus(false);
     return false;
   }
   checkBridge();
@@ -3271,37 +4151,34 @@ ${clone.innerHTML}
     }
   }
 
-  // No pagination needed any more - this renders as a horizontally
-  // scrolling row (see .poster-row), same as any streaming-service shelf,
-  // so a growing flow count just makes the row longer to scroll through
-  // rather than needing Prev/Next.
-  let savedFlowsPage = 1;
   // "all" plus each real platform - every flow already carries its own
   // recorded platform (server.py defaults missing ones to iOS, since that
   // was the only platform this project drove before Android support), so
   // this is a pure client-side filter over lastLoadedFlows, not a second
   // fetch or a different storage location.
   let savedFlowsPlatformFilter = 'all';
+  // The grid shows 8 cards (2 rows x 4) with a "N more / Show all" tile
+  // in the 9th slot until expanded - real pagination over the actual
+  // list, not a fixed page size that hides flows past it forever.
+  const FLOWS_GRID_PAGE_SIZE = 8;
+  let savedFlowsExpanded = false;
 
   function renderSavedFlowsPlatformFilter() {
     const filterEl = document.getElementById('savedFlowsPlatformFilter');
     const counts = {iOS: 0, Android: 0};
     lastLoadedFlows.forEach(f => { counts[f.platform] = (counts[f.platform] || 0) + 1; });
     const options = [
-      ['all', `All (${lastLoadedFlows.length})`],
-      ['iOS', `iOS (${counts.iOS || 0})`],
-      ['Android', `Android (${counts.Android || 0})`],
+      ['all', `All ${lastLoadedFlows.length}`],
+      ['iOS', `iOS ${counts.iOS || 0}`],
+      ['Android', `Android ${counts.Android || 0}`],
     ];
     filterEl.innerHTML = options.map(([value, label]) => `
-      <button class="copy saved-flows-platform-btn" data-platform="${value}"
-              style="flex:1; padding:4px 6px; font-size:10.5px;
-                     background:${savedFlowsPlatformFilter === value ? 'var(--signal)' : 'var(--ink-line)'};
-                     color:var(--paper);">${label}</button>
+      <button type="button" class="flows-filter-pill ${savedFlowsPlatformFilter === value ? 'active' : ''}" data-platform="${value}">${label}</button>
     `).join('');
-    filterEl.querySelectorAll('.saved-flows-platform-btn').forEach(btn => {
+    filterEl.querySelectorAll('.flows-filter-pill').forEach(btn => {
       btn.addEventListener('click', () => {
         savedFlowsPlatformFilter = btn.dataset.platform;
-        savedFlowsPage = 1;
+        savedFlowsExpanded = false;
         renderFlowsSidebarPage();
       });
     });
@@ -3315,7 +4192,7 @@ ${clone.innerHTML}
   // alpha suffix gets appended below (e.g. "#2DD4BF22"), which only
   // parses as a valid color when it's a real hex literal to begin with;
   // "var(--circuit)22" is not valid CSS.
-  const POSTER_ACCENTS = ['#2DD4BF', '#F2A900', '#7C3AED', '#2563EB', '#DB2777'];
+  const POSTER_ACCENTS = ['#2DD4BF', '#F2A900', '#A78BFA', '#60A5FA', '#EC4899'];
 
   // Generic "flow" glyph for every poster card's icon tile - there's no
   // real per-flow artwork to show (see POSTER_ACCENTS above), so this is
@@ -3336,53 +4213,169 @@ ${clone.innerHTML}
       .join(' ');
   }
 
+  let savedFlowsSearchQuery = '';
+
   function renderFlowsSidebarPage() {
     const listEl = document.getElementById('savedFlowsList');
-    const pagerEl = document.getElementById('savedFlowsPager');
+    const countEl = document.getElementById('flowsTabCountMy');
+    if (countEl) countEl.textContent = lastLoadedFlows.length;
     renderSavedFlowsPlatformFilter();
-    const flows = savedFlowsPlatformFilter === 'all'
+
+    let flows = savedFlowsPlatformFilter === 'all'
       ? lastLoadedFlows
       : lastLoadedFlows.filter(f => f.platform === savedFlowsPlatformFilter);
+    if (savedFlowsSearchQuery) {
+      const q = savedFlowsSearchQuery;
+      flows = flows.filter(f => `${f.name} ${f.slug} ${f.goal || ''}`.toLowerCase().includes(q));
+    }
+
     if (!lastLoadedFlows.length) {
       listEl.innerHTML = '<div class="empty-hint">No saved flows yet — run a goal below, then use "Save as flow" once it looks right.</div>';
-      pagerEl.textContent = '';
       return;
     }
     if (!flows.length) {
-      listEl.innerHTML = `<div class="empty-hint">No ${escapeHtml(savedFlowsPlatformFilter)} flows yet.</div>`;
-      pagerEl.textContent = '';
+      listEl.innerHTML = `<div class="empty-hint">No flows match${savedFlowsSearchQuery ? ' that search' : ` — no ${escapeHtml(savedFlowsPlatformFilter)} flows yet`}.</div>`;
       return;
     }
 
-    listEl.innerHTML = flows.map((f, i) => {
-      const state = flowRunState[f.slug];
-      const selected = f.slug === selectedFlowSlug;
-      const accent = POSTER_ACCENTS[i % POSTER_ACCENTS.length];
-      // A live run's outcome takes over this line for as long as it's
-      // relevant (pass/fail/running - see updateFlowBadge), falling back
-      // to the flow's own step/test counts the rest of the time.
-      const badgeText = (state && state.badgeText) ? state.badgeText : `${f.step_count} steps · ${f.test_count} test(s)`;
-      const badgeClass = (state && state.badgeClass) || '';
-      return `
-      <div class="poster-card flow-list-item ${selected ? 'selected' : ''}" data-slug="${escapeHtml(f.slug)}">
-        <span class="poster-ribbon">${escapeHtml(f.platform)}</span>
-        <span class="poster-icon" style="background:${accent}1F; color:${accent};">${POSTER_ICON}</span>
-        <span class="poster-title-text">${escapeHtml(humanizeFlowName(f.name))}</span>
-        ${f.goal ? `<span class="poster-subtitle">${escapeHtml(f.goal)}</span>` : ''}
-        <span class="poster-badge flow-sidebar-badge ${badgeClass}" data-sidebar-status-for="${escapeHtml(f.slug)}">${escapeHtml(badgeText)}</span>
-      </div>`;
-    }).join('');
-    listEl.querySelectorAll('.flow-list-item').forEach(item => {
-      item.addEventListener('click', () => selectFlow(item.dataset.slug));
-    });
+    const visible = savedFlowsExpanded ? flows : flows.slice(0, FLOWS_GRID_PAGE_SIZE);
+    const remaining = flows.length - visible.length;
+    listEl.innerHTML = visible.map((f, i) => buildFlowGridCardHtml(f, i, {
+      state: flowRunState[f.slug],
+      selected: f.slug === selectedFlowSlug,
+    })).join('') + (remaining > 0 ? `
+      <div class="flows-more-tile">
+        <div>${remaining} more flow${remaining === 1 ? '' : 's'}</div>
+        <button type="button" class="copy" id="savedFlowsShowAllBtn" style="padding:6px 14px; font-size:12px; background:var(--ink-line); color:var(--paper);">Show all ${flows.length}</button>
+      </div>` : '');
+    wireFlowGridCards(listEl, selectFlow);
+    const showAllBtn = document.getElementById('savedFlowsShowAllBtn');
+    if (showAllBtn) showAllBtn.addEventListener('click', () => { savedFlowsExpanded = true; renderFlowsSidebarPage(); });
+  }
 
-    pagerEl.textContent = `${flows.length} flow${flows.length === 1 ? '' : 's'}`;
+  // Client-only favoriting - no backend field for this exists (see the
+  // Dashboard's "known v1 simplifications"), so it's a plain Set of slugs
+  // persisted per-browser in localStorage. Not synced across devices or
+  // teammates, and lost if the browser's storage is cleared.
+  const FAVORITE_FLOWS_KEY = 'habiFavoriteFlows';
+  function loadFavoriteFlows() {
+    try { return new Set(JSON.parse(localStorage.getItem(FAVORITE_FLOWS_KEY) || '[]')); }
+    catch (e) { return new Set(); }
+  }
+  function saveFavoriteFlows(set) {
+    try { localStorage.setItem(FAVORITE_FLOWS_KEY, JSON.stringify(Array.from(set))); } catch (e) {}
+  }
+  let favoriteFlowSlugs = loadFavoriteFlows();
+  function toggleFavoriteFlow(slug) {
+    if (favoriteFlowSlugs.has(slug)) favoriteFlowSlugs.delete(slug); else favoriteFlowSlugs.add(slug);
+    saveFavoriteFlows(favoriteFlowSlugs);
+  }
+
+  // "Last run" line is built purely from flowRunState - the only run
+  // history this file has is per-session (see the Dashboard's "known v1
+  // simplifications"), so "—" for a flow nobody has run yet this session
+  // is the honest default, not a bug. "Known failing" mirrors the
+  // reference's own wording for a fail/error result.
+  function flowLastRunInfo(state) {
+    if (state && state.status === 'running') return {cls: '', label: 'Running…'};
+    if (state && (state.badgeClass === 'status-fail' || state.status === 'error')) return {cls: 'failing', label: 'Known failing'};
+    if (state && state.badgeClass === 'status-pass') return {cls: 'pass', label: 'Last run just now'};
+    return {cls: '', label: 'Last run —'};
+  }
+
+  // Grid card for the full Saved Flows page - slug line, last-run status,
+  // separate step/test stat blocks, a dedicated run button.
+  function buildFlowGridCardHtml(f, i, opts) {
+    opts = opts || {};
+    const state = opts.state;
+    const isFav = favoriteFlowSlugs.has(f.slug);
+    const lastRun = flowLastRunInfo(state);
+    const platformClass = f.platform === 'Android' ? 'android' : 'ios';
+    return `
+      <div class="flow-card ${opts.selected ? 'selected' : ''}" data-slug="${escapeHtml(f.slug)}">
+        <div class="flow-card-top">
+          <span class="flow-card-badge ${platformClass}">${escapeHtml(f.platform)}</span>
+          <button type="button" class="flow-card-fav ${isFav ? 'on' : ''}" data-fav-slug="${escapeHtml(f.slug)}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '★' : '☆'}</button>
+        </div>
+        <div class="flow-card-title">${escapeHtml(humanizeFlowName(f.name))}</div>
+        <div class="flow-card-slug">${escapeHtml(f.name)}</div>
+        ${f.goal ? `<div class="flow-card-desc">${escapeHtml(f.goal)}</div>` : ''}
+        <div class="flow-card-footer">
+          <div class="flow-card-last-run ${lastRun.cls}"><span class="flow-card-status-dot"></span><span>${lastRun.label}</span></div>
+          <div class="flow-card-stats">
+            <div><b>${f.step_count}</b>steps</div>
+            <div><b>${f.test_count}</b>tests</div>
+          </div>
+          <button type="button" class="flow-card-play" data-run-slug="${escapeHtml(f.slug)}" title="Run this flow">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }
+
+  // Wires the card's own click (select, via onSelect), its favorite star
+  // (toggle, stops propagation), and its Play button - which selects the
+  // flow (so #savedFlowDetail actually has this flow's own .flow-run-btn
+  // in the DOM) then clicks that real button, reusing every bit of
+  // existing run logic (setup-script checkbox, precondition, bundle id
+  // overrides, etc.) instead of a second copy of it here.
+  function wireFlowGridCards(containerEl, onSelect) {
+    containerEl.querySelectorAll('.flow-card').forEach(card => {
+      card.addEventListener('click', () => onSelect(card.dataset.slug));
+    });
+    containerEl.querySelectorAll('.flow-card-fav').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFavoriteFlow(btn.dataset.favSlug);
+        const isFav = btn.classList.toggle('on');
+        btn.textContent = isFav ? '★' : '☆';
+        btn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+      });
+    });
+    containerEl.querySelectorAll('.flow-card-play').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const slug = btn.dataset.runSlug;
+        onSelect(slug);
+        const runBtn = document.querySelector(`.flow-run-btn[data-slug="${CSS.escape(slug)}"]`);
+        if (runBtn) runBtn.click();
+      });
+    });
   }
 
   function renderFlowsSidebar(flows) {
     lastLoadedFlows = flows;
     savedFlowsPage = 1;
     renderFlowsSidebarPage();
+    updateDashboardFlowStats();
+  }
+
+  // Dashboard's flow-count tiles - built entirely from the same
+  // /api/flows response loadSavedFlows already fetched (no second fetch).
+  function updateDashboardFlowStats() {
+    const totalEl = document.getElementById('dashStatFlowsTotal');
+    if (!totalEl) return; // Dashboard panel not in the DOM yet on first call
+    const total = lastLoadedFlows.length;
+    const iosCount = lastLoadedFlows.filter(f => f.platform === 'iOS').length;
+    const androidCount = lastLoadedFlows.filter(f => f.platform === 'Android').length;
+    totalEl.textContent = total;
+    document.getElementById('dashStatFlowsIOS').textContent = iosCount;
+    document.getElementById('dashStatFlowsAndroid').textContent = androidCount;
+
+    // Real, derivable trend lines - no fabricated deltas. "This week" is
+    // counted from each flow's own created_at (already in /api/flows);
+    // iOS/Android get a plain share-of-total instead of a fake trend
+    // since a single snapshot has no "before" to compare against.
+    const now = Date.now();
+    const newThisWeek = lastLoadedFlows.filter(f => {
+      const created = f.created_at ? new Date(f.created_at).getTime() : NaN;
+      return !isNaN(created) && (now - created) <= 7 * 24 * 3600 * 1000;
+    }).length;
+    const weekTrendEl = document.getElementById('dashStatFlowsTotalTrend');
+    weekTrendEl.textContent = newThisWeek > 0 ? `↑ ${newThisWeek} this week` : 'No new flows this week';
+    weekTrendEl.className = 'stat-tile-trend' + (newThisWeek > 0 ? ' up' : '');
+    document.getElementById('dashStatFlowsIOSTrend').textContent = total ? `${Math.round(100 * iosCount / total)}% of total` : '—';
+    document.getElementById('dashStatFlowsAndroidTrend').textContent = total ? `${Math.round(100 * androidCount / total)}% of total` : '—';
   }
 
   function selectFlow(slug) {
@@ -3523,18 +4516,28 @@ ${clone.innerHTML}
   // unauthenticated (public repo), so listing/importing works for anyone
   // with the bridge server running, but publishing needs SHARED_FLOWS_TOKEN
   // configured in that person's own .env (same pattern as ALLURE_REPORTS_TOKEN).
+  // From team tab's own list (2-col rows, icon chip + slug + Import).
+  // Same shared-flow-import-btn class/data attributes as the import
+  // button always had, so the existing delegated
+  // handleSharedFlowImportClick handles this list without any changes.
+  function sharedFlowsTeamListHtml(flows) {
+    return flows.length ? flows.map(f => `
+      <div class="flows-team-row">
+        <span class="flows-team-row-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><circle cx="19" cy="6" r="2.4"/><path d="M7 7.2L17 16.8M17 7.2L12 15.6"/></svg></span>
+        <span class="flows-team-row-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+        <button class="copy shared-flow-import-btn" data-path="${escapeHtml(f.path)}" data-slug="${escapeHtml(f.slug)}" style="padding:5px 14px; font-size:12px; background:none; border:1px solid var(--ink-line-strong); color:var(--circuit);">Import</button>
+      </div>`).join('') : '<div class="empty-hint">Nothing published yet.</div>';
+  }
   async function loadSharedFlows() {
     const listEl = document.getElementById('sharedFlowsList');
+    const countEl = document.getElementById('flowsTabCountTeam');
     try {
       const res = await fetch(BRIDGE_URL + '/api/shared-flows');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed to load shared flows');
       const flows = data.flows || [];
-      listEl.innerHTML = flows.length ? flows.map(f => `
-        <div class="import-card">
-          <span class="name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
-          <button class="copy shared-flow-import-btn" data-path="${escapeHtml(f.path)}" data-slug="${escapeHtml(f.slug)}" style="padding:4px 10px; font-size:11px; background:var(--signal); color:#2B1D00; flex-shrink:0;">Import</button>
-        </div>`).join('') : '<div class="empty-hint" style="font-size:11.5px;">Nothing published yet.</div>';
+      if (countEl) countEl.textContent = flows.length;
+      listEl.innerHTML = sharedFlowsTeamListHtml(flows);
     } catch (e) {
       listEl.innerHTML = `<div class="empty-hint" style="font-size:11.5px;">${escapeHtml(e.message)}</div>`;
     }
@@ -3542,36 +4545,47 @@ ${clone.innerHTML}
   loadSharedFlows();
   document.getElementById('refreshSharedFlowsBtn').addEventListener('click', loadSharedFlows);
 
-  // Same poster-card treatment as Saved Flows above (reuses POSTER_ACCENTS/
-  // .poster-card/.poster-ribbon/.poster-badge) - a precondition is just a
-  // flow replayed automatically at the start of a run rather than a
-  // standalone Test Library entry, so it gets the same visual language,
-  // just without Run/Generate tests/Share (none of those apply to
-  // something that's never run on its own). Clicking a card jumps
-  // straight to editing it - see startEditingFlow.
+  // Preconditions tab's own card (badge/title/step-count/Edit button, via
+  // startEditingFlow). "New precondition" is a plain tile (dashed border)
+  // that jumps to Test Builder - there's no separate "create precondition"
+  // flow, it's the same "record steps, then Save as a Precondition" path
+  // Test Builder already has.
+  function buildPreconditionGridCardHtml(p) {
+    return `
+      <div class="flow-card precondition-card" data-slug="${escapeHtml(p.slug)}" style="cursor:default;">
+        <div class="flow-card-top">
+          <span class="flow-card-badge ${p.platform === 'Android' ? 'android' : 'ios'}">${escapeHtml(p.platform)}</span>
+        </div>
+        <div class="flow-card-title">${escapeHtml(humanizeFlowName(p.name))}</div>
+        <div class="precondition-card-footer">
+          <span class="hint" style="font-size:12px;">${p.step_count} step${p.step_count === 1 ? '' : 's'}</span>
+          <button type="button" class="copy precondition-edit-btn" data-slug="${escapeHtml(p.slug)}" style="padding:5px 12px; font-size:12px; background:var(--ink-line); color:var(--paper);">Edit</button>
+        </div>
+      </div>`;
+  }
+  function preconditionsNewTileHtml() {
+    return `
+      <button type="button" class="flows-new-tile" id="newPreconditionTile">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span>New precondition</span>
+      </button>`;
+  }
+
   async function loadPreconditionsList() {
     const listEl = document.getElementById('preconditionsList');
+    const countEl = document.getElementById('flowsTabCountPre');
     try {
       const res = await fetch(BRIDGE_URL + '/api/preconditions');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed to load preconditions');
       const preconditions = data.preconditions || [];
-      if (!preconditions.length) {
-        listEl.innerHTML = '<div class="empty-hint">No preconditions saved yet — record a setup flow (e.g. login) in Test Builder, then "Save as a Precondition".</div>';
-        return;
-      }
-      listEl.innerHTML = preconditions.map((p, i) => {
-        const accent = POSTER_ACCENTS[i % POSTER_ACCENTS.length];
-        return `
-        <div class="poster-card precondition-card" data-slug="${escapeHtml(p.slug)}" title="Click to edit">
-          <span class="poster-ribbon">${escapeHtml(p.platform)}</span>
-          <span class="poster-icon" style="background:${accent}1F; color:${accent};">${POSTER_ICON}</span>
-          <span class="poster-title-text">${escapeHtml(humanizeFlowName(p.name))}</span>
-          <span class="poster-badge">${p.step_count} step(s)</span>
-        </div>`;
-      }).join('');
-      listEl.querySelectorAll('.precondition-card').forEach(card => {
-        card.addEventListener('click', () => startEditingFlow('preconditions', card.dataset.slug));
+      if (countEl) countEl.textContent = preconditions.length;
+      listEl.innerHTML = preconditions.map(p => buildPreconditionGridCardHtml(p)).join('') + preconditionsNewTileHtml();
+      listEl.querySelectorAll('.precondition-edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => startEditingFlow('preconditions', btn.dataset.slug));
+      });
+      document.getElementById('newPreconditionTile').addEventListener('click', () => {
+        document.querySelector('.tab[data-tab="scraper"]').click();
       });
     } catch (e) {
       listEl.innerHTML = `<div class="empty-hint" style="font-size:11.5px;">${escapeHtml(e.message)}</div>`;
@@ -3580,7 +4594,11 @@ ${clone.innerHTML}
   loadPreconditionsList();
   document.getElementById('refreshPreconditionsListBtn').addEventListener('click', loadPreconditionsList);
 
-  document.getElementById('sharedFlowsList').addEventListener('click', async (e) => {
+  // Delegated (not per-button) so re-rendering either container (a
+  // Refresh click, or the Dashboard preview re-rendering after
+  // loadSavedFlows) never needs to re-wire anything - shared by both the
+  // full "From team" card and the Dashboard's "From team" preview.
+  async function handleSharedFlowImportClick(e) {
     const importBtn = e.target.closest('.shared-flow-import-btn');
     if (!importBtn) return;
     const path = importBtn.dataset.path;
@@ -3602,7 +4620,331 @@ ${clone.innerHTML}
       importBtn.textContent = 'Import';
       alert('Could not import: ' + err.message);
     }
+  }
+  document.getElementById('sharedFlowsList').addEventListener('click', handleSharedFlowImportClick);
+
+  // ================================================================
+  // Dashboard / Recent Runs / Test Reports / Device Lab
+  //
+  // New panels for this redesign. Data sources, per the plan:
+  //  - Flow counts: the SAME /api/flows fetch loadSavedFlows already
+  //    makes (see updateDashboardFlowStats above) - no second fetch.
+  //  - Pass rate / runs today / recent runs table: the new
+  //    GET /api/dashboard-stats endpoint (server-side, added alongside
+  //    this file). Approximate/"known v1 simplification" per its own
+  //    docstring - most recent N runs, not a full historical ledger.
+  //  - Devices + bridge health: existing /api/devices + the existing
+  //    checkBridge() poll loop (mirrored in, not duplicated - see
+  //    mirrorBridgeStatus above).
+  //  - Saved Flows / Preconditions / From team previews: existing
+  //    render functions/data, just also targeting a Dashboard container.
+  // ================================================================
+
+  // Greeting text itself is owned by applyUserIdentity() (see the auth
+  // gate section above) - it's set the instant someone unlocks, using
+  // whatever name they gave, not hardcoded here.
+
+  // started_at from the backend is `YYYYMMDDTHHMMSSZ` (UTC, no
+  // separators) - not something `new Date()` parses on its own, so this
+  // hand-splits it into an ISO string rather than pulling in a date
+  // library for one field.
+  function parseStartedAt(s) {
+    if (!s || s.length < 15) return null;
+    const iso = `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T${s.slice(9,11)}:${s.slice(11,13)}:${s.slice(13,15)}Z`;
+    const dt = new Date(iso);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+
+  function timeAgo(dateLike) {
+    const dt = (dateLike instanceof Date) ? dateLike : parseStartedAt(dateLike);
+    if (!dt) return '—';
+    const diffSec = Math.round((Date.now() - dt.getTime()) / 1000);
+    if (diffSec < 60) return diffSec < 5 ? 'just now' : `${diffSec}s ago`;
+    const diffMin = Math.round(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.round(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.round(diffHr / 24);
+    if (diffDay < 30) return `${diffDay}d ago`;
+    return dt.toLocaleDateString();
+  }
+
+  // Duration is itself only an approximation server-side (report file
+  // mtime minus started_at - no real wall-clock field exists in the run
+  // pipeline yet), so `null` here is expected for some runs, not a bug.
+  function formatDurationSeconds(sec) {
+    if (sec === null || sec === undefined || isNaN(sec)) return '—';
+    sec = Math.max(0, Math.round(sec));
+    return `${Math.floor(sec / 60)}m ${sec % 60}s`;
+  }
+
+  function runStatusBadgeClass(status) {
+    if (status === 'pass') return 'status-pass';
+    if (status === 'fail' || status === 'error') return 'status-fail';
+    if (status === 'cancelled') return 'status-skip';
+    return 'status-stuck'; // 'stuck' + anything unrecognized
+  }
+
+  async function fetchDashboardStats(limit) {
+    const res = await fetch(BRIDGE_URL + '/api/dashboard-stats?limit=' + encodeURIComponent(limit));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'failed to load dashboard stats');
+    return data;
+  }
+
+  // Shared table renderer for a "recent runs" list - used by both the
+  // Dashboard's last-5 preview and the standalone Recent Runs panel's
+  // fuller list, both fed by the same /api/dashboard-stats endpoint at
+  // different `limit` values. `onView(run)` fires on that row's View
+  // button.
+  function renderRunsTable(runs, targetEl, onView) {
+    if (!runs || !runs.length) {
+      targetEl.innerHTML = '<div class="empty-hint">No runs recorded yet.</div>';
+      return;
+    }
+    targetEl.innerHTML = `
+      <table class="data-table">
+        <thead><tr><th>Flow</th><th>Status</th><th>When</th><th>Duration</th><th></th></tr></thead>
+        <tbody>
+          ${runs.map((r, i) => `
+            <tr>
+              <td>${escapeHtml(humanizeFlowName(r.flow_name || r.goal || '(untitled)'))}</td>
+              <td><span class="status-badge ${runStatusBadgeClass(r.final_status)}">${escapeHtml(r.final_status || 'unknown')}</span></td>
+              <td class="hint" title="${escapeHtml(r.started_at || '')}">${timeAgo(r.started_at)}</td>
+              <td class="hint">${formatDurationSeconds(r.duration_seconds)}</td>
+              <td><button type="button" class="copy runs-view-btn" data-run-idx="${i}" style="padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">View</button></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+    targetEl.querySelectorAll('.runs-view-btn').forEach(btn => {
+      btn.addEventListener('click', () => onView(runs[Number(btn.dataset.runIdx)]));
+    });
+  }
+
+  // Fetches one run's full report (same GET /api/reports/<filename>
+  // loadFlowReport already uses) and renders it with the same generic
+  // renderReport(data, targetEl) every other report view in this file
+  // uses - no second report-rendering implementation.
+  async function viewRunReport(run, viewerEl, cardEl) {
+    cardEl.style.display = 'block';
+    viewerEl.innerHTML = '<div class="empty-hint">Loading report…</div>';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/reports/' + encodeURIComponent(run.filename));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to load report');
+      renderReport(data, viewerEl);
+    } catch (e) {
+      viewerEl.innerHTML = `<div class="empty-hint">Couldn't load report: ${escapeHtml(e.message)}</div>`;
+    }
+    cardEl.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+
+  function setTrendEl(el, text, direction) {
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'stat-tile-trend' + (direction === 'up' ? ' up' : direction === 'down' ? ' down' : '');
+  }
+
+  // Fetches one wider batch (up to 100) instead of just the 5 the table
+  // shows, so that same response can also power: the pass-rate/runs-today
+  // deltas below (split into a "recent half" vs "older half" of this same
+  // list - real, derivable numbers, not fabricated trend arrows) and the
+  // util bar's notification bell (see loadUtilNotifications below) -
+  // one fetch instead of three.
+  async function loadDashboardRecentRuns() {
+    const targetEl = document.getElementById('dashRecentRunsTable');
+    try {
+      const data = await fetchDashboardStats(100);
+      const passEl = document.getElementById('dashStatPassRate');
+      const runsEl = document.getElementById('dashStatRunsToday');
+      passEl.textContent = (data.pass_rate === null || data.pass_rate === undefined) ? '—' : Math.round(data.pass_rate) + '%';
+      runsEl.textContent = (data.runs_today === null || data.runs_today === undefined) ? '—' : data.runs_today;
+
+      const all = data.recent || [];
+      const decided = r => r.final_status === 'pass' || r.final_status === 'fail' || r.final_status === 'error' || r.final_status === 'stuck';
+      const passRateOf = list => {
+        const d = list.filter(decided);
+        if (!d.length) return null;
+        return 100 * d.filter(r => r.final_status === 'pass').length / d.length;
+      };
+      const half = Math.ceil(all.length / 2);
+      const recentRate = passRateOf(all.slice(0, half));
+      const olderRate = passRateOf(all.slice(half));
+      if (recentRate !== null && olderRate !== null) {
+        const delta = Math.round(recentRate - olderRate);
+        setTrendEl(document.getElementById('dashStatPassRateTrend'),
+          delta === 0 ? 'Flat vs prior runs' : `${delta > 0 ? '↑' : '↓'} ${Math.abs(delta)}% vs prior runs`,
+          delta > 0 ? 'up' : delta < 0 ? 'down' : null);
+      } else {
+        setTrendEl(document.getElementById('dashStatPassRateTrend'), 'Not enough data yet', null);
+      }
+
+      const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const yesterdayStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10).replace(/-/g, '');
+      const runsYesterday = all.filter(r => (r.started_at || '').slice(0, 8) === yesterdayStr).length;
+      const runsTodayDelta = (data.runs_today || 0) - runsYesterday;
+      setTrendEl(document.getElementById('dashStatRunsTodayTrend'),
+        runsTodayDelta === 0 ? `Same as yesterday (${runsYesterday})` : `${runsTodayDelta > 0 ? '↑' : '↓'} ${Math.abs(runsTodayDelta)} from yesterday`,
+        runsTodayDelta > 0 ? 'up' : runsTodayDelta < 0 ? 'down' : null);
+
+      renderRunsTable(all.slice(0, 5), targetEl, (run) => viewRunReport(
+        run, document.getElementById('dashReportViewer'), document.getElementById('dashReportViewerCard')
+      ));
+      loadUtilNotifications(all);
+    } catch (e) {
+      targetEl.innerHTML = `<div class="empty-hint">Couldn't load recent runs: ${escapeHtml(e.message)} (is the bridge server running?)</div>`;
+    }
+  }
+  loadDashboardRecentRuns();
+  document.getElementById('dashReportCloseBtn').addEventListener('click', () => {
+    document.getElementById('dashReportViewerCard').style.display = 'none';
   });
+
+  async function loadRecentRunsPanel() {
+    const targetEl = document.getElementById('recentRunsTable');
+    try {
+      const data = await fetchDashboardStats(50);
+      renderRunsTable(data.recent || [], targetEl, (run) => viewRunReport(
+        run, document.getElementById('recentRunsReportViewer'), document.getElementById('recentRunsReportCard')
+      ));
+    } catch (e) {
+      targetEl.innerHTML = `<div class="empty-hint">Couldn't load recent runs: ${escapeHtml(e.message)} (is the bridge server running?)</div>`;
+    }
+  }
+  loadRecentRunsPanel();
+  document.getElementById('refreshRecentRunsBtn').addEventListener('click', loadRecentRunsPanel);
+  document.getElementById('recentRunsReportCloseBtn').addEventListener('click', () => {
+    document.getElementById('recentRunsReportCard').style.display = 'none';
+  });
+
+  // Test Reports: every raw report filename from GET /api/reports (no
+  // flow context needed/assumed, unlike Recent Runs above), each opening
+  // into the same renderReport() viewer.
+  async function loadTestReportsList() {
+    const listEl = document.getElementById('testReportsList');
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/reports');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to load reports');
+      const reports = data.reports || [];
+      if (!reports.length) {
+        listEl.innerHTML = '<div class="empty-hint">No reports yet.</div>';
+        return;
+      }
+      listEl.innerHTML = reports.map((filename, i) => `
+        <div class="device-row">
+          <span style="font-family:var(--mono); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;" title="${escapeHtml(filename)}">${escapeHtml(filename)}</span>
+          <button type="button" class="copy test-report-open-btn" data-idx="${i}" style="padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper); flex-shrink:0;">Open</button>
+        </div>`).join('');
+      listEl.querySelectorAll('.test-report-open-btn').forEach(btn => {
+        btn.addEventListener('click', () => openTestReport(reports[Number(btn.dataset.idx)]));
+      });
+    } catch (e) {
+      listEl.innerHTML = `<div class="empty-hint">${escapeHtml(e.message)} (is the bridge server running?)</div>`;
+    }
+  }
+  async function openTestReport(filename) {
+    const cardEl = document.getElementById('testReportsViewerCard');
+    const viewerEl = document.getElementById('testReportsViewer');
+    document.getElementById('testReportsViewerTitle').textContent = filename;
+    cardEl.style.display = 'block';
+    viewerEl.innerHTML = '<div class="empty-hint">Loading report…</div>';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/reports/' + encodeURIComponent(filename));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to load report');
+      renderReport(data, viewerEl);
+    } catch (e) {
+      viewerEl.innerHTML = `<div class="empty-hint">Couldn't load report: ${escapeHtml(e.message)}</div>`;
+    }
+    cardEl.scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+  loadTestReportsList();
+  document.getElementById('refreshTestReportsBtn').addEventListener('click', loadTestReportsList);
+  document.getElementById('testReportsViewerCloseBtn').addEventListener('click', () => {
+    document.getElementById('testReportsViewerCard').style.display = 'none';
+  });
+
+  async function fetchDevices(platform) {
+    const res = await fetch(BRIDGE_URL + '/api/devices?platform=' + encodeURIComponent(platform));
+    const data = await res.json();
+    if (!res.ok) throw new Error((data && data.error) || 'failed to load devices');
+    return Array.isArray(data) ? data : (data.devices || []);
+  }
+
+  function renderDeviceListHtml(devices, showPlatform) {
+    if (!devices.length) return '<div class="empty-hint" style="font-size:12.5px;">No devices detected.</div>';
+    return devices.map(d => `
+      <div class="device-row">
+        <span style="font-size:12.5px;">${escapeHtml(d.name || d.udid || 'Unknown device')}${showPlatform ? ` <span class="hint" style="font-size:10.5px;">(${escapeHtml(d.platform)})</span>` : ''}</span>
+        <span class="hint" style="font-size:11.5px;">${escapeHtml(d.platform_version || '')}</span>
+      </div>`).join('');
+  }
+
+  async function loadDeviceLabDevices() {
+    const iosEl = document.getElementById('deviceLabIosList');
+    const androidEl = document.getElementById('deviceLabAndroidList');
+    try { iosEl.innerHTML = renderDeviceListHtml(await fetchDevices('iOS'), false); }
+    catch (e) { iosEl.innerHTML = `<div class="empty-hint" style="font-size:12.5px;">${escapeHtml(e.message)}</div>`; }
+    try { androidEl.innerHTML = renderDeviceListHtml(await fetchDevices('Android'), false); }
+    catch (e) { androidEl.innerHTML = `<div class="empty-hint" style="font-size:12.5px;">${escapeHtml(e.message)}</div>`; }
+  }
+  loadDeviceLabDevices();
+  document.getElementById('refreshIosDevicesBtn').addEventListener('click', loadDeviceLabDevices);
+  document.getElementById('refreshAndroidDevicesBtn').addEventListener('click', loadDeviceLabDevices);
+
+  async function loadDashboardDeviceCard() {
+    const el = document.getElementById('dashDeviceCard');
+    const heroNameEl = document.getElementById('heroDeviceName');
+    const heroOsEl = document.getElementById('heroDeviceOS');
+    try {
+      const [ios, android] = await Promise.all([fetchDevices('iOS'), fetchDevices('Android')]);
+      const tagged = ios.map(d => Object.assign({}, d, {platform: 'iOS'}))
+        .concat(android.map(d => Object.assign({}, d, {platform: 'Android'})));
+      el.innerHTML = renderDeviceListHtml(tagged, true)
+        + `<div class="device-row"><span style="font-size:12.5px;">Bridge server</span><span class="hint" id="dashBridgeLastSynced" style="font-size:11px;">${lastBridgeSyncAt ? 'Last synced ' + timeAgo(lastBridgeSyncAt) : 'Not synced yet'}</span></div>`;
+      // Hero card only has room for one headline device - the first
+      // connected device (iOS checked first, same priority order as the
+      // list above), not a second copy of the full multi-device list.
+      const primary = tagged[0];
+      if (heroNameEl) heroNameEl.textContent = primary ? (primary.name || primary.udid || 'Unknown device') : 'No device connected';
+      if (heroOsEl) heroOsEl.textContent = primary ? `${primary.platform}${primary.platform_version ? ' ' + primary.platform_version : ''}` : '';
+    } catch (e) {
+      el.innerHTML = `<div class="empty-hint" style="font-size:12.5px;">${escapeHtml(e.message)} (is the bridge server running?)</div>`;
+      if (heroNameEl) heroNameEl.textContent = 'No device connected';
+      if (heroOsEl) heroOsEl.textContent = '';
+    }
+  }
+  loadDashboardDeviceCard();
+
+  // "View all →" link: jumps to the corresponding nav tab rather than
+  // duplicating that whole page's view inline on the Dashboard.
+  document.getElementById('dashViewAllRuns').addEventListener('click', (e) => {
+    e.preventDefault();
+    document.querySelector('.tab[data-tab="recent-runs"]').click();
+  });
+
+  // Saved Flows page's own in-page tabs (My flows / Preconditions / From
+  // team) - independent of the sidebar's panel-switching (.tab/.panel),
+  // this just toggles which .flows-tab-panel shows inside panel-library-
+  // flows itself.
+  function switchFlowsTab(tabId) {
+    document.querySelectorAll('.flows-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.flowsTab === tabId));
+    document.querySelectorAll('.flows-tab-panel').forEach(panel => {
+      panel.style.display = (panel.id === 'flowsTabPanel-' + tabId) ? '' : 'none';
+    });
+  }
+  document.querySelectorAll('.flows-tab').forEach(btn => {
+    btn.addEventListener('click', () => switchFlowsTab(btn.dataset.flowsTab));
+  });
+
+  // Preconditions nav row targets the SAME panel as Saved Flows (they
+  // already live together, see panel-library-flows) rather than a fake
+  // separate sidebar panel just for a nav label - layered on top of the
+  // generic tab-switch delegation above (both listeners fire on click),
+  // this one also switches the Saved Flows page's own in-page tab to
+  // Preconditions once that panel is showing.
+  document.getElementById('navPreconditions').addEventListener('click', () => switchFlowsTab('preconditions'));
 
   // -------- Setup script picker: pick a .py file from the local pytest
   // project OR a configured GitHub automation repo, to run before this
@@ -5352,22 +6694,22 @@ ${clone.innerHTML}
   // made the list feel flat rather than a difference in information
   // density.
   const LS_ACTION_ACCENTS = {
-    tap: {fg: '#1D4ED8', bg: '#DBEAFE'},
-    type_text: {fg: '#6D28D9', bg: '#EDE9FE'},
-    clear: {fg: '#6D28D9', bg: '#EDE9FE'},
-    swipe: {fg: '#0E7490', bg: '#CFFAFE'},
-    wait: {fg: '#57606A', bg: '#F1F2F4'},
-    back: {fg: '#57606A', bg: '#F1F2F4'},
-    assert_visible: {fg: '#0D9488', bg: '#CCFBF1'},
-    assert_value: {fg: '#0D9488', bg: '#CCFBF1'},
-    assert_expr: {fg: '#0D9488', bg: '#CCFBF1'},
-    parse_label: {fg: '#4338CA', bg: '#E0E7FF'},
-    compute: {fg: '#4338CA', bg: '#E0E7FF'},
-    switch_app: {fg: '#B45309', bg: '#FDE9C8'},
-    note: {fg: '#0F766E', bg: '#CCFBF1'},
-    run_api_script: {fg: '#0F766E', bg: '#CCFBF1'},
+    tap: {fg: '#60A5FA', bg: 'rgba(96,165,250,0.16)'},
+    type_text: {fg: '#A78BFA', bg: 'rgba(167,139,250,0.16)'},
+    clear: {fg: '#A78BFA', bg: 'rgba(167,139,250,0.16)'},
+    swipe: {fg: '#22D3EE', bg: 'rgba(34,211,238,0.16)'},
+    wait: {fg: '#9CA3AF', bg: 'rgba(156,163,175,0.16)'},
+    back: {fg: '#9CA3AF', bg: 'rgba(156,163,175,0.16)'},
+    assert_visible: {fg: '#2DD4BF', bg: 'rgba(45,212,191,0.16)'},
+    assert_value: {fg: '#2DD4BF', bg: 'rgba(45,212,191,0.16)'},
+    assert_expr: {fg: '#2DD4BF', bg: 'rgba(45,212,191,0.16)'},
+    parse_label: {fg: '#818CF8', bg: 'rgba(129,140,248,0.16)'},
+    compute: {fg: '#818CF8', bg: 'rgba(129,140,248,0.16)'},
+    switch_app: {fg: '#FBBF24', bg: 'rgba(251,191,36,0.16)'},
+    note: {fg: '#2DD4BF', bg: 'rgba(45,212,191,0.16)'},
+    run_api_script: {fg: '#2DD4BF', bg: 'rgba(45,212,191,0.16)'},
   };
-  const LS_ACTION_ACCENT_DEFAULT = {fg: '#57606A', bg: '#F1F2F4'};
+  const LS_ACTION_ACCENT_DEFAULT = {fg: '#9CA3AF', bg: 'rgba(156,163,175,0.16)'};
   function lsActionAccent(action) { return LS_ACTION_ACCENTS[action] || LS_ACTION_ACCENT_DEFAULT; }
 
   function renderLsCapturedSteps() {
@@ -7907,6 +9249,143 @@ ${lines}
       btn.disabled = false;
       btn.textContent = 'Push to GitHub';
     }
+  });
+
+  // ---------- Global utility bar ----------
+
+  // Live search: filters the full Saved Flows page by substring match,
+  // client-side, no extra fetch. Doesn't reach into other panels (Test
+  // Scripts, Preconditions, devices) yet - the placeholder text is
+  // intentionally broader than v1's behavior, same as the rest of this
+  // dashboard's known simplifications.
+  document.getElementById('utilSearchInput').addEventListener('input', (e) => {
+    const q = e.target.value.trim().toLowerCase();
+    // Saved Flows page has its own search state (savedFlowsSearchQuery,
+    // feeding renderFlowsSidebarPage's pagination) rather than a display
+    // toggle on already-rendered cards, so mirror the typed value into
+    // its own search box and re-render through that same path instead of
+    // fighting the "show all" tile with a second hide/show pass.
+    const savedFlowsSearchInput = document.getElementById('savedFlowsSearchInput');
+    if (savedFlowsSearchInput) savedFlowsSearchInput.value = e.target.value;
+    savedFlowsSearchQuery = q;
+    savedFlowsExpanded = false;
+    renderFlowsSidebarPage();
+  });
+
+  // Real light/dark toggle - swaps :root token values via [data-theme] on
+  // <html> (see the light overrides near the top of <style>), persisted
+  // so a reload doesn't snap back to dark.
+  const THEME_KEY = 'habiTheme';
+  function applyTheme(theme) {
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  }
+  applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
+  document.getElementById('utilThemeBtn').addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    localStorage.setItem(THEME_KEY, next);
+    applyTheme(next);
+  });
+
+  // Notification bell - real data (the same /api/dashboard-stats batch
+  // loadDashboardRecentRuns() already fetched for the Dashboard's stat
+  // tiles/table), not a decorative badge. Shows the most recent
+  // fail/error/stuck runs, each opening the same renderReport() viewer
+  // everything else in this file uses.
+  function loadUtilNotifications(allRuns) {
+    const failed = (allRuns || []).filter(r => r.final_status === 'fail' || r.final_status === 'error' || r.final_status === 'stuck').slice(0, 8);
+    const dot = document.getElementById('utilNotifDot');
+    const list = document.getElementById('utilNotifList');
+    dot.style.display = failed.length ? 'block' : 'none';
+    if (!failed.length) {
+      list.innerHTML = '<div class="empty-hint" style="font-size:12px; padding:10px 14px;">No recent failures 🎉</div>';
+      return;
+    }
+    list.innerHTML = failed.map((r, i) => `
+      <div class="util-notif-row" data-notif-idx="${i}">
+        <div class="util-notif-flow">${escapeHtml(humanizeFlowName(r.flow_name || r.goal || '(untitled)'))}</div>
+        <div class="util-notif-meta"><span class="status-badge ${runStatusBadgeClass(r.final_status)}">${escapeHtml(r.final_status || 'unknown')}</span> · ${timeAgo(r.started_at)}</div>
+      </div>`).join('');
+    list.querySelectorAll('.util-notif-row').forEach(row => {
+      row.addEventListener('click', () => {
+        document.getElementById('utilNotifPanel').style.display = 'none';
+        document.querySelector('.tab[data-tab="recent-runs"]').click();
+        viewRunReport(failed[Number(row.dataset.notifIdx)],
+          document.getElementById('recentRunsReportViewer'), document.getElementById('recentRunsReportCard'));
+      });
+    });
+  }
+
+  // Popovers: click the trigger to toggle just that one panel, click
+  // anywhere outside either popover to close both - standard dropdown
+  // behavior, no library needed for two of them.
+  document.getElementById('utilNotifBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const panel = document.getElementById('utilNotifPanel');
+    const wasOpen = panel.style.display !== 'none';
+    document.getElementById('utilUserMenu').style.display = 'none';
+    panel.style.display = wasOpen ? 'none' : 'block';
+  });
+  document.getElementById('utilUserMenuBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('utilUserMenu');
+    const wasOpen = menu.style.display !== 'none';
+    document.getElementById('utilNotifPanel').style.display = 'none';
+    menu.style.display = wasOpen ? 'none' : 'block';
+  });
+  document.addEventListener('click', () => {
+    document.getElementById('utilNotifPanel').style.display = 'none';
+    document.getElementById('utilUserMenu').style.display = 'none';
+  });
+
+  // All three real actions, not stubs: Settings just clicks this app's own
+  // Settings nav tab; "Edit name" re-runs the same setUserName/
+  // applyUserIdentity the auth gate uses, so it updates the greeting/
+  // avatar immediately, not just on next reload; "Lock console" clears
+  // the auth-gate's localStorage key and reloads - the same passcode gate
+  // at the top of this file, not a second auth system (the name is kept,
+  // so the same person unlocking again isn't asked for it twice).
+  document.getElementById('utilUserSettingsBtn').addEventListener('click', () => {
+    document.getElementById('utilUserMenu').style.display = 'none';
+    document.querySelector('.tab[data-tab="settings"]').click();
+  });
+  document.getElementById('utilUserEditNameBtn').addEventListener('click', () => {
+    document.getElementById('utilUserMenu').style.display = 'none';
+    const next = prompt('Your name:', getUserName());
+    if (next === null) return;
+    const trimmed = next.trim();
+    if (!trimmed) return;
+    setUserName(trimmed);
+    applyUserIdentity();
+  });
+  document.getElementById('utilUserLockBtn').addEventListener('click', () => {
+    localStorage.removeItem(AUTH_GATE_STORAGE_KEY);
+    location.reload();
+  });
+
+  // Saved Flows page toolbar: its own local search (separate element from
+  // the global util bar search, feeds savedFlowsSearchQuery into the same
+  // renderFlowsSidebarPage() the platform filter already uses, so search
+  // + filter + pagination all compose correctly instead of a second
+  // display:none pass fighting with the "show all" tile), a grid/list
+  // view toggle (CSS class swap on the existing cards - see
+  // .flows-grid.list-view - not a second render path), and "+ Create
+  // flow" which just jumps to Test Builder, this app's actual
+  // flow-creation entry point.
+  document.getElementById('savedFlowsSearchInput').addEventListener('input', (e) => {
+    savedFlowsSearchQuery = e.target.value.trim().toLowerCase();
+    savedFlowsExpanded = false;
+    renderFlowsSidebarPage();
+  });
+  document.querySelectorAll('#savedFlowsViewToggle .view-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#savedFlowsViewToggle .view-toggle-btn').forEach(b => b.classList.remove('on'));
+      btn.classList.add('on');
+      document.getElementById('savedFlowsList').classList.toggle('list-view', btn.dataset.view === 'list');
+    });
+  });
+  document.getElementById('createFlowBtn').addEventListener('click', () => {
+    document.querySelector('.tab[data-tab="scraper"]').click();
   });
 </script>
 </body>
