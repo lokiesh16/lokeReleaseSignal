@@ -1,0 +1,152 @@
+{
+  "name": "ota_testcases",
+  "module": "HomePage",
+  "context": "I am validating OTA feature",
+  "created_at": "2026-09-24T06:27:55Z",
+  "cases": [
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Reload Now' applies the OTA update and reloads the app to the latest version",
+      "precondition": "User is logged in, on the Home screen, and the 'Update Ready' bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Bottom sheet shows title 'Update Ready', description text, 'Reload Now' button, and 'Maybe Later' link",
+          "step": "Observe the 'Update Ready' bottom sheet displayed over the Home screen",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App begins reloading/updating immediately, showing a loading indicator or briefly going blank before returning to the Home screen on the new version",
+          "step": "Tap the 'Reload Now' button",
+          "test_data": ""
+        }
+      ],
+      "title": "Reload Now triggers app update immediately",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping 'Maybe Later' dismisses the sheet and schedules the update for the next app open",
+      "precondition": "User is logged in, on the Home screen, and the 'Update Ready' bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Bottom sheet is dismissed and user returns to the Home screen without an immediate reload",
+          "step": "Tap the 'Maybe Later' link at the bottom of the sheet",
+          "test_data": ""
+        },
+        {
+          "expected_result": "The OTA update is applied automatically on next launch without showing the 'Update Ready' prompt again",
+          "step": "Close and reopen the app",
+          "test_data": ""
+        }
+      ],
+      "title": "Maybe Later defers update to next app launch",
+      "execution_status": "pass"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify that the Home screen content behind the bottom sheet is not interactable while the sheet is open",
+      "precondition": "User is logged in, on the Home screen, and the 'Update Ready' bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Tap is intercepted by the sheet overlay; no navigation to the 'Buy Now' flow occurs",
+          "step": "Attempt to tap the 'Buy Now' banner button visible behind the sheet",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Tap is blocked; no navigation to notifications occurs",
+          "step": "Attempt to tap the notification bell icon in the header area",
+          "test_data": ""
+        }
+      ],
+      "title": "Update Ready sheet blocks underlying screen interaction",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that once the OTA update is applied via 'Reload Now', the update prompt does not reappear",
+      "precondition": "User is on the Home screen with 'Update Ready' sheet visible",
+      "steps": [
+        {
+          "expected_result": "App reloads and returns to the Home screen on the new version",
+          "step": "Tap the 'Reload Now' button",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Home screen loads normally without displaying the 'Update Ready' bottom sheet",
+          "step": "Close and reopen the app",
+          "test_data": ""
+        }
+      ],
+      "title": "Update Ready sheet does not appear after successful reload",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify the sheet displays all required UI components with correct copy",
+      "precondition": "User is logged in, on the Home screen, and the 'Update Ready' bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Title reads 'Update Ready' in bold large font",
+          "step": "Observe the title of the bottom sheet",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Body reads 'A new version with the latest features and fixes is ready. Reload now to update, or choose Maybe Later to update automatically the next time you open the app.'",
+          "step": "Observe the body text of the sheet",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Dark blue button with white bold text 'Reload Now' is visible and spans full width",
+          "step": "Observe the primary action button",
+          "test_data": ""
+        },
+        {
+          "expected_result": "'Maybe Later' appears as an underlined link below the button",
+          "step": "Observe the secondary action",
+          "test_data": ""
+        }
+      ],
+      "title": "Update Ready sheet UI elements are fully visible and correctly worded",
+      "execution_status": "pass"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify behavior when user taps 'Reload Now' but the device has no internet connectivity",
+      "precondition": "User is on the Home screen with the 'Update Ready' sheet visible; device has Wi-Fi/mobile data turned off",
+      "steps": [
+        {
+          "expected_result": "Device shows no network connection indicator",
+          "step": "Disable device network connectivity (Wi-Fi and mobile data off)",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App displays an appropriate error message or gracefully falls back, informing the user the update could not be applied due to no connectivity",
+          "step": "Tap the 'Reload Now' button",
+          "test_data": ""
+        }
+      ],
+      "title": "Update Ready sheet shown when app has no network connection",
+      "execution_comment": "testing is in progress"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that dismissing the update sheet with Maybe Later leaves all Home screen data unchanged",
+      "precondition": "User is logged in, on the Home screen with streak of 30 and best of 38 displayed; 'Update Ready' sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Sheet dismisses and Home screen is fully visible",
+          "step": "Tap 'Maybe Later' to dismiss the sheet",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Current streak shows 30 and 'Your best' shows 38, unchanged from before the sheet appeared",
+          "step": "Observe the streak card on the Home screen",
+          "test_data": ""
+        }
+      ],
+      "title": "Streak and week data on Home screen intact after Maybe Later dismissal",
+      "execution_comment": "streak data are just an example and to be ignored",
+      "execution_status": "pass"
+    }
+  ]
+}
