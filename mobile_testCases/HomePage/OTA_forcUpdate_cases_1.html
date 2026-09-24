@@ -133,7 +133,7 @@
                   <td rowspan="2"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="edge_case" data-execution="pass">
               <td>Re-open the app</td>
               <td></td>
-              <td>The &#x27;Updating your app...&#x27; screen is shown again and update continues or restarts</td></tr><tr class="case-start" data-category="negative" data-execution="pass">
+              <td>The &#x27;Updating your app...&#x27; screen is shown again and update continues or restarts</td></tr><tr class="case-start" data-category="negative" data-execution="fail">
                   <td rowspan="2"><span class="badge" style="background:#DC2626">Negative</span>
                     <div class="case-name">Update screen displayed when server returns corrupted update package</div></td>
                   <td rowspan="2">Verify the app handles a corrupted or invalid update payload gracefully</td>
@@ -142,7 +142,7 @@
               <td></td>
               <td>Update screen appears and progress bar begins moving</td>
                   <td rowspan="2" class="shots-cell"></td>
-                  <td rowspan="2"><span class="badge" style="background:#0D9488">Pass</span><div class="exec-comment">if crash happens, it rolls back to previous version</div></td></tr><tr class="" data-category="negative" data-execution="pass">
+                  <td rowspan="2"><span class="badge" style="background:#DC2626">Fail</span><div class="exec-comment">if crash happens, it rolls back to previous version</div></td></tr><tr class="" data-category="negative" data-execution="fail">
               <td>Wait for the download to complete and installation to fail</td>
               <td></td>
               <td>An error message is shown; app does not crash and does not navigate to main content</td></tr><tr class="case-start" data-category="negative" data-execution="pass">
