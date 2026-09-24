@@ -1,0 +1,421 @@
+{
+  "name": "OTA_testcases_2",
+  "module": "HomePage",
+  "context": "I am validating OTA feature.\nContext:\nTapping Reload now loads the app, and navigates to Homepage\nTapping MaybeLater, closes the Update Ready sheet\nTapping MaybeLater, then put the app in background, then come back to the app, Update Ready sheet shows up\nTapping anywhere above the Update Ready bottom sheet, closes the sheet\nKilling the app with sheet ON, and then the app opened, updates applied automatically.\nInteracting with Update ready sheet 'Reload Now' button will always navigate back to HomePage\nTurning off INternet, and then tap \"reload now' button, skeleton loads. Then when internt is resumed back, then the content should load if user is on any page, such as Home, Food, Health, Login page etc\n\nUpdate Ready shouldnt come when there are no actual updates",
+  "created_at": "2026-09-24T10:42:43Z",
+  "cases": [
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping Reload Now applies the update and navigates the user to the Homepage",
+      "precondition": "User is on the Recipes screen and the Update Ready bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "App reloads, update is applied, and user is navigated to the Homepage",
+          "step": "Tap the 'Reload Now' button",
+          "test_data": ""
+        }
+      ],
+      "title": "Tap Reload Now navigates to Homepage",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping Maybe Later dismisses the Update Ready bottom sheet without reloading",
+      "precondition": "User is on the Recipes screen and the Update Ready bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Update Ready sheet is dismissed and the Recipes screen remains fully accessible",
+          "step": "Tap the 'Maybe Later' link",
+          "test_data": ""
+        }
+      ],
+      "title": "Tap Maybe Later closes the Update Ready sheet",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that after dismissing with Maybe Later, the Update Ready sheet re-appears when the app is brought back from background",
+      "precondition": "User is on the Recipes screen and the Update Ready bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Update Ready sheet is dismissed",
+          "step": "Tap the 'Maybe Later' link",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App moves to background",
+          "step": "Press the device Home button to send the app to the background",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Update Ready bottom sheet appears again on the current screen",
+          "step": "Tap the app icon to bring it back to the foreground",
+          "test_data": ""
+        }
+      ],
+      "title": "Maybe Later then background then foreground shows sheet again",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that tapping anywhere on the dimmed backdrop above the Update Ready sheet dismisses it",
+      "precondition": "User is on the Recipes screen and the Update Ready bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Update Ready sheet is dismissed and the Recipes screen is fully interactive",
+          "step": "Tap on the dimmed Recipes screen area above the Update Ready bottom sheet",
+          "test_data": ""
+        }
+      ],
+      "title": "Tap dimmed area above sheet closes it",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that force-killing the app while the Update Ready sheet is open causes the update to be applied automatically on next launch",
+      "precondition": "User is on the Recipes screen and the Update Ready bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "App is terminated",
+          "step": "Force-kill the app via the app switcher while the sheet is showing",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App launches with the update already applied automatically, no Update Ready sheet shown",
+          "step": "Relaunch the app by tapping its icon",
+          "test_data": ""
+        }
+      ],
+      "title": "Kill app with sheet open then reopen applies update automatically",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that Reload Now always redirects to Homepage regardless of the screen where the sheet appeared",
+      "precondition": "User is on the Recipes screen (not the Homepage) and the Update Ready bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Recipes screen with Update Ready sheet is displayed",
+          "step": "Confirm current screen is Recipes, not Homepage",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App reloads and navigates to the Homepage, not back to Recipes",
+          "step": "Tap the 'Reload Now' button",
+          "test_data": ""
+        }
+      ],
+      "title": "Reload Now from non-Home screen still navigates to Homepage",
+      "execution_status": "pass"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify that tapping Reload Now without internet shows a skeleton loading state",
+      "precondition": "User is on the Recipes screen, Update Ready sheet is visible, and device internet is turned off",
+      "steps": [
+        {
+          "expected_result": "Internet is disabled",
+          "step": "Turn off device internet connection",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App attempts to reload and displays skeleton loader UI instead of content",
+          "step": "Tap the 'Reload Now' button",
+          "test_data": ""
+        }
+      ],
+      "title": "Reload Now with internet off shows skeleton loader",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that content loads correctly once internet is restored after tapping Reload Now with no connectivity",
+      "precondition": "User tapped Reload Now with internet off and skeleton loader is showing on a page (e.g. Home, Food, Health)",
+      "steps": [
+        {
+          "expected_result": "Skeleton loader is displayed",
+          "step": "Turn off internet and tap 'Reload Now' to trigger skeleton state",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Content loads and replaces the skeleton loader on the current page",
+          "step": "Re-enable device internet connection",
+          "test_data": ""
+        }
+      ],
+      "title": "Internet restored after Reload Now loads content",
+      "execution_status": "pass"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify whether the Update Ready sheet can be dismissed by swiping it downward",
+      "precondition": "User is on the Recipes screen and the Update Ready bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Sheet either stays open or closes gracefully; update is not lost",
+          "step": "Swipe down on the Update Ready bottom sheet",
+          "test_data": ""
+        }
+      ],
+      "title": "Sheet cannot be swiped down to dismiss",
+      "execution_status": "pass"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that UI elements on the Recipes screen (e.g. search, recipe items) are not interactable while the sheet is open",
+      "precondition": "User is on the Recipes screen and the Update Ready bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "No interaction occurs on the underlying screen; sheet remains in focus",
+          "step": "Tap on the Search bar or a recipe item visible behind the sheet",
+          "test_data": ""
+        }
+      ],
+      "title": "Update Ready sheet blocks interaction with underlying screen",
+      "execution_status": "pass"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that after dismissing the sheet multiple times with Maybe Later, eventually tapping Reload Now still navigates to Homepage",
+      "precondition": "User is on the Recipes screen and the Update Ready bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Sheet dismisses",
+          "step": "Tap 'Maybe Later'",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Sheet re-appears and is dismissed each time",
+          "step": "Background and foreground the app twice to trigger the sheet again each time and tap 'Maybe Later' each time",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App reloads and navigates to Homepage successfully",
+          "step": "Background and foreground the app once more, then tap 'Reload Now'",
+          "test_data": ""
+        }
+      ],
+      "title": "Multiple Maybe Later taps then Reload Now navigates to Homepage",
+      "execution_status": "pass"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that Reload Now from the Login page context still navigates to the Homepage after update",
+      "precondition": "User is on the Login page and the Update Ready bottom sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Update Ready sheet visible on Login page",
+          "step": "Confirm the Update Ready sheet is displayed over the Login page",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App reloads, update is applied, and user lands on the Homepage",
+          "step": "Tap 'Reload Now'",
+          "test_data": ""
+        }
+      ],
+      "title": "Reload Now on Login page navigates to Homepage",
+      "execution_status": "pass"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify the Update Ready sheet is not shown when there is no new OTA update pending",
+      "precondition": "App is on the latest version with no pending OTA update; user is on the Recipes screen",
+      "steps": [
+        {
+          "expected_result": "Recipes screen loads normally with no Update Ready bottom sheet visible",
+          "step": "Open the app and navigate to the Recipes screen",
+          "test_data": ""
+        }
+      ],
+      "title": "Update Ready sheet does not appear when no update is available",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify tapping Reload Now while on the Recipes screen lands the user on the Homepage after update",
+      "precondition": "User is on the Recipes screen and the Update Ready sheet is displayed",
+      "steps": [
+        {
+          "expected_result": "Sheet shows 'Reload Now' button and 'Maybe Later' link",
+          "step": "Observe the Update Ready bottom sheet on the Recipes screen",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App reloads and navigates to the Homepage, not the Recipes screen",
+          "step": "Tap the 'Reload Now' button",
+          "test_data": ""
+        }
+      ],
+      "title": "Reload Now on Recipes screen navigates to Homepage",
+      "execution_status": "pass"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that choosing Maybe Later then force-closing and reopening the app still presents the Update Ready sheet (update not yet applied)",
+      "precondition": "Update Ready sheet is visible; user is on the Recipes screen",
+      "steps": [
+        {
+          "expected_result": "Update Ready sheet closes; user remains on Recipes screen",
+          "step": "Tap 'Maybe Later'",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App is fully closed",
+          "step": "Force-kill the app from the app switcher",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App opens and the Update Ready sheet appears again since update was not applied",
+          "step": "Reopen the app",
+          "test_data": ""
+        }
+      ],
+      "title": "Maybe Later then kill app then reopen shows Update Ready sheet again",
+      "execution_status": "pass"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify the Update Ready sheet consistently reappears each time the app returns to foreground after Maybe Later is chosen",
+      "precondition": "Update Ready sheet is visible; user is on the Recipes screen",
+      "steps": [
+        {
+          "expected_result": "Sheet closes",
+          "step": "Tap 'Maybe Later'",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App is backgrounded",
+          "step": "Send app to background",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Update Ready sheet appears again",
+          "step": "Bring app to foreground",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Sheet closes",
+          "step": "Tap 'Maybe Later' again",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Update Ready sheet appears again for the second time",
+          "step": "Send app to background and bring to foreground a second time",
+          "test_data": ""
+        }
+      ],
+      "title": "Sheet reappears on every foreground resume after Maybe Later",
+      "execution_status": "pass"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify skeleton loader shows on Recipes screen when internet is off at Reload Now, then content loads once connection is restored",
+      "precondition": "User is on Recipes screen with Update Ready sheet visible; device internet is turned off",
+      "steps": [
+        {
+          "expected_result": "Device has no internet connectivity",
+          "step": "Confirm internet is disabled on the device",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App reloads and shows skeleton loader (no actual content)",
+          "step": "Tap 'Reload Now'",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Recipes screen content loads and populates replacing the skeleton loader",
+          "step": "Re-enable internet on the device",
+          "test_data": ""
+        }
+      ],
+      "title": "Reload Now with internet off on Recipes screen then internet restored loads content",
+      "execution_status": "pass"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify that UI elements behind the Update Ready sheet (e.g., info icon) are not interactive while the sheet is displayed",
+      "precondition": "User is on Recipes screen and Update Ready sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Nothing happens or the sheet closes (no info dialog opens), confirming underlying UI is blocked",
+          "step": "Attempt to tap the info icon (\u24d8) next to 'Recipe Book' visible behind the sheet",
+          "test_data": ""
+        }
+      ],
+      "title": "Tapping info icon while Update Ready sheet is visible",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify all expected text and buttons on the Update Ready sheet are displayed correctly",
+      "precondition": "User is on the Recipes screen and the Update Ready sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Sheet shows title 'Update Ready', descriptive message about new version, 'Reload Now' button, and 'Maybe Later' link all fully visible without truncation",
+          "step": "Observe the Update Ready bottom sheet",
+          "test_data": ""
+        }
+      ],
+      "title": "Update Ready sheet content is fully visible and readable",
+      "execution_status": "pass"
+    },
+    {
+      "category": "happy_path",
+      "objective": "Verify that after tapping Reload Now and the app updates, the Update Ready sheet does not appear again on subsequent foreground resume",
+      "precondition": "User is on the Recipes screen and the Update Ready sheet is visible",
+      "steps": [
+        {
+          "expected_result": "App reloads and navigates to Homepage",
+          "step": "Tap 'Reload Now'",
+          "test_data": ""
+        },
+        {
+          "expected_result": "App is backgrounded",
+          "step": "Send app to background",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Update Ready sheet does NOT appear since the update has already been applied",
+          "step": "Bring app to foreground",
+          "test_data": ""
+        }
+      ],
+      "title": "Reload Now triggers update only once and sheet does not reappear after reload",
+      "execution_status": "pass"
+    },
+    {
+      "category": "negative",
+      "objective": "Verify the search bar on the Recipes screen is not accessible while the Update Ready sheet is displayed",
+      "precondition": "User is on Recipes screen and Update Ready sheet is visible",
+      "steps": [
+        {
+          "expected_result": "Keyboard does not appear and search bar is not focused, confirming interaction is blocked by the sheet",
+          "step": "Attempt to tap the Search bar visible behind the Update Ready sheet",
+          "test_data": ""
+        }
+      ],
+      "title": "Search bar interaction blocked by Update Ready sheet",
+      "execution_status": "pass"
+    },
+    {
+      "category": "edge_case",
+      "objective": "Verify that tapping Maybe Later does not trigger any update or reload, leaving the current screen state intact",
+      "precondition": "User is on Recipes screen with recently generated recipes visible and Update Ready sheet displayed",
+      "steps": [
+        {
+          "expected_result": "Recipes such as 'Coconut Flour Crepes' and 'Savory Sweet Potato Hash' are visible",
+          "step": "Note the recipes listed under 'Recently Generated' before interacting with the sheet",
+          "test_data": ""
+        },
+        {
+          "expected_result": "Sheet closes and the same recipes are still displayed unchanged; no reload occurs",
+          "step": "Tap 'Maybe Later'",
+          "test_data": ""
+        }
+      ],
+      "title": "Maybe Later does not apply the update \u2014 content unchanged after dismissal",
+      "execution_status": "pass"
+    }
+  ]
+}
