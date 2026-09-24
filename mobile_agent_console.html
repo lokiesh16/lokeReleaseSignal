@@ -823,9 +823,9 @@
   /* ---------- Global utility bar (search / notifications / theme /
      user menu) - see the HTML comment above .util-bar for what's real
      vs. decorative in here. ---------- */
-  .util-bar { display: none; align-items: center; gap: 16px; margin-bottom: 18px; }
+  .util-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
   .util-search {
-    flex: 1; max-width: 520px; min-width: 0; height: 40px; display: flex; align-items: center; gap: 12px;
+    flex: 1; max-width: 520px; min-width: 0; height: 40px; display: none; align-items: center; gap: 12px;
     background: rgba(255,255,255,0.025);
     border: 1px solid var(--ink-line); border-radius: 10px; padding: 0 8px 0 14px; color: var(--paper-dim);
   }
