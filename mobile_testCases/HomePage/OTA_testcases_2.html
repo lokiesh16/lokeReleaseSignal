@@ -1,0 +1,369 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>OTA_testcases_2 - Manual Test Cases</title>
+<style>
+  :root { --ink-line: #E3E5EA; --paper: #171A21; --paper-dim: #6B7280; --ink: #F1F2F5; --ink-raised: #FFFFFF; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 28px 32px 60px;
+         background: var(--ink); color: var(--paper); }
+  .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  .logo { height: 34px; flex-shrink: 0; }
+  h1 { font-size: 21px; margin: 0 0 6px; }
+  .meta { color: var(--paper-dim); font-size: 12.5px; margin-bottom: 4px; }
+  .meta-line { font-size: 13px; margin: 4px 0; }
+  .filters { display: flex; gap: 14px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+  .filters label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--paper-dim);
+                    display: flex; align-items: center; gap: 6px; }
+  .filters select { font-size: 13px; padding: 5px 8px; border-radius: 6px; border: 1px solid var(--ink-line);
+                     background: var(--ink-raised); color: var(--paper); text-transform: none; letter-spacing: normal; }
+  #filterCount { font-size: 12.5px; color: var(--paper-dim); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 14px; background: var(--ink-raised);
+          box-shadow: 0 1px 2px rgba(16,20,28,0.04), 0 4px 16px rgba(16,20,28,0.05); border-radius: 10px; overflow: hidden; }
+  th, td { border: 1px solid var(--ink-line); padding: 10px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--ink); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--paper-dim); }
+  tr.case-start td { border-top: 2px solid var(--paper-dim); }
+  .case-name { font-weight: 700; margin-top: 4px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; color: #fff; }
+  .exec-comment { font-size: 12px; color: var(--paper-dim); margin-top: 6px; }
+  .shots-cell { min-width: 200px; }
+  .shot-thumb { display: inline-block; width: 96px; height: 170px; margin: 0 6px 6px 0; }
+  .shot-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 7px; border: 1px solid var(--ink-line); display: block; }
+  .no-match { text-align: center; color: var(--paper-dim); padding: 24px; display: none; }
+</style></head>
+<body>
+  <div class="header-row">
+    <div>
+      <h1>OTA_testcases_2</h1>
+      <div class="meta">Generated manual test cases &middot; <span id="filterCount">22 case(s)</span></div>
+      <p class="meta-line"><b>Module/Feature:</b> HomePage</p>
+      <p class="meta-line"><b>Context:</b> I am validating OTA feature.
+Context:
+Tapping Reload now loads the app, and navigates to Homepage
+Tapping MaybeLater, closes the Update Ready sheet
+Tapping MaybeLater, then put the app in background, then come back to the app, Update Ready sheet shows up
+Tapping anywhere above the Update Ready bottom sheet, closes the sheet
+Killing the app with sheet ON, and then the app opened, updates applied automatically.
+Interacting with Update ready sheet &#x27;Reload Now&#x27; button will always navigate back to HomePage
+Turning off INternet, and then tap &quot;reload now&#x27; button, skeleton loads. Then when internt is resumed back, then the content should load if user is on any page, such as Home, Food, Health, Login page etc
+
+Update Ready shouldnt come when there are no actual updates</p>
+    </div>
+    <img class="logo" src="data:image/png;base64,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" alt="habitnu">
+  </div>
+  <div class="filters">
+    <label>Category
+      <select id="categoryFilter">
+        <option value="">All</option>
+        <option value="happy_path">Happy path</option><option value="edge_case">Edge case</option><option value="negative">Negative</option>
+      </select>
+    </label>
+    <label>Test Execution
+      <select id="executionFilter">
+        <option value="">All</option>
+        <option value="not_run">Not run</option><option value="pass">Pass</option><option value="fail">Fail</option>
+      </select>
+    </label>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Name</th><th>Objective</th><th>Precondition</th>
+      <th>Test Script (Step-by-Step) — Step</th>
+      <th>Test Script (Step-by-Step) — Test Data</th>
+      <th>Test Script (Step-by-Step) — Expected Result</th>
+      <th>Screenshot</th>
+      <th>Test Execution</th>
+    </tr></thead>
+    <tbody id="casesBody"><tr class="case-start" data-category="happy_path" data-execution="pass">
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Tap Reload Now navigates to Homepage</div></td>
+                  <td rowspan="1">Verify that tapping Reload Now applies the update and navigates the user to the Homepage</td>
+                  <td rowspan="1">User is on the Recipes screen and the Update Ready bottom sheet is visible</td>
+              <td>Tap the &#x27;Reload Now&#x27; button</td>
+              <td></td>
+              <td>App reloads, update is applied, and user is navigated to the Homepage</td>
+                  <td rowspan="1" class="shots-cell"></td>
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="case-start" data-category="happy_path" data-execution="pass">
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Tap Maybe Later closes the Update Ready sheet</div></td>
+                  <td rowspan="1">Verify that tapping Maybe Later dismisses the Update Ready bottom sheet without reloading</td>
+                  <td rowspan="1">User is on the Recipes screen and the Update Ready bottom sheet is visible</td>
+              <td>Tap the &#x27;Maybe Later&#x27; link</td>
+              <td></td>
+              <td>Update Ready sheet is dismissed and the Recipes screen remains fully accessible</td>
+                  <td rowspan="1" class="shots-cell"></td>
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="case-start" data-category="happy_path" data-execution="pass">
+                  <td rowspan="3"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Maybe Later then background then foreground shows sheet again</div></td>
+                  <td rowspan="3">Verify that after dismissing with Maybe Later, the Update Ready sheet re-appears when the app is brought back from background</td>
+                  <td rowspan="3">User is on the Recipes screen and the Update Ready bottom sheet is visible</td>
+              <td>Tap the &#x27;Maybe Later&#x27; link</td>
+              <td></td>
+              <td>Update Ready sheet is dismissed</td>
+                  <td rowspan="3" class="shots-cell"></td>
+                  <td rowspan="3"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="happy_path" data-execution="pass">
+              <td>Press the device Home button to send the app to the background</td>
+              <td></td>
+              <td>App moves to background</td></tr><tr class="" data-category="happy_path" data-execution="pass">
+              <td>Tap the app icon to bring it back to the foreground</td>
+              <td></td>
+              <td>Update Ready bottom sheet appears again on the current screen</td></tr><tr class="case-start" data-category="happy_path" data-execution="pass">
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Tap dimmed area above sheet closes it</div></td>
+                  <td rowspan="1">Verify that tapping anywhere on the dimmed backdrop above the Update Ready sheet dismisses it</td>
+                  <td rowspan="1">User is on the Recipes screen and the Update Ready bottom sheet is visible</td>
+              <td>Tap on the dimmed Recipes screen area above the Update Ready bottom sheet</td>
+              <td></td>
+              <td>Update Ready sheet is dismissed and the Recipes screen is fully interactive</td>
+                  <td rowspan="1" class="shots-cell"></td>
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="case-start" data-category="happy_path" data-execution="pass">
+                  <td rowspan="2"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Kill app with sheet open then reopen applies update automatically</div></td>
+                  <td rowspan="2">Verify that force-killing the app while the Update Ready sheet is open causes the update to be applied automatically on next launch</td>
+                  <td rowspan="2">User is on the Recipes screen and the Update Ready bottom sheet is visible</td>
+              <td>Force-kill the app via the app switcher while the sheet is showing</td>
+              <td></td>
+              <td>App is terminated</td>
+                  <td rowspan="2" class="shots-cell"></td>
+                  <td rowspan="2"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="happy_path" data-execution="pass">
+              <td>Relaunch the app by tapping its icon</td>
+              <td></td>
+              <td>App launches with the update already applied automatically, no Update Ready sheet shown</td></tr><tr class="case-start" data-category="happy_path" data-execution="pass">
+                  <td rowspan="2"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Reload Now from non-Home screen still navigates to Homepage</div></td>
+                  <td rowspan="2">Verify that Reload Now always redirects to Homepage regardless of the screen where the sheet appeared</td>
+                  <td rowspan="2">User is on the Recipes screen (not the Homepage) and the Update Ready bottom sheet is visible</td>
+              <td>Confirm current screen is Recipes, not Homepage</td>
+              <td></td>
+              <td>Recipes screen with Update Ready sheet is displayed</td>
+                  <td rowspan="2" class="shots-cell"></td>
+                  <td rowspan="2"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="happy_path" data-execution="pass">
+              <td>Tap the &#x27;Reload Now&#x27; button</td>
+              <td></td>
+              <td>App reloads and navigates to the Homepage, not back to Recipes</td></tr><tr class="case-start" data-category="negative" data-execution="pass">
+                  <td rowspan="2"><span class="badge" style="background:#DC2626">Negative</span>
+                    <div class="case-name">Reload Now with internet off shows skeleton loader</div></td>
+                  <td rowspan="2">Verify that tapping Reload Now without internet shows a skeleton loading state</td>
+                  <td rowspan="2">User is on the Recipes screen, Update Ready sheet is visible, and device internet is turned off</td>
+              <td>Turn off device internet connection</td>
+              <td></td>
+              <td>Internet is disabled</td>
+                  <td rowspan="2" class="shots-cell"></td>
+                  <td rowspan="2"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="negative" data-execution="pass">
+              <td>Tap the &#x27;Reload Now&#x27; button</td>
+              <td></td>
+              <td>App attempts to reload and displays skeleton loader UI instead of content</td></tr><tr class="case-start" data-category="happy_path" data-execution="pass">
+                  <td rowspan="2"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Internet restored after Reload Now loads content</div></td>
+                  <td rowspan="2">Verify that content loads correctly once internet is restored after tapping Reload Now with no connectivity</td>
+                  <td rowspan="2">User tapped Reload Now with internet off and skeleton loader is showing on a page (e.g. Home, Food, Health)</td>
+              <td>Turn off internet and tap &#x27;Reload Now&#x27; to trigger skeleton state</td>
+              <td></td>
+              <td>Skeleton loader is displayed</td>
+                  <td rowspan="2" class="shots-cell"></td>
+                  <td rowspan="2"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="happy_path" data-execution="pass">
+              <td>Re-enable device internet connection</td>
+              <td></td>
+              <td>Content loads and replaces the skeleton loader on the current page</td></tr><tr class="case-start" data-category="edge_case" data-execution="pass">
+                  <td rowspan="1"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Sheet cannot be swiped down to dismiss</div></td>
+                  <td rowspan="1">Verify whether the Update Ready sheet can be dismissed by swiping it downward</td>
+                  <td rowspan="1">User is on the Recipes screen and the Update Ready bottom sheet is visible</td>
+              <td>Swipe down on the Update Ready bottom sheet</td>
+              <td></td>
+              <td>Sheet either stays open or closes gracefully; update is not lost</td>
+                  <td rowspan="1" class="shots-cell"></td>
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="case-start" data-category="edge_case" data-execution="pass">
+                  <td rowspan="1"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Update Ready sheet blocks interaction with underlying screen</div></td>
+                  <td rowspan="1">Verify that UI elements on the Recipes screen (e.g. search, recipe items) are not interactable while the sheet is open</td>
+                  <td rowspan="1">User is on the Recipes screen and the Update Ready bottom sheet is visible</td>
+              <td>Tap on the Search bar or a recipe item visible behind the sheet</td>
+              <td></td>
+              <td>No interaction occurs on the underlying screen; sheet remains in focus</td>
+                  <td rowspan="1" class="shots-cell"></td>
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="case-start" data-category="edge_case" data-execution="pass">
+                  <td rowspan="3"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Multiple Maybe Later taps then Reload Now navigates to Homepage</div></td>
+                  <td rowspan="3">Verify that after dismissing the sheet multiple times with Maybe Later, eventually tapping Reload Now still navigates to Homepage</td>
+                  <td rowspan="3">User is on the Recipes screen and the Update Ready bottom sheet is visible</td>
+              <td>Tap &#x27;Maybe Later&#x27;</td>
+              <td></td>
+              <td>Sheet dismisses</td>
+                  <td rowspan="3" class="shots-cell"></td>
+                  <td rowspan="3"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Background and foreground the app twice to trigger the sheet again each time and tap &#x27;Maybe Later&#x27; each time</td>
+              <td></td>
+              <td>Sheet re-appears and is dismissed each time</td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Background and foreground the app once more, then tap &#x27;Reload Now&#x27;</td>
+              <td></td>
+              <td>App reloads and navigates to Homepage successfully</td></tr><tr class="case-start" data-category="edge_case" data-execution="pass">
+                  <td rowspan="2"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Reload Now on Login page navigates to Homepage</div></td>
+                  <td rowspan="2">Verify that Reload Now from the Login page context still navigates to the Homepage after update</td>
+                  <td rowspan="2">User is on the Login page and the Update Ready bottom sheet is visible</td>
+              <td>Confirm the Update Ready sheet is displayed over the Login page</td>
+              <td></td>
+              <td>Update Ready sheet visible on Login page</td>
+                  <td rowspan="2" class="shots-cell"></td>
+                  <td rowspan="2"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Tap &#x27;Reload Now&#x27;</td>
+              <td></td>
+              <td>App reloads, update is applied, and user lands on the Homepage</td></tr><tr class="case-start" data-category="negative" data-execution="pass">
+                  <td rowspan="1"><span class="badge" style="background:#DC2626">Negative</span>
+                    <div class="case-name">Update Ready sheet does not appear when no update is available</div></td>
+                  <td rowspan="1">Verify the Update Ready sheet is not shown when there is no new OTA update pending</td>
+                  <td rowspan="1">App is on the latest version with no pending OTA update; user is on the Recipes screen</td>
+              <td>Open the app and navigate to the Recipes screen</td>
+              <td></td>
+              <td>Recipes screen loads normally with no Update Ready bottom sheet visible</td>
+                  <td rowspan="1" class="shots-cell"></td>
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="case-start" data-category="happy_path" data-execution="pass">
+                  <td rowspan="2"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Reload Now on Recipes screen navigates to Homepage</div></td>
+                  <td rowspan="2">Verify tapping Reload Now while on the Recipes screen lands the user on the Homepage after update</td>
+                  <td rowspan="2">User is on the Recipes screen and the Update Ready sheet is displayed</td>
+              <td>Observe the Update Ready bottom sheet on the Recipes screen</td>
+              <td></td>
+              <td>Sheet shows &#x27;Reload Now&#x27; button and &#x27;Maybe Later&#x27; link</td>
+                  <td rowspan="2" class="shots-cell"></td>
+                  <td rowspan="2"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="happy_path" data-execution="pass">
+              <td>Tap the &#x27;Reload Now&#x27; button</td>
+              <td></td>
+              <td>App reloads and navigates to the Homepage, not the Recipes screen</td></tr><tr class="case-start" data-category="edge_case" data-execution="pass">
+                  <td rowspan="3"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Maybe Later then kill app then reopen shows Update Ready sheet again</div></td>
+                  <td rowspan="3">Verify that choosing Maybe Later then force-closing and reopening the app still presents the Update Ready sheet (update not yet applied)</td>
+                  <td rowspan="3">Update Ready sheet is visible; user is on the Recipes screen</td>
+              <td>Tap &#x27;Maybe Later&#x27;</td>
+              <td></td>
+              <td>Update Ready sheet closes; user remains on Recipes screen</td>
+                  <td rowspan="3" class="shots-cell"></td>
+                  <td rowspan="3"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Force-kill the app from the app switcher</td>
+              <td></td>
+              <td>App is fully closed</td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Reopen the app</td>
+              <td></td>
+              <td>App opens and the Update Ready sheet appears again since update was not applied</td></tr><tr class="case-start" data-category="edge_case" data-execution="pass">
+                  <td rowspan="5"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Sheet reappears on every foreground resume after Maybe Later</div></td>
+                  <td rowspan="5">Verify the Update Ready sheet consistently reappears each time the app returns to foreground after Maybe Later is chosen</td>
+                  <td rowspan="5">Update Ready sheet is visible; user is on the Recipes screen</td>
+              <td>Tap &#x27;Maybe Later&#x27;</td>
+              <td></td>
+              <td>Sheet closes</td>
+                  <td rowspan="5" class="shots-cell"></td>
+                  <td rowspan="5"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Send app to background</td>
+              <td></td>
+              <td>App is backgrounded</td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Bring app to foreground</td>
+              <td></td>
+              <td>Update Ready sheet appears again</td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Tap &#x27;Maybe Later&#x27; again</td>
+              <td></td>
+              <td>Sheet closes</td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Send app to background and bring to foreground a second time</td>
+              <td></td>
+              <td>Update Ready sheet appears again for the second time</td></tr><tr class="case-start" data-category="edge_case" data-execution="pass">
+                  <td rowspan="3"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Reload Now with internet off on Recipes screen then internet restored loads content</div></td>
+                  <td rowspan="3">Verify skeleton loader shows on Recipes screen when internet is off at Reload Now, then content loads once connection is restored</td>
+                  <td rowspan="3">User is on Recipes screen with Update Ready sheet visible; device internet is turned off</td>
+              <td>Confirm internet is disabled on the device</td>
+              <td></td>
+              <td>Device has no internet connectivity</td>
+                  <td rowspan="3" class="shots-cell"></td>
+                  <td rowspan="3"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Tap &#x27;Reload Now&#x27;</td>
+              <td></td>
+              <td>App reloads and shows skeleton loader (no actual content)</td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Re-enable internet on the device</td>
+              <td></td>
+              <td>Recipes screen content loads and populates replacing the skeleton loader</td></tr><tr class="case-start" data-category="negative" data-execution="pass">
+                  <td rowspan="1"><span class="badge" style="background:#DC2626">Negative</span>
+                    <div class="case-name">Tapping info icon while Update Ready sheet is visible</div></td>
+                  <td rowspan="1">Verify that UI elements behind the Update Ready sheet (e.g., info icon) are not interactive while the sheet is displayed</td>
+                  <td rowspan="1">User is on Recipes screen and Update Ready sheet is visible</td>
+              <td>Attempt to tap the info icon (ⓘ) next to &#x27;Recipe Book&#x27; visible behind the sheet</td>
+              <td></td>
+              <td>Nothing happens or the sheet closes (no info dialog opens), confirming underlying UI is blocked</td>
+                  <td rowspan="1" class="shots-cell"></td>
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="case-start" data-category="happy_path" data-execution="pass">
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Update Ready sheet content is fully visible and readable</div></td>
+                  <td rowspan="1">Verify all expected text and buttons on the Update Ready sheet are displayed correctly</td>
+                  <td rowspan="1">User is on the Recipes screen and the Update Ready sheet is visible</td>
+              <td>Observe the Update Ready bottom sheet</td>
+              <td></td>
+              <td>Sheet shows title &#x27;Update Ready&#x27;, descriptive message about new version, &#x27;Reload Now&#x27; button, and &#x27;Maybe Later&#x27; link all fully visible without truncation</td>
+                  <td rowspan="1" class="shots-cell"></td>
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="case-start" data-category="happy_path" data-execution="pass">
+                  <td rowspan="3"><span class="badge" style="background:#0D9488">Happy path</span>
+                    <div class="case-name">Reload Now triggers update only once and sheet does not reappear after reload</div></td>
+                  <td rowspan="3">Verify that after tapping Reload Now and the app updates, the Update Ready sheet does not appear again on subsequent foreground resume</td>
+                  <td rowspan="3">User is on the Recipes screen and the Update Ready sheet is visible</td>
+              <td>Tap &#x27;Reload Now&#x27;</td>
+              <td></td>
+              <td>App reloads and navigates to Homepage</td>
+                  <td rowspan="3" class="shots-cell"></td>
+                  <td rowspan="3"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="happy_path" data-execution="pass">
+              <td>Send app to background</td>
+              <td></td>
+              <td>App is backgrounded</td></tr><tr class="" data-category="happy_path" data-execution="pass">
+              <td>Bring app to foreground</td>
+              <td></td>
+              <td>Update Ready sheet does NOT appear since the update has already been applied</td></tr><tr class="case-start" data-category="negative" data-execution="pass">
+                  <td rowspan="1"><span class="badge" style="background:#DC2626">Negative</span>
+                    <div class="case-name">Search bar interaction blocked by Update Ready sheet</div></td>
+                  <td rowspan="1">Verify the search bar on the Recipes screen is not accessible while the Update Ready sheet is displayed</td>
+                  <td rowspan="1">User is on Recipes screen and Update Ready sheet is visible</td>
+              <td>Attempt to tap the Search bar visible behind the Update Ready sheet</td>
+              <td></td>
+              <td>Keyboard does not appear and search bar is not focused, confirming interaction is blocked by the sheet</td>
+                  <td rowspan="1" class="shots-cell"></td>
+                  <td rowspan="1"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="case-start" data-category="edge_case" data-execution="pass">
+                  <td rowspan="2"><span class="badge" style="background:#D97706">Edge case</span>
+                    <div class="case-name">Maybe Later does not apply the update — content unchanged after dismissal</div></td>
+                  <td rowspan="2">Verify that tapping Maybe Later does not trigger any update or reload, leaving the current screen state intact</td>
+                  <td rowspan="2">User is on Recipes screen with recently generated recipes visible and Update Ready sheet displayed</td>
+              <td>Note the recipes listed under &#x27;Recently Generated&#x27; before interacting with the sheet</td>
+              <td></td>
+              <td>Recipes such as &#x27;Coconut Flour Crepes&#x27; and &#x27;Savory Sweet Potato Hash&#x27; are visible</td>
+                  <td rowspan="2" class="shots-cell"></td>
+                  <td rowspan="2"><span class="badge" style="background:#0D9488">Pass</span></td></tr><tr class="" data-category="edge_case" data-execution="pass">
+              <td>Tap &#x27;Maybe Later&#x27;</td>
+              <td></td>
+              <td>Sheet closes and the same recipes are still displayed unchanged; no reload occurs</td></tr></tbody>
+  </table>
+  <div class="no-match" id="noMatch">No test cases match these filters.</div>
+  <script>
+    (function() {
+      var categorySelect = document.getElementById('categoryFilter');
+      var executionSelect = document.getElementById('executionFilter');
+      var rows = Array.prototype.slice.call(document.querySelectorAll('#casesBody tr'));
+      var countEl = document.getElementById('filterCount');
+      var noMatchEl = document.getElementById('noMatch');
+      var totalCases = 22;
+
+      function applyFilters() {
+        var wantCategory = categorySelect.value;
+        var wantExecution = executionSelect.value;
+        var visibleCases = 0;
+        var seenCases = 0;
+        rows.forEach(function(row) {
+          var matches = (!wantCategory || row.dataset.category === wantCategory)
+            && (!wantExecution || row.dataset.execution === wantExecution);
+          row.style.display = matches ? '' : 'none';
+          if (matches && row.classList.contains('case-start')) visibleCases++;
+          if (row.classList.contains('case-start')) seenCases++;
+        });
+        countEl.textContent = (wantCategory || wantExecution)
+          ? visibleCases + ' of ' + totalCases + ' case(s)'
+          : totalCases + ' case(s)';
+        noMatchEl.style.display = (seenCases > 0 && visibleCases === 0) ? 'block' : 'none';
+      }
+
+      categorySelect.addEventListener('change', applyFilters);
+      executionSelect.addEventListener('change', applyFilters);
+    })();
+  </script>
+</body></html>
