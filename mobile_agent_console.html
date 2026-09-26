@@ -1129,6 +1129,17 @@
   .mtc-table .mtc-remove-btn { padding: 3px 8px; font-size: 10.5px; background: var(--ink-line); color: var(--paper); white-space: nowrap; }
   .mtc-execution-cell { min-width: 140px; }
   .mtc-exec-status { width: 100%; font-size: 11px; font-weight: 700; padding: 3px 4px; margin-bottom: 5px; background: var(--ink-raised); }
+  .mtc-screenshot-cell { min-width: 200px; }
+  .mtc-screenshot-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .mtc-screenshot-thumb { position: relative; display: block; width: 96px; height: 170px; flex-shrink: 0; }
+  .mtc-screenshot-thumb img {
+    width: 100%; height: 100%; object-fit: cover; border-radius: 7px; border: 1px solid var(--ink-line); display: block;
+  }
+  .mtc-screenshot-remove-btn {
+    position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%; border: none;
+    background: var(--alert); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; padding: 0;
+  }
+  .mtc-attach-screenshot-btn:disabled { opacity: 0.5; cursor: default; }
   .mtc-exec-comment { width: 100%; font-size: 11.5px; padding: 5px 6px; resize: vertical; min-height: 40px; box-sizing: border-box; }
 
   /* Casual-visitor deterrent, not real security - a passcode hash sitting
@@ -2117,6 +2128,22 @@
         </details>
 
         <details class="ls-tool" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--ink-line);">
+          <summary><span class="ls-chevron">▸</span> Restart app</summary>
+          <div class="ls-tool-body">
+            <div class="hint" style="font-size:11.5px; margin-bottom:6px; line-height:1.4;">
+              Force-kills then relaunches the app mid-flow (a cold start, not just backgrounding) — same
+              connected session, no need to reconnect. Useful for resetting app state between steps, e.g.
+              clearing a "resume where you left off" banner or re-triggering a first-launch flow.
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <input id="lsRestartAppCustom" placeholder="bundle id (leave blank for the app under test)" style="flex:1; min-width:220px;">
+              <button class="copy" id="lsRestartAppBtn" style="flex-shrink:0;">Restart app</button>
+            </div>
+            <div id="lsRestartAppStatus" style="font-size:12px; margin-top:6px;"></div>
+          </div>
+        </details>
+
+        <details class="ls-tool" style="margin-top:10px; padding-top:10px; border-top:1px solid var(--ink-line);">
           <summary><span class="ls-chevron">▸</span> Compare captured values</summary>
           <div class="ls-tool-body">
             <div class="hint" style="font-size:11.5px; margin-bottom:6px; line-height:1.4;">
@@ -2406,6 +2433,19 @@
             an automation flow — nothing here ever gets replayed. Uses the same connected session as
             <b>Test Builder</b> — connect there first if you haven't yet.
           </p>
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+            <button type="button" class="copy" id="mtcLoadExistingBtn" style="background:var(--ink-line); color:var(--paper); padding:6px 14px; font-size:12.5px;">Load an existing set…</button>
+            <span class="hint" style="font-size:11.5px;">Reopen a saved or previously-pushed set to keep adding to it instead of starting fresh.</span>
+          </div>
+          <div class="card" id="mtcLoadExistingPanel" style="display:none; margin-bottom:14px; background:var(--ink-raised-2);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div style="font-weight:700; font-size:13px;">Load an existing test case set</div>
+              <button type="button" class="util-icon-btn" id="mtcLoadExistingCloseBtn" title="Close">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div id="mtcLoadExistingList" class="hint">Loading…</div>
+          </div>
           <div class="field full">
             <label>Context overview <span class="opt">what are you testing? gives the AI the QA intent behind what you're about to explore</span></label>
             <textarea id="mtcContext" rows="3" placeholder="e.g. Testing the Weight Widget: adding a weight entry, setting a target, switching lbs/kg, and the &quot;lbs left to goal&quot; math"></textarea>
@@ -2430,6 +2470,20 @@
             <span id="mtcCount" class="hint"></span>
           </div>
           <div id="mtcList" style="margin-top:10px;"></div>
+
+          <!-- Continue the generation "conversation": more context gets
+               appended onto #mtcContext (so the full history stays
+               visible/editable there and is sent in full on every call,
+               not just the latest delta) and re-sent through the same
+               endpoint mtcGenerateBtn uses - existing_titles already
+               stops it from repeating anything already in the table below. -->
+          <div style="border-top:1px solid var(--ink-line); margin-top:14px; padding-top:12px;">
+            <label style="margin:0; display:block;">Continue this conversation <span class="opt">give more context — new cases get appended below, nothing already listed is repeated</span></label>
+            <textarea id="mtcContinueContext" rows="2" style="margin-top:8px;" placeholder="e.g. also cover the &quot;Sign in with Code&quot; path, and what happens if Sign in is tapped with an invalid email format"></textarea>
+            <button type="button" class="copy" id="mtcContinueBtn" style="margin-top:8px;">+ Add context &amp; generate more</button>
+            <div id="mtcContinueStatus" style="font-size:12px; margin-top:6px;"></div>
+          </div>
+
           <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
             <input id="mtcSaveName" placeholder="Name this test case set, e.g. weight_widget_manual_cases" style="flex:1; min-width:200px;">
             <button class="copy" id="mtcSaveBtn" style="flex-shrink:0;">Save set</button>
@@ -2454,10 +2508,12 @@
               <option value="Chatbot">Chatbot</option>
             </select>
             <button class="copy" id="mtcPushGithubBtn" style="flex-shrink:0;">Push to GitHub</button>
+            <button class="copy" id="mtcPushCloudflareBtn" style="flex-shrink:0;">Push to Cloudflare</button>
           </div>
           <div class="hint" style="font-size:11px; margin-top:5px;">
             Uses <b>Name this test case set</b> above as the filename, filed under this feature/module - pushes the
-            raw data plus a standalone shareable report page.
+            raw data plus a standalone shareable report page to GitHub, or upserts a row in Cloudflare D1 (no
+            shareable link - it's queryable storage, not a hosted page).
           </div>
           <div id="mtcPushStatus" style="font-size:12px; margin-top:6px;"></div>
         </div>
@@ -4093,6 +4149,40 @@ ${clone.innerHTML}
     }
   }
 
+  // Same as publishFlowReport above, but posts to Cloudflare R2 instead
+  // of the GitHub-Pages-backed repo (see /api/publish-flow-report-
+  // cloudflare) - an independent second destination, not a replacement.
+  async function publishFlowReportCloudflare(slug) {
+    const statusEl = document.querySelector(`.flow-report-publish-status[data-slug="${CSS.escape(slug)}"]`);
+    const btn = document.querySelector(`.flow-publish-report-cf-btn[data-slug="${CSS.escape(slug)}"]`);
+    const originalLabel = btn ? btn.textContent : 'Publish to Cloudflare';
+    if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
+    if (statusEl) statusEl.textContent = '';
+    const built = await lsBuildFlowReportHtml(slug);
+    if (!built) {
+      if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
+      return;
+    }
+    const {doc, title} = built;
+    const filename = (title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'report')
+      + '_' + Date.now() + '.html';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/publish-flow-report-cloudflare', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({filename, html: doc}),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'publish failed');
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Published to Cloudflare: <a href="${result.url}" target="_blank" rel="noopener">${escapeHtml(result.url)}</a></span>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  }
+
   // Master-detail layout: the left list only ever shows compact rows (name,
   // step count, a small live status pill) - clicking one renders its full
   // detail (setup/login controls, Run/Generate/Delete, and the execution
@@ -4479,6 +4569,7 @@ ${clone.innerHTML}
         <button class="copy flow-download-csv-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download CSV summary</button>
         <button class="copy flow-download-pdf-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download PDF summary</button>
         <button class="copy flow-publish-report-btn" data-slug="${escapeHtml(f.slug)}" title="Pushes this same report to lokeReleaseSignal (GitHub Pages) for a real shareable link - a downloaded .html file usually just shows raw source when opened on a phone." style="padding:6px 10px; font-size:12px;">Publish to GitHub</button>
+        <button class="copy flow-publish-report-cf-btn" data-slug="${escapeHtml(f.slug)}" title="Uploads this same report to a Cloudflare R2 bucket for a real shareable link - an independent second destination, works whether or not GitHub is configured." style="padding:6px 10px; font-size:12px;">Publish to Cloudflare</button>
         <span class="hint flow-report-path" data-report-path-for="${escapeHtml(f.slug)}" style="font-size:11px;"></span>
       </div>
       <div class="hint flow-report-publish-status" data-slug="${escapeHtml(f.slug)}" style="font-size:11.5px; margin-top:4px;"></div>
@@ -5136,6 +5227,7 @@ ${clone.innerHTML}
     const downloadCsvBtn = e.target.closest('.flow-download-csv-btn');
     const downloadPdfBtn = e.target.closest('.flow-download-pdf-btn');
     const publishReportBtn = e.target.closest('.flow-publish-report-btn');
+    const publishReportCfBtn = e.target.closest('.flow-publish-report-cf-btn');
     const setupToggleBtn = e.target.closest('.flow-setup-script-toggle-btn');
     const setupSourceBtn = e.target.closest('.setup-script-source-btn');
     const setupCrumb = e.target.closest('.setup-script-crumb');
@@ -5325,6 +5417,10 @@ ${clone.innerHTML}
     }
     if (publishReportBtn) {
       publishFlowReport(publishReportBtn.dataset.slug);
+      return;
+    }
+    if (publishReportCfBtn) {
+      publishFlowReportCloudflare(publishReportCfBtn.dataset.slug);
       return;
     }
     if (editBtn) {
@@ -5582,6 +5678,7 @@ ${clone.innerHTML}
         <button class="copy flow-download-csv-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download CSV summary</button>
         <button class="copy flow-download-pdf-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download PDF summary</button>
         <button class="copy flow-publish-report-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Publish to GitHub</button>
+        <button class="copy flow-publish-report-cf-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Publish to Cloudflare</button>
         <span class="hint flow-report-path" data-report-path-for="${escapeHtml(slug)}" style="font-size:11px;"></span>
         <div class="hint flow-report-publish-status" data-slug="${escapeHtml(slug)}" style="font-size:11px;"></div>
       </div>
@@ -5830,12 +5927,14 @@ ${clone.innerHTML}
     const downloadCsvBtn = e.target.closest('.flow-download-csv-btn');
     const downloadPdfBtn = e.target.closest('.flow-download-pdf-btn');
     const publishReportBtn = e.target.closest('.flow-publish-report-btn');
+    const publishReportCfBtn = e.target.closest('.flow-publish-report-cf-btn');
     const runBtn = e.target.closest('.ts-run-btn');
 
     if (downloadBtn) { downloadReportHtml(downloadBtn.dataset.slug); return; }
     if (downloadCsvBtn) { downloadServerFile(downloadCsvBtn.dataset.slug, 'csv'); return; }
     if (downloadPdfBtn) { downloadServerFile(downloadPdfBtn.dataset.slug, 'pdf'); return; }
     if (publishReportBtn) { publishFlowReport(publishReportBtn.dataset.slug); return; }
+    if (publishReportCfBtn) { publishFlowReportCloudflare(publishReportCfBtn.dataset.slug); return; }
     if (!runBtn) return;
 
     await runTestTarget(runBtn.dataset.path, runBtn.dataset.slug, runBtn);
@@ -6706,6 +6805,7 @@ ${clone.innerHTML}
     parse_label: {fg: '#818CF8', bg: 'rgba(129,140,248,0.16)'},
     compute: {fg: '#818CF8', bg: 'rgba(129,140,248,0.16)'},
     switch_app: {fg: '#FBBF24', bg: 'rgba(251,191,36,0.16)'},
+    restart_app: {fg: '#FBBF24', bg: 'rgba(251,191,36,0.16)'},
     note: {fg: '#2DD4BF', bg: 'rgba(45,212,191,0.16)'},
     run_api_script: {fg: '#2DD4BF', bg: 'rgba(45,212,191,0.16)'},
   };
@@ -6748,8 +6848,10 @@ ${clone.innerHTML}
           <option value="swipe-up">scroll up</option>
           <option value="swipe-down">scroll down</option>
           <option value="run_api_script">run API validation script</option>
+          <option value="restart_app">restart app</option>
         </select>
         <input class="ls-insert-seconds" data-insert-at="${insertAt}" type="number" step="0.5" value="2" style="width:auto; flex:0 0 80px;">
+        <input class="ls-insert-bundle-id" data-insert-at="${insertAt}" placeholder="bundle id (blank = app under test)" style="display:none; width:auto; flex:0 0 220px;">
         <span class="ls-insert-api-script-note" data-insert-at="${insertAt}" style="display:none; font-size:11px; color:var(--paper-dim);"></span>
         <button class="copy ls-insert-confirm" data-insert-at="${insertAt}" style="padding:4px 10px; font-size:11px;">Insert</button>
         <button class="copy ls-insert-cancel" data-insert-at="${insertAt}" style="background:var(--ink-line); color:var(--paper); padding:4px 10px; font-size:11px;">Cancel</button>
@@ -6764,6 +6866,7 @@ ${clone.innerHTML}
         (s.extract && s.action !== 'parse_label') ? `${s.extract} ${s.compare || 'equals'} ${s.expected}` : '',
         s.action === 'assert_expr' && s.expr ? `expr: ${s.expr}` : '',
         s.action === 'switch_app' && s.bundle_id ? `bundle_id=${s.bundle_id}` : '',
+        s.action === 'restart_app' ? (s.bundle_id ? `bundle_id=${s.bundle_id}` : 'app under test') : '',
         (s.x != null && s.y != null && s.x2 != null && s.y2 != null) ? `(${s.x}, ${s.y}) → (${s.x2}, ${s.y2}) — no locator` :
           (s.x != null && s.y != null) ? `by position (${s.x}, ${s.y}) — no locator` : '',
         s.reason ? `AI: ${s.reason}` : '',
@@ -6976,10 +7079,12 @@ ${clone.innerHTML}
     });
     listEl.querySelectorAll('.ls-insert-type').forEach(sel => {
       const secondsInput = listEl.querySelector(`.ls-insert-seconds[data-insert-at="${sel.dataset.insertAt}"]`);
+      const bundleIdInput = listEl.querySelector(`.ls-insert-bundle-id[data-insert-at="${sel.dataset.insertAt}"]`);
       const apiScriptNote = listEl.querySelector(`.ls-insert-api-script-note[data-insert-at="${sel.dataset.insertAt}"]`);
       const confirmBtn = listEl.querySelector(`.ls-insert-confirm[data-insert-at="${sel.dataset.insertAt}"]`);
       const applyVisibility = () => {
         secondsInput.style.display = sel.value === 'wait' ? 'inline-block' : 'none';
+        bundleIdInput.style.display = sel.value === 'restart_app' ? 'inline-block' : 'none';
         if (sel.value === 'run_api_script') {
           const resolved = lsResolvedApiScript();
           apiScriptNote.style.display = 'inline';
@@ -7013,6 +7118,12 @@ ${clone.innerHTML}
             ? {source: 'github', repo: resolved.repo, branch: resolved.branch, path: resolved.path}
             : resolved.path;
           step = {action: 'run_api_script', label: 'Run API validation script', api_script: scriptValue};
+        } else if (type === 'restart_app') {
+          const bundleId = listEl.querySelector(`.ls-insert-bundle-id[data-insert-at="${insertAt}"]`).value.trim();
+          step = {
+            action: 'restart_app', ...(bundleId ? {bundle_id: bundleId} : {}),
+            label: bundleId ? `Restart ${bundleId}` : 'Restart app under test',
+          };
         } else {
           const direction = type === 'swipe-up' ? 'up' : 'down';
           step = {action: 'swipe', direction, label: `scroll ${direction}`};
@@ -7449,13 +7560,30 @@ ${clone.innerHTML}
         // several) - keep the editing target's own bookkeeping in sync so
         // the banner and any further update stay correct without a reload.
         lsEditingTarget.totalTestCount = data.total_test_count;
-        statusEl.innerHTML = (data.test_count > 1)
-          ? `<span style="color:var(--circuit);">✓ Split into ${data.test_count} test cases in "${escapeHtml(editing.name)}" (${kind}) at test case ${data.test_index + 1} - ${data.step_count} step(s) total, now ${data.total_test_count} test case(s) in the whole flow.</span>`
-          : `<span style="color:var(--circuit);">✓ Updated test case ${data.test_index + 1} of ${data.total_test_count} in "${escapeHtml(editing.name)}" (${kind}) - ${data.step_count} step(s). Keep tweaking and update again, or Stop editing when done.</span>`;
+        if (data.test_count > 1) {
+          // A split just replaced ONE entry (test_index) with SEVERAL, so
+          // two things are now stale: (1) lsCapturedSteps still has the
+          // same splitBefore markers, and clicking Update again with the
+          // same test_index would re-run the exact same split and splice
+          // it all back in a second time, duplicating every group after
+          // the first (tests[0:1] = [G1,G2,G3] against an array that's
+          // already [G1,G2,G3] yields [G1,G2,G3,G2,G3]) - this was a real
+          // bug, confirmed against a flow file that had grown duplicate
+          // test cases exactly this way; (2) lsEditFlowCache/the test-case
+          // dropdown still reflect the pre-split shape, so picking "test
+          // case 3" from it now would silently target the wrong entry -
+          // whatever shifted into that index once the array grew.
+          // Reloading from the server (same fetch startEditingFlow does)
+          // fixes both at once, writing its own status to a different
+          // element (#lsEditStatus) so it doesn't clobber the message set
+          // below.
+          await startEditingFlow(editing.kind, editing.slug);
+          statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Split into ${data.test_count} test cases in "${escapeHtml(editing.name)}" (${kind}) - ${data.step_count} step(s) total, now ${data.total_test_count} test case(s) in the whole flow. Reloaded - pick a test case above to keep editing.</span>`;
+        } else {
+          statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Updated test case ${data.test_index + 1} of ${data.total_test_count} in "${escapeHtml(editing.name)}" (${kind}) - ${data.step_count} step(s). Keep tweaking and update again, or Stop editing when done.</span>`;
+        }
         renderLsEditBanner();
         if (!isPrecondition) showCreateTestScriptBtn(data.slug, editing.name);
-        // Left as-is (not cleared) on purpose - editing is an iterate-in-
-        // place workflow, unlike a fresh capture's append-then-move-on one.
       } else {
         const hasSplits = lsCapturedSteps.some(s => s.splitBefore);
         const body = hasSplits
@@ -7751,6 +7879,40 @@ ${clone.innerHTML}
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
     }
   }
+
+  // Force-kills then relaunches an app mid-flow (`mobile: terminateApp` +
+  // `mobile: activateApp`) - same session, same "just another recordable
+  // step" shape as lsRunSwitchApp above. bundleId is optional - blank
+  // means "the app under test", resolved server-side (see ActionExecutor's
+  // RESTART_APP branch in actions.py) from the session's own capabilities,
+  // so the common case needs no bundle id typed in at all.
+  async function lsRunRestartApp(bundleId) {
+    if (!lsSessionId) return;
+    const statusEl = document.getElementById('lsRestartAppStatus');
+    statusEl.textContent = 'Restarting…';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'restart_app', ...(bundleId ? {bundle_id: bundleId} : {})}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'restart failed');
+      if (data.result && data.result.status !== 'ok') throw new Error(data.result.detail || 'restart failed');
+      lsCapturedSteps.push({
+        action: 'restart_app', ...(bundleId ? {bundle_id: bundleId} : {}),
+        label: bundleId ? `Restart ${bundleId}` : 'Restart app under test',
+      });
+      renderLsCapturedSteps();
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ ${escapeHtml(data.result.detail)} - recorded</span>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    }
+  }
+
+  document.getElementById('lsRestartAppBtn').addEventListener('click', () => {
+    lsRunRestartApp(document.getElementById('lsRestartAppCustom').value.trim());
+  });
 
   document.getElementById('lsSwitchAppBtn').addEventListener('click', () => {
     const preset = document.getElementById('lsSwitchAppPreset').value;
@@ -8994,13 +9156,17 @@ ${lines}
   document.querySelector('[data-tab="mtc"]').addEventListener('click', mtcOnShown);
   document.getElementById('mtcRefreshBtn').addEventListener('click', mtcLoadScreenshot);
 
-  document.getElementById('mtcGenerateBtn').addEventListener('click', async () => {
+  // Shared by both the main "Generate test cases from this flow" button
+  // and "Continue this conversation"'s "+ Add context & generate more" -
+  // same endpoint, same append-into-mtcCases/existing_titles-dedup
+  // behavior either way; only which button/status element gets the
+  // loading state, and which context string gets sent, differ per caller.
+  async function mtcGenerateCases(btn, statusEl, contextText) {
     if (!lsSessionId) return;
-    const btn = document.getElementById('mtcGenerateBtn');
-    const statusEl = document.getElementById('mtcGenerateStatus');
     // The screenshot right before each tap, in order, plus the current
     // (final) one - the LLM sees the actual visual journey instead of an
-    // accessibility-tree dump of just the last screen.
+    // accessibility-tree dump of just the last screen. Reused as-is for a
+    // "continue" round too - more context doesn't require new taps.
     const images = mtcTrail.map(t => t.screenshot_b64).filter(Boolean);
     const current = mtcCurrentScreenshotB64();
     if (current) images.push(current);
@@ -9009,6 +9175,7 @@ ${lines}
       return;
     }
 
+    const originalLabel = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Thinking…';
     statusEl.textContent = '';
@@ -9017,7 +9184,7 @@ ${lines}
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          context: document.getElementById('mtcContext').value.trim(),
+          context: contextText,
           existing_titles: mtcCases.map(c => c.title),
           images,
         }),
@@ -9034,8 +9201,40 @@ ${lines}
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Generate test cases from this flow';
+      btn.textContent = originalLabel;
     }
+  }
+
+  document.getElementById('mtcGenerateBtn').addEventListener('click', () => {
+    mtcGenerateCases(
+      document.getElementById('mtcGenerateBtn'),
+      document.getElementById('mtcGenerateStatus'),
+      document.getElementById('mtcContext').value.trim()
+    );
+  });
+
+  // "Continue this conversation": the new context gets appended onto the
+  // main Context overview textarea (not sent on its own) so that field
+  // stays the single, visible, growing record of everything asked for so
+  // far, and every subsequent call - including a later plain "Generate"
+  // click - keeps sending the full history, not just the latest round.
+  document.getElementById('mtcContinueBtn').addEventListener('click', () => {
+    const continueInput = document.getElementById('mtcContinueContext');
+    const continueStatus = document.getElementById('mtcContinueStatus');
+    const extra = continueInput.value.trim();
+    if (!extra) {
+      continueStatus.innerHTML = `<span style="color:var(--alert);">Add some context first.</span>`;
+      return;
+    }
+    const contextEl = document.getElementById('mtcContext');
+    const priorContext = contextEl.value.trim();
+    contextEl.value = priorContext ? `${priorContext}\n\n${extra}` : extra;
+    continueInput.value = '';
+    mtcGenerateCases(
+      document.getElementById('mtcContinueBtn'),
+      continueStatus,
+      contextEl.value
+    );
   });
 
   function mtcRenderTray() {
@@ -9054,6 +9253,8 @@ ${lines}
       // case itself (name/objective/precondition) never silently
       // disappears just because the LLM gave it no steps yet.
       const steps = (c.steps && c.steps.length) ? c.steps : [{step: '', test_data: '', expected_result: ''}];
+      const hasCurrentShot = !!mtcCurrentScreenshotB64();
+      const screenshots = c.screenshots || [];
       steps.forEach((s, si) => {
         const first = si === 0;
         rows.push(`
@@ -9069,6 +9270,18 @@ ${lines}
           <td>${escapeHtml(s.test_data || '')}</td>
           <td>${escapeHtml(s.expected_result || '')}</td>
           ${first ? `
+          <td rowspan="${steps.length}" class="mtc-screenshot-cell">
+            <div class="mtc-screenshot-thumbs">
+              ${screenshots.map((shot, si2) => `
+                <span class="mtc-screenshot-thumb">
+                  <a href="data:image/png;base64,${shot}" target="_blank" rel="noopener" title="Open full size"><img src="data:image/png;base64,${shot}" alt=""></a>
+                  <button type="button" class="mtc-screenshot-remove-btn" data-index="${i}" data-shot-index="${si2}" title="Remove this screenshot">&times;</button>
+                </span>`).join('')}
+            </div>
+            <button type="button" class="copy mtc-attach-screenshot-btn" data-index="${i}" ${hasCurrentShot ? '' : 'disabled'}
+                    title="${hasCurrentShot ? 'Add the current Live App Screen screenshot as evidence for this test case' : 'No live screenshot loaded yet'}"
+                    style="padding:4px 8px; font-size:10.5px; background:var(--ink-line); color:var(--paper); margin-top:${screenshots.length ? '6px' : '0'};">+ Screenshot</button>
+          </td>
           <td rowspan="${steps.length}" class="mtc-execution-cell">
             <select class="mtc-exec-status" data-index="${i}" style="border-color:${execMeta.color}; color:${execMeta.color}; font-weight:700;">
               <option value="not_run" ${execStatus === 'not_run' ? 'selected' : ''}>Not run</option>
@@ -9093,6 +9306,7 @@ ${lines}
               <th>Test Script (Step-by-Step) — Step</th>
               <th>Test Script (Step-by-Step) — Test Data</th>
               <th>Test Script (Step-by-Step) — Expected Result</th>
+              <th>Screenshot</th>
               <th>Test Execution</th>
               <th></th>
             </tr>
@@ -9104,6 +9318,28 @@ ${lines}
     listEl.querySelectorAll('.mtc-remove-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         mtcCases.splice(Number(btn.dataset.index), 1);
+        mtcRenderTray();
+      });
+    });
+    // "Do you want to add the current screenshot against this test case?"
+    // - the click itself IS the yes; each case can hold more than one
+    // (evidence at different points), removable individually via the ×
+    // on its thumbnail. Same bare-base64 mtcCurrentScreenshotB64() the
+    // generate call already sends to the LLM, just stored per-case
+    // instead of sent anywhere.
+    listEl.querySelectorAll('.mtc-attach-screenshot-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const shot = mtcCurrentScreenshotB64();
+        if (!shot) return;
+        const c = mtcCases[Number(btn.dataset.index)];
+        c.screenshots = c.screenshots || [];
+        c.screenshots.push(shot);
+        mtcRenderTray();
+      });
+    });
+    listEl.querySelectorAll('.mtc-screenshot-remove-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        mtcCases[Number(btn.dataset.index)].screenshots.splice(Number(btn.dataset.shotIndex), 1);
         mtcRenderTray();
       });
     });
@@ -9165,6 +9401,11 @@ ${lines}
       md += `\n**Execution:** ${execMeta.label}`;
       if (c.execution_comment) md += ` - ${c.execution_comment}`;
       md += '\n\n';
+      // Embedded as data URIs (not linked files) so this stays a single
+      // portable .md - no separate images folder to lose track of.
+      (c.screenshots || []).forEach((shot, si2) => {
+        md += `![Screenshot ${si2 + 1} for ${c.title}](data:image/png;base64,${shot})\n\n`;
+      });
     });
     const blob = new Blob([md], {type: 'text/markdown'});
     const url = URL.createObjectURL(blob);
@@ -9250,6 +9491,175 @@ ${lines}
       btn.textContent = 'Push to GitHub';
     }
   });
+
+  document.getElementById('mtcPushCloudflareBtn').addEventListener('click', async () => {
+    const statusEl = document.getElementById('mtcPushStatus');
+    const module = document.getElementById('mtcModuleName').value.trim();
+    const name = document.getElementById('mtcSaveName').value.trim();
+    if (!mtcCases.length) { statusEl.innerHTML = `<span style="color:var(--alert);">No test cases to push yet.</span>`; return; }
+    if (!module) { statusEl.innerHTML = `<span style="color:var(--alert);">Give the feature/module these belong to first.</span>`; return; }
+    if (!name) { statusEl.innerHTML = `<span style="color:var(--alert);">Name this test case set first (above).</span>`; return; }
+
+    const btn = document.getElementById('mtcPushCloudflareBtn');
+    btn.disabled = true;
+    btn.textContent = 'Pushing…';
+    statusEl.textContent = '';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/manual-test-cases/push-cloudflare', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({module, name, context: document.getElementById('mtcContext').value.trim(), cases: mtcCases}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to push to Cloudflare');
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Saved to Cloudflare D1</span> `
+        + `(${escapeHtml(data.module)}/${escapeHtml(data.name)}, updated ${escapeHtml(data.updated_at)})`
+        + (data.html_url
+          ? ` &middot; <a href="${escapeHtml(data.html_url)}" target="_blank" rel="noopener">View/share report</a>`
+          : (data.html_error ? ` &middot; <span style="color:var(--alert);">report upload failed: ${escapeHtml(data.html_error)}</span>` : ''));
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Push to Cloudflare';
+    }
+  });
+
+  // "Load an existing set" - reopens a set saved locally (POST /api/
+  // manual-test-cases) or previously pushed to GitHub (mobile_testCases/)
+  // so the person can keep adding to it via "Continue this conversation"
+  // instead of only ever starting from a blank Context overview. Fetches
+  // both lists in parallel purely to populate this picker - loading the
+  // chosen set is a second, separate fetch for its full data, since the
+  // list endpoints intentionally return summaries only (name/count), not
+  // every case's full content, to stay cheap when there are many sets.
+  document.getElementById('mtcLoadExistingBtn').addEventListener('click', async () => {
+    const panel = document.getElementById('mtcLoadExistingPanel');
+    const opening = panel.style.display === 'none';
+    panel.style.display = opening ? 'block' : 'none';
+    if (!opening) return;
+    await mtcRefreshExistingList();
+  });
+
+  async function mtcRefreshExistingList() {
+    const listEl = document.getElementById('mtcLoadExistingList');
+    listEl.innerHTML = 'Loading…';
+    try {
+      const [localData, githubData, cloudflareData] = await Promise.all([
+        fetch(BRIDGE_URL + '/api/manual-test-cases').then(r => r.json()).catch(() => ({sets: []})),
+        fetch(BRIDGE_URL + '/api/manual-test-cases/github').then(r => r.json()).catch(() => ({sets: []})),
+        fetch(BRIDGE_URL + '/api/manual-test-cases/cloudflare').then(r => r.json()).catch(() => ({sets: []})),
+      ]);
+      const localSets = localData.sets || [];
+      const githubSets = githubData.sets || [];
+      const cloudflareSets = cloudflareData.sets || [];
+      if (!localSets.length && !githubSets.length && !cloudflareSets.length) {
+        listEl.innerHTML = '<div class="empty-hint">No saved or pushed test case sets yet.</div>';
+        return;
+      }
+
+      const renderGroup = (title, sets, source) => !sets.length ? '' : `
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--paper-dim); font-weight:600; margin:10px 0 6px;">${title}</div>
+        ${sets.map(s => `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--ink-line);">
+            <div style="min-width:0; overflow-wrap:anywhere;">
+              <div style="font-weight:700; font-size:13px;">${escapeHtml(s.name)}</div>
+              <div class="hint" style="font-size:11px;">${s.module ? escapeHtml(s.module) + ' &middot; ' : ''}${s.count != null ? s.count + ' case(s)' : (s.updated_at ? 'updated ' + escapeHtml(s.updated_at) : 'case count unknown until loaded')}</div>
+            </div>
+            <div style="display:flex; gap:6px; flex-shrink:0;">
+              <button type="button" class="copy mtc-load-existing-pick-btn" data-source="${source}"
+                      data-ref="${escapeHtml(source === 'local' ? s.slug : (source === 'cloudflare' ? s.module + '/' + s.name : s.path))}"
+                      data-name="${escapeHtml(s.name)}" data-module="${escapeHtml(s.module || '')}"
+                      style="padding:5px 12px; font-size:12px;">Load</button>
+              ${source === 'cloudflare' ? `
+              <button type="button" class="copy mtc-delete-existing-pick-btn" data-module="${escapeHtml(s.module)}" data-name="${escapeHtml(s.name)}"
+                      style="padding:5px 12px; font-size:12px; background:var(--alert); color:var(--paper);">Delete</button>` : ''}
+            </div>
+          </div>`).join('')}`;
+
+      listEl.innerHTML = renderGroup('Saved locally', localSets, 'local')
+        + renderGroup('Pushed to GitHub', githubSets, 'github')
+        + renderGroup('Pushed to Cloudflare', cloudflareSets, 'cloudflare');
+      listEl.querySelectorAll('.mtc-load-existing-pick-btn').forEach(btn => {
+        btn.addEventListener('click', () => mtcLoadExistingSet(btn.dataset.source, btn.dataset.ref, btn.dataset.name, btn.dataset.module));
+      });
+      listEl.querySelectorAll('.mtc-delete-existing-pick-btn').forEach(btn => {
+        btn.addEventListener('click', () => mtcDeleteCloudflareSet(btn.dataset.module, btn.dataset.name));
+      });
+    } catch (e) {
+      listEl.innerHTML = `<div class="empty-hint">${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  async function mtcDeleteCloudflareSet(module, name) {
+    if (!confirm(`Delete "${name}" (${module}) from Cloudflare? This removes the D1 row and its hosted report page - it does not undo anything already pushed to GitHub.`)) return;
+    const listEl = document.getElementById('mtcLoadExistingList');
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/manual-test-cases/cloudflare/' + encodeURIComponent(module) + '/' + encodeURIComponent(name), {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to delete from Cloudflare');
+      await mtcRefreshExistingList();
+    } catch (e) {
+      listEl.innerHTML = `<div class="empty-hint">${escapeHtml(e.message)}</div>`;
+    }
+  }
+  document.getElementById('mtcLoadExistingCloseBtn').addEventListener('click', () => {
+    document.getElementById('mtcLoadExistingPanel').style.display = 'none';
+  });
+
+  async function mtcLoadExistingSet(source, ref, fallbackName, fallbackModule) {
+    const listEl = document.getElementById('mtcLoadExistingList');
+    try {
+      const url = source === 'local'
+        ? BRIDGE_URL + '/api/manual-test-cases/' + encodeURIComponent(ref)
+        : source === 'cloudflare'
+        ? BRIDGE_URL + '/api/manual-test-cases/cloudflare/' + ref.split('/').map(encodeURIComponent).join('/')
+        : BRIDGE_URL + '/api/manual-test-cases/github/' + ref.split('/').map(encodeURIComponent).join('/');
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to load this set');
+
+      mtcCases = data.cases || [];
+      document.getElementById('mtcContext').value = data.context || '';
+      // Re-using the EXACT loaded name/module (not just a similar one) is
+      // what makes Save/Push overwrite this same set in place afterward -
+      // save/push both derive their file path from these two fields, so
+      // any drift here silently creates a second entry alongside the
+      // original instead of updating it.
+      document.getElementById('mtcSaveName').value = data.name || fallbackName || '';
+      const moduleValue = data.module || fallbackModule;
+      const moduleSel = document.getElementById('mtcModuleName');
+      if (moduleValue) {
+        // Exact match only (not case-insensitive) - reusing a
+        // similarly-cased existing option's own value here would quietly
+        // rewrite e.g. "login" to "Login", which is exactly the kind of
+        // drift that sends a later Push to GitHub to a different path
+        // than the one this set actually lives at.
+        let matched = Array.from(moduleSel.options).find(o => o.value === moduleValue);
+        if (!matched) {
+          // Doesn't match any of the fixed dropdown options (e.g. pushed
+          // under a different case, or before this became a fixed list) -
+          // add it as a one-off option with the value exactly as loaded,
+          // rather than leaving the dropdown unselected, so a later Push
+          // to GitHub goes back to this exact module/path instead of
+          // forcing a pick from the fixed list.
+          matched = document.createElement('option');
+          matched.value = moduleValue;
+          matched.textContent = moduleValue + ' (from loaded set)';
+          moduleSel.appendChild(matched);
+        }
+        moduleSel.value = matched.value;
+      }
+      mtcRenderTray();
+      document.getElementById('mtcLoadExistingPanel').style.display = 'none';
+      document.getElementById('mtcSaveStatus').innerHTML =
+        `<span style="color:var(--circuit);">✓ Loaded "${escapeHtml(data.name || fallbackName)}" (${mtcCases.length} case(s)) - add more context below and generate more, or re-explore to keep going.</span>`;
+    } catch (e) {
+      listEl.innerHTML = `<div class="empty-hint">${escapeHtml(e.message)}</div>`;
+    }
+  }
 
   // ---------- Global utility bar ----------
 
