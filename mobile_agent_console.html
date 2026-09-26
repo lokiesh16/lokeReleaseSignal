@@ -6634,11 +6634,27 @@ ${clone.innerHTML}
     }
     empty.style.display = 'none';
     body.style.display = 'block';
+    // el.name (iOS's stable accessibilityIdentifier, when a developer set
+    // one) wins over el.label (the live, human-readable accessibilityLabel)
+    // for every locator strategy below - build_locator_preview's own
+    // "identity = name || label" (see platforms/ios/locators.py), on
+    // purpose, since a predicate built from ever-changing displayed text
+    // (a running timer, a live counter, ...) would stop matching the
+    // moment that text changes. That's the right call for a LOCATOR, but
+    // it means the four rows below never show what's actually on screen
+    // right now for an element like this - shown here separately instead
+    // of leaving it only visible back in the (smaller, easy to miss) list
+    // row on the left.
+    const showLiveText = el.label && el.name && el.name !== el.label;
     body.innerHTML = `
       <div style="margin-bottom:10px;">
         <span style="font-family:var(--mono); font-size:13px; color:var(--circuit); font-weight:600;">${escapeHtml(el.element_id)}</span>
         <span style="font-family:var(--mono); font-size:12px; color:var(--paper-dim); margin-left:8px;">${escapeHtml(el.tag || '')}</span>
       </div>
+      ${showLiveText ? `
+      <div style="font-size:11px; color:var(--paper-dim); margin-bottom:10px;" title="Locators below match this element's stable identifier (name), not this live text - the identifier stays the same as this value changes.">
+        current text: <span style="color:var(--paper); font-family:var(--mono);">${escapeHtml(el.label)}</span>
+      </div>` : ''}
       <div style="display:grid; grid-template-columns:auto 1fr; gap:3px 10px; font-family:var(--mono); font-size:11px; margin-bottom:14px;">
         ${renderFindByRows(el)}
       </div>
