@@ -2228,6 +2228,7 @@
       <div id="lsStepRunStatus" style="font-size:12px; margin-bottom:6px;"></div>
       <div id="lsCapturedList" class="empty-hint">Click <b>Act</b> on an element above, run an action, and it'll show up here.</div>
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+        <button class="copy" id="lsRunTestCaseBtn" title="Runs every step above, in order, against the live session - stops at the first failure, same as a saved flow's own replay does for a fixed test case.">Run this test case</button>
         <button class="copy" id="lsClearCapturedBtn" style="background:var(--ink-line); color:var(--paper); padding:6px 10px; font-size:11.5px;">Clear all</button>
         <button class="copy" id="lsExportCapturedBtn" style="background:var(--ink-line); color:var(--paper); padding:6px 10px; font-size:11.5px;">Copy all locators to export</button>
       </div>
@@ -6828,6 +6829,66 @@ ${clone.innerHTML}
   const LS_ACTION_ACCENT_DEFAULT = {fg: '#9CA3AF', bg: 'rgba(156,163,175,0.16)'};
   function lsActionAccent(action) { return LS_ACTION_ACCENTS[action] || LS_ACTION_ACCENT_DEFAULT; }
 
+  // Re-executes lsCapturedSteps[i] exactly as recorded against the CURRENT
+  // live screen - shared by the single-step ▶ button and lsRunTestCaseBtn's
+  // sequential runner below, so both go through the exact same request/
+  // context-update logic instead of two copies drifting apart. Returns the
+  // action's result detail string, or throws with the failure detail.
+  async function lsExecuteCapturedStep(i) {
+    const s = lsCapturedSteps[i];
+    const payload = {...s};
+    delete payload.label; delete payload.description; delete payload.optional; delete payload.splitBefore; delete payload.tag;
+    const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'action failed');
+    if (data.result && data.result.status !== 'ok') throw new Error(data.result.detail || 'action failed');
+    lsUpdateContext(data.context);
+    lsRenderElementList(data.elements || []);
+    return data.result.detail;
+  }
+
+  document.getElementById('lsRunTestCaseBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('lsRunTestCaseBtn');
+    const statusEl = document.getElementById('lsStepRunStatus');
+    if (!lsSessionId) {
+      statusEl.innerHTML = '<span style="color:var(--signal);">Connect above first.</span>';
+      return;
+    }
+    // "note" steps are AI mode's own validation annotations, not a real
+    // ActionType - skipped here the same way lsGroupCapturedStepsIntoTests
+    // already does when building tests for save/update.
+    const runnable = lsCapturedSteps.map((s, i) => ({s, i})).filter(({s}) => s.action !== 'note');
+    if (!runnable.length) {
+      statusEl.innerHTML = '<span style="color:var(--signal);">No steps to run yet.</span>';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Running…';
+    try {
+      for (const {s, i} of runnable) {
+        statusEl.innerHTML = `<span style="color:var(--paper-dim);">Running step ${i + 1}/${lsCapturedSteps.length} (${escapeHtml(s.action)})…</span>`;
+        try {
+          await lsExecuteCapturedStep(i);
+        } catch (e) {
+          // Same "a failing fixed step stops the rest" rule replay.py's own
+          // replay_flow uses for a real saved-flow run - continuing past a
+          // failure here would just cascade into unrelated failures against
+          // a screen the rest of the test case was never written for.
+          statusEl.innerHTML = `<span style="color:var(--alert);">✗ step ${i + 1}/${lsCapturedSteps.length} failed: ${escapeHtml(e.message)}</span>`;
+          return;
+        }
+      }
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Test case passed - ${runnable.length} step(s) run.</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Run this test case';
+    }
+  });
+
   function renderLsCapturedSteps() {
     // Applied here (rather than at each of the many lsCapturedSteps.push
     // call sites) since every one of them already calls this right
@@ -6966,30 +7027,11 @@ ${clone.innerHTML}
       btn.addEventListener('click', async () => {
         if (!lsSessionId) return;
         const i = Number(btn.dataset.stepIdx);
-        const s = lsCapturedSteps[i];
         const statusEl = document.getElementById('lsStepRunStatus');
-        statusEl.innerHTML = `<span style="color:var(--paper-dim);">Running step ${i + 1} (${escapeHtml(s.action)})…</span>`;
+        statusEl.innerHTML = `<span style="color:var(--paper-dim);">Running step ${i + 1} (${escapeHtml(lsCapturedSteps[i].action)})…</span>`;
         try {
-          // Re-executes the step exactly as recorded (its own action/locator/
-          // text/etc.) against the CURRENT live screen - doesn't append a
-          // duplicate to the list, just catches the session's context up to
-          // wherever this step is (e.g. a parse_label re-run puts its
-          // save_as value back in "Captured so far"), so a later step you're
-          // editing/testing has something real to compare against without
-          // re-doing everything from scratch through the tools above.
-          const payload = {...s};
-          delete payload.label; delete payload.description; delete payload.optional; delete payload.splitBefore; delete payload.tag;
-          const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'action failed');
-          if (data.result && data.result.status !== 'ok') throw new Error(data.result.detail || 'action failed');
-          lsUpdateContext(data.context);
-          lsRenderElementList(data.elements || []);
-          statusEl.innerHTML = `<span style="color:var(--circuit);">✓ step ${i + 1}: ${escapeHtml(data.result.detail)}</span>`;
+          const detail = await lsExecuteCapturedStep(i);
+          statusEl.innerHTML = `<span style="color:var(--circuit);">✓ step ${i + 1}: ${escapeHtml(detail)}</span>`;
         } catch (e) {
           statusEl.innerHTML = `<span style="color:var(--alert);">step ${i + 1} failed: ${escapeHtml(e.message)}</span>`;
         }
