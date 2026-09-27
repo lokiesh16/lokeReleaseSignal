@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API Test Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:     #0a0a0f; --bg2: #111118; --bg3: #1a1a24;
+    --border: #2a2a3a; --border2: #3a3a50;
+    --text:   #e8e8f0; --muted: #9494a8;
+    --accent: #7c6aff; --accent2: #b09aff;
+    --green:  #2dd4a0; --red: #ff5f6d; --amber: #ffb74d;
+    --mono:   'IBM Plex Mono', monospace;
+    --sans:   'Syne', sans-serif;
+
+    /* glass */
+    --glass:        rgba(255,255,255,0.055);
+    --glass-strong: rgba(255,255,255,0.09);
+    --glass-hover:  rgba(255,255,255,0.11);
+    --glass-border: rgba(255,255,255,0.10);
+    --glass-border-strong: rgba(255,255,255,0.18);
+    --glass-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+    --glass-blur: blur(24px) saturate(160%);
+  }
+  html, body {
+    height: 100%; color: var(--text); font-family: var(--sans); overflow: hidden;
+    background-color: #08080d;
+    background-image:
+      radial-gradient(ellipse 900px 700px at 12% 8%,  rgba(124,106,255,0.32), transparent 60%),
+      radial-gradient(ellipse 800px 700px at 90% 0%,  rgba(45,212,160,0.20), transparent 55%),
+      radial-gradient(ellipse 900px 800px at 100% 95%, rgba(255,183,77,0.16), transparent 55%),
+      radial-gradient(ellipse 700px 700px at 0% 100%, rgba(255,95,109,0.14), transparent 55%),
+      linear-gradient(180deg, #0a0a12 0%, #0c0c16 50%, #09090f 100%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+
+  .shell { display: grid; grid-template-columns: 260px 1fr; grid-template-rows: 56px 1fr; height: 100vh; }
+
+  .topbar {
+    grid-column: 1/-1; display: flex; align-items: center; gap: 16px; padding: 0 24px;
+    background: var(--glass); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    border-bottom: 1px solid var(--glass-border); box-shadow: 0 1px 0 rgba(255,255,255,0.04);
+    position: relative; z-index: 20;
+  }
+  .logo { font-size: 15px; font-weight: 800; letter-spacing: -.5px; color: var(--accent2); }
+  .logo span { color: var(--green); }
+  .tagline { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.15); margin-left: auto; }
+  .dot.on { background: var(--green); box-shadow: 0 0 10px var(--green), 0 0 2px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.5} }
+  .conn-label { font-size: 11px; font-family: var(--mono); color: var(--muted); }
+
+  .sidebar {
+    display: flex; flex-direction: column; overflow: hidden; position: relative; z-index: 15;
+    background: var(--glass); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    border-right: 1px solid var(--glass-border);
+  }
+  .sidebar-section { padding: 20px 16px 12px; }
+  .sidebar-title { font-size: 10px; font-family: var(--mono); color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+  .step { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: background .15s, border-color .15s; margin-bottom: 4px; border: 1px solid transparent; }
+  .step:hover { background: var(--glass-strong); }
+  .step.active { background: var(--glass-strong); border-color: var(--glass-border-strong); box-shadow: var(--glass-shadow); }
+  .step-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.08); color: var(--muted); font-size: 11px; font-weight: 600; font-family: var(--mono); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .2s; }
+  .step.active .step-num { background: var(--accent); color: #fff; box-shadow: 0 0 12px rgba(124,106,255,0.6); }
+  .step.done   .step-num { background: var(--green); color: #000; }
+  .step-label { font-size: 13px; font-weight: 600; }
+  .step.active .step-label { color: var(--accent2); }
+  .step.done   .step-label { color: var(--green); }
+  .sidebar-footer { margin-top: auto; padding: 12px 16px 16px; border-top: 1px solid var(--glass-border); }
+
+  .main { overflow: hidden; display: flex; flex-direction: column; position: relative; z-index: 10; }
+  .panel { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+  .panel.active { display: flex; }
+  .panel-header { padding: 24px 28px 16px; border-bottom: 1px solid var(--glass-border); flex-shrink: 0; }
+  .panel-header h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .panel-header p  { font-size: 13px; color: var(--muted); }
+  .panel-body { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; border-radius: 9px; font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; border: none; transition: all .15s; }
+  .btn-primary { background: linear-gradient(155deg, var(--accent2), var(--accent)); color: #fff; box-shadow: 0 4px 18px rgba(124,106,255,0.35), inset 0 1px 0 rgba(255,255,255,0.3); }
+  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 6px 22px rgba(124,106,255,0.45), inset 0 1px 0 rgba(255,255,255,0.35); }
+  .btn-primary:disabled { opacity: .4; cursor: default; transform: none; }
+  .btn-ghost  { background: var(--glass); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); color: var(--text); border: 1px solid var(--glass-border); }
+  .btn-ghost:hover  { border-color: var(--accent); color: var(--accent2); background: var(--glass-hover); }
+  .btn-danger { background: rgba(255,95,109,0.08); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); color: var(--red); border: 1px solid #ff5f6d44; }
+  .btn-danger:hover { background: rgba(255,95,109,0.18); }
+  .btn-green  { background: linear-gradient(155deg, #5fe8bf, var(--green)); color: #06231a; box-shadow: 0 4px 18px rgba(45,212,160,0.3), inset 0 1px 0 rgba(255,255,255,0.35); }
+  .btn-green:hover  { filter: brightness(1.08); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+  .card {
+    background: var(--glass); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border); border-radius: 16px; padding: 20px; margin-bottom: 20px;
+    box-shadow: var(--glass-shadow);
+  }
+  .card h3 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .card p  { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.6; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .field label { font-size: 10px; font-family: var(--mono); color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .field input, .field textarea, .field select {
+    background: rgba(255,255,255,0.045); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border); border-radius: 9px;
+    padding: 9px 14px; color: var(--text); font-family: var(--mono); font-size: 13px;
+    transition: border-color .15s, background .15s;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,0.07); }
+  .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .flex-row { display: flex; align-items: center; gap: 10px; }
+  .spacer { flex: 1; }
+
+  .name-row { display: flex; gap: 8px; }
+  .name-row input {
+    flex: 1; background: rgba(255,255,255,0.045); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border); border-radius: 9px; padding: 9px 14px; color: var(--text); font-family: var(--mono); font-size: 13px;
+  }
+  .name-row input:focus { outline: none; border-color: var(--accent); }
+
+  /* Network panel */
+  .network-item {
+    background: rgba(255,255,255,0.035); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border); border-radius: 10px; padding: 0; margin-bottom: 8px; transition: all .15s; overflow: hidden;
+  }
+  .network-item:hover { border-color: var(--accent); background: rgba(255,255,255,0.06); }
+  .network-item.expanded { border-color: var(--accent); box-shadow: var(--glass-shadow); }
+  .network-item-header { display:flex; align-items:center; gap:8px; padding:10px 12px; cursor:pointer; }
+  .network-item-header:hover { background: rgba(255,255,255,0.05); }
+  .network-method { font-weight:700; padding:2px 6px; border-radius:5px; font-size:10px; }
+  .network-method.GET { background:#2dd4a020; color:#2dd4a0; }
+  .network-method.POST { background:#6366f120; color:#6366f1; }
+  .network-method.PUT { background:#ffb74d20; color:#ffb74d; }
+  .network-method.DELETE { background:#ff5f6d20; color:#ff5f6d; }
+  .network-method.PATCH { background:#9c27b020; color:#9c27b0; }
+  .network-portal { font-weight:700; padding:2px 6px; border-radius:5px; font-size:10px; border:1px solid; }
+  .network-portal.portal-A { color:var(--accent2); border-color:var(--accent2); background:#7c6aff20; }
+  .network-portal.portal-B { color:var(--amber); border-color:var(--amber); background:#ffb74d20; }
+  .selected-apis-list { margin-bottom:10px; }
+  .selected-apis-empty { color:var(--muted); font-size:11px; font-family:var(--mono); padding:8px 0; }
+  .selected-api-row {
+    display:flex; align-items:center; gap:8px; margin-bottom:6px; font-family:var(--mono); font-size:11px;
+    background: rgba(255,255,255,0.045); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--glass-border); border-radius: 8px; padding: 6px 10px;
+  }
+  .chain-remove-btn { background:none; border:none; color:var(--muted); font-size:15px; line-height:1; cursor:pointer; padding:0 2px; }
+  .chain-remove-btn:hover { color:var(--red); }
+  .network-url { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); }
+  .network-status { font-size:10px; padding:2px 6px; border-radius:5px; }
+  .network-status.ok { background:#2dd4a020; color:#2dd4a0; }
+  .network-status.err { background:#ff5f6d20; color:#ff5f6d; }
+  .network-status.pending { background:#ffb74d20; color:#ffb74d; }
+  .network-duration { font-size:10px; color:var(--muted); }
+  .network-expand-icon { font-size:8px; color:var(--muted); transition:transform .2s; }
+  .network-item.expanded .network-expand-icon { transform:rotate(180deg); }
+  .network-details { padding:0 12px 12px 12px; border-top:1px solid var(--glass-border); display:none; cursor:default; }
+  .network-item.expanded .network-details { display:block; }
+  .network-section { margin-top:10px; }
+  .network-section-title { font-size:10px; color:var(--accent2); font-weight:600; margin-bottom:4px; text-transform:uppercase; }
+  .network-json { background: rgba(0,0,0,0.28); padding:8px; border-radius:6px; max-height:200px; overflow:auto; white-space:pre-wrap; word-break:break-all; font-size:10px; color:var(--muted); user-select:text; border: 1px solid rgba(255,255,255,0.05); }
+
+  .gen-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .gen-option {
+    background: rgba(255,255,255,0.035); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border); border-radius: 12px; padding: 14px; cursor: pointer; transition: all .15s;
+  }
+  .gen-option:hover, .gen-option.selected { border-color: var(--accent); background: rgba(124,106,255,0.10); box-shadow: var(--glass-shadow); }
+  .gen-option h4 { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+  .gen-option.selected h4 { color: var(--accent2); }
+  .gen-option p  { font-size: 11px; color: var(--muted); }
+
+  .preview-tabs {
+    display: flex; gap: 4px; padding: 0 28px; flex-shrink: 0;
+    background: var(--glass); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    border-bottom: 1px solid var(--glass-border);
+  }
+  .preview-tab { padding: 10px 16px; font-size: 12px; font-weight: 600; font-family: var(--mono); cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; transition: all .15s; margin-bottom: -1px; }
+  .preview-tab:hover { color: var(--text); }
+  .preview-tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+  .code-view { display: none; flex: 1; overflow: hidden; flex-direction: column; }
+  .code-view.active { display: flex; }
+  .code-header {
+    display: flex; align-items: center; gap: 10px; padding: 12px 28px; flex-shrink: 0;
+    background: var(--glass); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    border-bottom: 1px solid var(--glass-border);
+  }
+  .code-header .file-name { font-family: var(--mono); font-size: 12px; color: var(--accent2); flex: 1; }
+  .code-scroll { flex: 1; overflow: auto; }
+  .code-block { font-family: var(--mono); font-size: 12px; line-height: 1.7; padding: 20px 28px; white-space: pre; color: #c8c8e0; tab-size: 4; }
+  .kw { color: #b09aff; } .st { color: #79d4a9; } .cm { color: #555566; } .dc { color: #ffb74d; }
+
+  .log-wrap {
+    height: 110px; flex-shrink: 0; display: flex; flex-direction: column;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(0,0,0,0.18); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  }
+  .log-header { padding: 5px 28px; font-size: 10px; font-family: var(--mono); color: var(--muted); letter-spacing: 1px; text-transform: uppercase; border-bottom: 1px solid var(--glass-border); }
+  .log-body { flex: 1; overflow-y: auto; padding: 6px 28px; }
+  .log-line { font-size: 11px; font-family: var(--mono); line-height: 1.8; color: var(--muted); }
+  .log-line.ok  { color: var(--green); }
+  .log-line.err { color: var(--red); }
+
+  .run-results-wrap {
+    display: none; flex-direction: column; height: 260px; flex-shrink: 0;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(0,0,0,0.22); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  }
+  .run-results-wrap.show { display: flex; }
+  .run-results-wrap.pass { border-top-color: var(--green); }
+  .run-results-wrap.fail { border-top-color: var(--red); }
+  .run-results-header {
+    display: flex; align-items: center; gap: 10px; padding: 8px 28px;
+    font-size: 11px; font-family: var(--mono); letter-spacing: .5px; text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--glass-border);
+  }
+  .run-results-wrap.pass .run-results-header { color: var(--green); }
+  .run-results-wrap.fail .run-results-header { color: var(--red); }
+  .run-results-body { flex: 1; overflow: auto; padding: 12px 28px; font-family: var(--mono); font-size: 11px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; color: #c8c8e0; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; border-radius: 10px; padding: 12px 18px; font-size: 13px; font-family: var(--mono);
+    transform: translateY(80px); opacity: 0; transition: all .3s; pointer-events: none; z-index: 999;
+    background: rgba(20,20,30,0.55); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border-strong); box-shadow: var(--glass-shadow);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.ok  { border-color: var(--green); color: var(--green); }
+  .toast.err { border-color: var(--red);   color: var(--red); }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 2px; }
+  .badge { font-size: 10px; font-family: var(--mono); padding: 2px 8px; border-radius: 5px; background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border); color: var(--muted); }
+
+  .gen-progress {
+    background: rgba(255,255,255,0.045); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border); border-radius: 14px; padding: 18px; margin-bottom: 16px; display: none;
+    box-shadow: var(--glass-shadow);
+  }
+  .gen-progress.show { display: block; }
+  .progress-bar-wrap { background: rgba(255,255,255,0.08); border-radius: 4px; height: 4px; margin: 10px 0; overflow: hidden; }
+  .progress-bar { height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 4px; width: 0%; transition: width .4s; box-shadow: 0 0 10px rgba(124,106,255,0.6); }
+  .gen-status-text { font-size: 12px; font-family: var(--mono); color: var(--accent2); }
+
+  .config-overlay {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 500;
+    background: rgba(4,4,8,.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  .config-overlay.show { display: flex; }
+  .config-box {
+    width: 700px; max-width: 92vw; max-height: 86vh; display: flex; flex-direction: column; border-radius: 18px;
+    background: rgba(24,24,36,0.55); backdrop-filter: blur(32px) saturate(180%); -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border: 1px solid var(--glass-border-strong); box-shadow: 0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+  .config-box-header { padding: 18px 22px; border-bottom: 1px solid var(--glass-border); display: flex; align-items: center; gap: 10px; }
+  .config-box-header h3 { font-size: 15px; font-weight: 700; }
+  .config-box-body { padding: 18px 22px; overflow: auto; flex: 1; }
+  #config-editor {
+    width: 100%; min-height: 420px; color: var(--text); font-family: var(--mono); font-size: 12px; padding: 14px; resize: vertical;
+    background: rgba(0,0,0,0.25); border: 1px solid var(--glass-border); border-radius: 10px;
+  }
+  .config-box-footer { padding: 14px 22px; border-top: 1px solid var(--glass-border); display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* Latency Guard */
+  .network-item.slow { border-color: var(--red); box-shadow: 0 0 0 1px rgba(255,95,109,0.3), var(--glass-shadow); }
+  .slow-badge { font-size:10px; font-weight:700; padding:2px 6px; border-radius:5px; background:#ff5f6d22; color:var(--red); border:1px solid #ff5f6d55; white-space:nowrap; }
+  .latency-threshold-input {
+    width: 90px; background: rgba(255,255,255,0.045); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border); border-radius: 9px; padding: 8px 12px; color: var(--text); font-family: var(--mono); font-size: 12px;
+  }
+  .latency-threshold-input:focus { outline: none; border-color: var(--accent); }
+  .latency-presets .btn { padding: 6px 10px; }
+
+  /* Suite Runner */
+  .pw-log-box {
+    display: none; background: rgba(0,0,0,0.28); border: 1px solid var(--glass-border); border-radius: 8px;
+    padding: 10px 12px; max-height: 240px; overflow: auto; font-family: var(--mono); font-size: 11px;
+    line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: #c8c8e0;
+  }
+  .pw-log-box.show { display: block; }
+  .pw-run-status { font-size: 11px; font-family: var(--mono); color: var(--muted); }
+  .pw-run-status.ok  { color: var(--green); }
+  .pw-run-status.err { color: var(--red); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="topbar">
+    <div class="logo">api<span>✦</span>testgen</div>
+    <div class="tagline">network capture · chain detection · pytest generation</div>
+    <div class="spacer"></div>
+    <div class="dot" id="conn-dot"></div>
+    <div class="conn-label" id="conn-label">disconnected</div>
+  </header>
+
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">Workflow</div>
+      <div class="step active" id="step-1" onclick="showPanel('capture')">
+        <div class="step-num">1</div><div class="step-label">Capture traffic</div>
+      </div>
+      <div class="step" id="step-2" onclick="showPanel('preview')">
+        <div class="step-num">2</div><div class="step-label">Preview &amp; download</div>
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <button class="btn btn-ghost btn-sm" style="width:100%" onclick="showPanel('config')">⚙ Framework config</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- Panel: Capture -->
+    <div class="panel active" id="panel-capture">
+      <div class="panel-header">
+        <h2>Capture &amp; select API traffic</h2>
+        <p>Launch a browser, use the target app, then pick which calls make up the scenario you want to test.</p>
+      </div>
+      <div class="panel-body">
+
+        <div class="card">
+          <h3>Browser</h3>
+          <p>Opens a real Chromium window via Playwright. Every fetch/XHR the page makes is captured — auth headers and bodies included.</p>
+          <div class="field">
+            <label>Target URL (Portal A)</label>
+            <input type="text" id="target-url" placeholder="https://example.com">
+          </div>
+          <div class="field">
+            <label>Portal B URL <span style="opacity:0.6">— optional, opens a second window so you can capture APIs across both portals (e.g. Portal A creating data that Portal B then fetches)</span></label>
+            <input type="text" id="target-url-b" placeholder="https://other-portal.example.com">
+          </div>
+          <div class="flex-row">
+            <button class="btn btn-primary btn-sm" id="btn-launch" onclick="launchBrowser()">▶ Launch browser(s)</button>
+            <button class="btn btn-danger btn-sm" onclick="stopBrowser()">■ Stop all</button>
+          </div>
+          <div class="flex-row" style="margin-top:12px">
+            <input type="text" id="nav-url-a" placeholder="Navigate Portal A to..." style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-family:var(--mono);font-size:12px">
+            <button class="btn btn-ghost btn-sm" onclick="navigateBrowser('A')">→ Go</button>
+          </div>
+          <div class="flex-row" style="margin-top:8px">
+            <input type="text" id="nav-url-b" placeholder="Navigate Portal B to..." style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-family:var(--mono);font-size:12px">
+            <button class="btn btn-ghost btn-sm" onclick="navigateBrowser('B')">→ Go</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex-row" style="margin-bottom:6px">
+            <h3 style="margin:0;flex:1">🎭 Suite Runner</h3>
+          </div>
+          <p>Run an already-instrumented external Playwright/pytest project (one with the <code>testgen_capture</code> bridge wired into its <code>context</code> fixture) straight from here — no separate terminal needed. Runs with that project's own venv, and the captured traffic lands below as a session automatically.</p>
+          <div class="field">
+            <label>Project path</label>
+            <input type="text" id="pw-project-root" placeholder="/path/to/your/playwright-project">
+          </div>
+          <div class="field">
+            <label>Test path / pytest args</label>
+            <input type="text" id="pw-test-args" placeholder="tests/PlayWrightTests/UserFacingPortal/test_login.py   or   -m otp_login_ui">
+          </div>
+          <div class="name-row" style="margin-bottom:10px">
+            <input type="text" id="pw-session-name" placeholder="Session name (optional — auto-named if left blank)">
+          </div>
+          <div class="flex-row" style="margin-bottom:10px">
+            <button class="btn btn-primary btn-sm" id="btn-run-suite" onclick="runPlaywrightSuite()">▶ Run suite</button>
+            <button class="btn btn-danger btn-sm" id="btn-stop-suite" onclick="stopPlaywrightSuite()" style="display:none">■ Stop</button>
+            <div class="spacer"></div>
+            <span id="pw-run-status" class="pw-run-status"></span>
+          </div>
+          <pre class="pw-log-box" id="pw-run-log"></pre>
+        </div>
+
+        <div class="card">
+          <div class="flex-row" style="margin-bottom:6px">
+            <h3 style="margin:0;flex:1">💾 Session</h3>
+          </div>
+          <p>Save the current capture (network log, selection, scenario, chain links) to disk so it survives a restart, or reload one you saved earlier.</p>
+          <div class="name-row" style="margin-bottom:10px">
+            <input type="text" id="session-name" placeholder="Session name, e.g. checkout-flow">
+            <button class="btn btn-primary btn-sm" onclick="saveSession()">💾 Save</button>
+          </div>
+          <div class="flex-row">
+            <select id="session-select" style="flex:1;background:rgba(255,255,255,0.045);backdrop-filter:blur(10px);border:1px solid var(--glass-border);border-radius:9px;padding:9px 14px;color:var(--text);font-family:var(--mono);font-size:12px">
+              <option value="">No saved sessions</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="loadSession()">📂 Load</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteSession()">Delete</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex-row" style="margin-bottom:6px">
+            <h3 style="margin:0;flex:1">🌐 Network requests <span id="network-count" class="badge">0</span></h3>
+            <label style="font-size:11px;font-family:var(--mono);color:var(--muted);display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="network-api-only" checked onchange="refreshNetworkLog()"> API only
+            </label>
+            <button class="btn btn-ghost btn-sm" onclick="exportNetworkToCsv()">📥 Export CSV</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearNetworkLog()">Clear</button>
+          </div>
+          <p>Interact with the app in the opened browser window — logins, form submits, page loads. Calls appear here live.</p>
+          <div id="network-list" style="max-height:340px;overflow-y:auto;font-family:var(--mono);font-size:11px">
+            <div style="color:var(--muted);text-align:center;padding:20px">No requests captured yet. Interact with the page to see network calls.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex-row" style="margin-bottom:6px">
+            <h3 style="margin:0;flex:1">⏱ Latency Guard <span id="latency-guard-count" class="badge">0 flagged</span></h3>
+          </div>
+          <p>Flags any captured call slower than the threshold below — tune it per test run (cold cache vs warm, staging vs prod) without touching code. Re-flags instantly if you change it after capturing.</p>
+          <div class="flex-row" style="margin-bottom:14px;flex-wrap:wrap">
+            <label style="font-size:10px;font-family:var(--mono);color:var(--muted);letter-spacing:1px;text-transform:uppercase">Flag slower than</label>
+            <input type="number" id="latency-threshold" class="latency-threshold-input" min="0" step="100">
+            <span style="font-size:12px;color:var(--muted);font-family:var(--mono)">ms</span>
+            <div class="spacer"></div>
+            <div class="flex-row latency-presets">
+              <button class="btn btn-ghost btn-sm" onclick="setLatencyThreshold(1000)">1s</button>
+              <button class="btn btn-ghost btn-sm" onclick="setLatencyThreshold(3000)">3s</button>
+              <button class="btn btn-ghost btn-sm" onclick="setLatencyThreshold(5000)">5s</button>
+              <button class="btn btn-ghost btn-sm" onclick="setLatencyThreshold(10000)">10s</button>
+            </div>
+          </div>
+          <div id="latency-guard-list">
+            <div class="selected-apis-empty">No calls flagged yet — they'll show up here once a captured response exceeds the threshold.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex-row" style="margin-bottom:10px">
+            <h3 style="margin:0;flex:1">🔗 API chain test <span id="chain-selected-count" class="badge">0 selected</span></h3>
+            <button class="btn btn-ghost btn-sm" onclick="selectAllApiCalls()">Select all API calls</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearChainSelection()">Clear selection</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportSelectedApisToCsv()">📥 Export selected</button>
+          </div>
+          <div id="selected-apis-list" class="selected-apis-list">
+            <div class="selected-apis-empty">No APIs selected yet — check the boxes on the calls above to add them here.</div>
+          </div>
+
+          <div class="field">
+            <label>Scenario description</label>
+            <textarea id="api-chain-scenario" placeholder="e.g. Creating an order returns an id that a follow-up GET resolves with matching item/qty data" style="min-height:50px"></textarea>
+          </div>
+
+          <div id="chain-links-list" style="margin-bottom:10px"></div>
+
+          <div class="flex-row" style="margin-bottom:16px">
+            <button class="btn btn-ghost btn-sm" id="btn-analyze-chain" onclick="analyzeApiChain()">🔗 Analyze chain</button>
+            <div class="spacer"></div>
+          </div>
+
+          <div class="gen-options">
+            <div id="provider-anthropic" class="gen-option selected" onclick="setProvider('anthropic')">
+              <h4>Claude (Anthropic)</h4>
+              <p>Requires an API key. Best quality.</p>
+            </div>
+            <div id="provider-ollama" class="gen-option" onclick="setProvider('ollama')">
+              <h4>Ollama (free, local)</h4>
+              <p>Runs on your machine. No API key needed.</p>
+            </div>
+          </div>
+          <div class="field" id="field-api-key">
+            <label>Anthropic API key</label>
+            <input type="password" id="api-key" placeholder="sk-ant-...">
+          </div>
+          <div class="field" id="field-ollama-model" style="display:none">
+            <label>Ollama model <button type="button" class="btn btn-ghost btn-sm" onclick="refreshOllamaModels()" style="margin-left:6px">↻ Refresh</button></label>
+            <select id="ollama-model"></select>
+          </div>
+
+          <div class="gen-progress" id="gen-progress">
+            <div class="gen-status-text" id="gen-status">Generating...</div>
+            <div class="progress-bar-wrap"><div class="progress-bar" id="prog-bar"></div></div>
+          </div>
+
+          <button class="btn btn-primary" id="btn-gen-chain" onclick="generateApiChainTest()">⚡ Generate API chain test</button>
+        </div>
+
+      </div>
+
+      <div class="log-wrap">
+        <div class="log-header">Log</div>
+        <div class="log-body" id="log"></div>
+      </div>
+    </div>
+
+    <!-- Panel: Preview -->
+    <div class="panel" id="panel-preview">
+      <div class="panel-header">
+        <h2>Generated files</h2>
+        <p>Review the generated API client(s) and pytest file, then download.</p>
+        <div class="flex-row" style="margin-top:10px">
+          <button class="btn btn-ghost btn-sm" onclick="showPanel('capture')">← Back to capture</button>
+          <div class="spacer"></div>
+          <button class="btn btn-ghost btn-sm" id="btn-run-tests" onclick="runGeneratedTests()">▶ Run tests</button>
+          <button class="btn btn-green btn-sm" onclick="downloadAll()">↓ Download all</button>
+        </div>
+      </div>
+      <div class="preview-tabs" id="preview-tabs"></div>
+      <div id="preview-panels" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+        <div style="color:var(--muted);text-align:center;padding:60px;font-family:var(--mono);font-size:13px">
+          Nothing generated yet — go to Capture, select some API calls, and generate a test.
+        </div>
+      </div>
+      <div class="run-results-wrap" id="run-results-wrap">
+        <div class="run-results-header">
+          <span id="run-results-status">Test run</span>
+          <div class="spacer"></div>
+          <button class="btn btn-ghost btn-sm" onclick="closeRunResults()">Close</button>
+        </div>
+        <pre class="run-results-body" id="run-results-body"></pre>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Config overlay -->
+  <div class="config-overlay" id="config-overlay">
+    <div class="config-box">
+      <div class="config-box-header"><h3>⚙ Framework config</h3><div class="spacer"></div>
+        <button class="btn btn-ghost btn-sm" onclick="closeConfig()">Close</button>
+      </div>
+      <div class="config-box-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+          These rules are injected into every generation prompt: client architecture, chaining rules, auth
+          conventions, and the exact <code>config_manager</code> methods the generated code is allowed to call.
+          Edit <code>prompt_config.json</code> here to match your own project's conventions.
+        </p>
+        <textarea id="config-editor" spellcheck="false"></textarea>
+      </div>
+      <div class="config-box-footer">
+        <button class="btn btn-ghost btn-sm" onclick="closeConfig()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="saveConfig()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// This page is hosted separately (val.town) from the bridge server, which
+// runs locally on whoever's opening this page's own machine - same split
+// mobile_agent's console uses. Every request below goes to BRIDGE_URL
+// explicitly instead of a same-origin relative path.
+const BRIDGE_URL = 'http://localhost:5002';
+const socket = io(BRIDGE_URL);
+
+let networkLog = [];
+let networkPaused = false;
+let browserOpen = false;
+let selectedChainEntries = new Map(); // chainKey -> snapshotted entry, survives log clears
+let lastChainLinks = [];
+let aiProvider = 'anthropic';
+let scripts = [];
+
+// ── Connection ────────────────────────────────────────────────────────────────
+
+function setConnected(on) {
+  browserOpen = on;
+  document.getElementById('conn-dot').classList.toggle('on', on);
+  document.getElementById('conn-label').textContent = on ? 'browser open' : 'disconnected';
+}
+socket.on('status',         (d) => setConnected(d.connected));
+socket.on('browser_started',(d) => { setConnected(true); log(`Browser${d.portal==='B'?' (Portal B)':''} at ${d.url}`, 'ok'); setTimeout(refreshNetworkLog, 800); });
+socket.on('browser_stopped',()  => setConnected(false));
+socket.on('navigated',      (d) => { log(`Portal ${d.portal||'A'} → ${d.url}`); setTimeout(refreshNetworkLog, 800); });
+socket.on('network_log',    (d) => { networkLog = d.network || []; renderNetworkLog(); });
+socket.on('log',            (d) => log(d.msg));
+socket.on('error',          (d) => { log(d.msg, 'err'); toast(d.msg, 'err'); });
+
+function launchBrowser() {
+  const urlA = document.getElementById('target-url').value.trim();
+  const urlB = document.getElementById('target-url-b').value.trim();
+  if (!urlA) { toast('Enter a target URL (Portal A) first', 'err'); return; }
+  socket.emit('start_browser', { url: urlA, portal: 'A' });
+  if (urlB) {
+    socket.emit('start_browser', { url: urlB, portal: 'B' });
+  }
+}
+function navigateBrowser(portal) {
+  const url = document.getElementById(portal === 'B' ? 'nav-url-b' : 'nav-url-a').value.trim();
+  if (!url) { toast(`Enter a URL to navigate Portal ${portal} to`, 'err'); return; }
+  socket.emit('navigate', { url, portal });
+}
+function stopBrowser() { socket.emit('stop_browser'); }
+
+// ── Network log ───────────────────────────────────────────────────────────────
+
+let networkPollTimer = null;
+function startNetworkPolling() {
+  if (networkPollTimer) return;
+  networkPollTimer = setInterval(refreshNetworkLog, 2000);
+}
+startNetworkPolling();
+
+function refreshNetworkLog() {
+  if (networkPaused || !browserOpen) return;
+  const apiOnly = document.getElementById('network-api-only').checked;
+  socket.emit('get_network_log', { api_only: apiOnly });
+}
+
+function clearNetworkLog() {
+  // Only clears the live log — already-selected APIs are snapshotted in
+  // selectedChainEntries and deliberately survive this.
+  socket.emit('clear_network_log');
+  networkPaused = false;
+}
+
+function renderNetworkLog() {
+  const container = document.getElementById('network-list');
+  document.getElementById('network-count').textContent = networkLog.length;
+
+  if (networkPaused) return;
+
+  if (!networkLog.length) {
+    container.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px">No requests captured yet. Interact with the page to see network calls.</div>';
+    renderLatencyGuard();
+    return;
+  }
+
+  container.innerHTML = networkLog.slice().reverse().map((n, i) => {
+    const statusClass = n.status >= 200 && n.status < 300 ? 'ok' : n.status >= 400 ? 'err' : 'pending';
+    const statusText = n.status || 'pending';
+    const urlShort = (n.url || '').replace(/^https?:\/\/[^\/]+/, '');
+    const reqHeaders = n.requestHeaders ? JSON.stringify(n.requestHeaders, null, 2) : '{}';
+    const resHeaders = n.responseHeaders ? JSON.stringify(n.responseHeaders, null, 2) : '{}';
+    const reqBody = n.requestBody || '(none)';
+    const resBody = formatJsonBody(n.responseBody);
+    const duration = n.duration ? `${n.duration}ms` : '-';
+    const slow = isSlowEntry(n);
+    const chainKey = `${n.method}|${n.url}|${n.ts}`;
+    const chainChecked = selectedChainEntries.has(chainKey) ? 'checked' : '';
+    const portalBadge = n.portal ? `<span class="network-portal portal-${escapeHtml(n.portal)}" title="Captured from Portal ${escapeHtml(n.portal)}">${escapeHtml(n.portal)}</span>` : '';
+
+    return `
+      <div class="network-item${slow ? ' slow' : ''}" data-index="${i}">
+        <div class="network-item-header" onclick="toggleNetworkItem(${i})">
+          <input type="checkbox" class="chain-select" title="Select for API chain test" onclick="event.stopPropagation(); toggleChainSelect(this)" data-chain-key="${escapeHtml(chainKey)}" ${chainChecked}>
+          ${portalBadge}
+          <span class="network-method ${n.method}">${n.method}</span>
+          <span class="network-url" title="${escapeHtml(n.url)}">${escapeHtml(urlShort)}</span>
+          <span class="network-status ${statusClass}">${statusText}</span>
+          <span class="network-duration">${duration}</span>
+          ${slow ? `<span class="slow-badge" title="Exceeds the ${latencyThresholdMs}ms Latency Guard threshold">⏱ SLOW</span>` : ''}
+          <span class="network-expand-icon">▼</span>
+        </div>
+        <div class="network-details">
+          <div class="network-section"><div class="network-section-title">URL</div><div class="network-json">${escapeHtml(n.url || '-')}</div></div>
+          <div class="network-section"><div class="network-section-title">Request headers</div><div class="network-json">${escapeHtml(reqHeaders)}</div></div>
+          <div class="network-section"><div class="network-section-title">Request body</div><div class="network-json">${escapeHtml(reqBody)}</div></div>
+          <div class="network-section"><div class="network-section-title">Response headers</div><div class="network-json">${escapeHtml(resHeaders)}</div></div>
+          <div class="network-section"><div class="network-section-title">Response body</div><div class="network-json">${escapeHtml(resBody)}</div></div>
+          <div style="margin-top:10px;text-align:right"><button class="btn btn-ghost btn-sm" onclick="closeNetworkDetails()">Close</button></div>
+        </div>
+      </div>`;
+  }).join('');
+  renderLatencyGuard();
+}
+
+function toggleNetworkItem(index) {
+  const item = document.querySelector(`.network-item[data-index="${index}"]`);
+  if (!item) return;
+  const wasExpanded = item.classList.contains('expanded');
+  document.querySelectorAll('.network-item.expanded').forEach(el => el.classList.remove('expanded'));
+  if (!wasExpanded) { item.classList.add('expanded'); networkPaused = true; }
+  else { networkPaused = false; }
+}
+
+function closeNetworkDetails() {
+  document.querySelectorAll('.network-item.expanded').forEach(el => el.classList.remove('expanded'));
+  networkPaused = false;
+  refreshNetworkLog();
+}
+
+// ── Latency Guard (flags calls slower than a configurable, per-run threshold) ──
+
+const LATENCY_STORAGE_KEY = 'testgen_latency_threshold_ms';
+let latencyThresholdMs = 5000;
+
+function initLatencyGuard() {
+  try {
+    const stored = Number(localStorage.getItem(LATENCY_STORAGE_KEY));
+    if (stored > 0) latencyThresholdMs = stored;
+  } catch {}
+  document.getElementById('latency-threshold').value = latencyThresholdMs;
+  document.getElementById('latency-threshold').addEventListener('change', (e) => applyLatencyThreshold(e.target.value));
+}
+
+function setLatencyThreshold(ms) {
+  applyLatencyThreshold(ms);
+}
+
+function applyLatencyThreshold(value) {
+  latencyThresholdMs = Math.max(0, Math.round(Number(value)) || 0);
+  document.getElementById('latency-threshold').value = latencyThresholdMs;
+  try { localStorage.setItem(LATENCY_STORAGE_KEY, String(latencyThresholdMs)); } catch {}
+  renderNetworkLog();
+  renderSelectedApis();
+}
+
+function isSlowEntry(n) {
+  return typeof n.duration === 'number' && n.duration > latencyThresholdMs;
+}
+
+function renderLatencyGuard() {
+  const flagged = networkLog.filter(isSlowEntry);
+  const countBadge = document.getElementById('latency-guard-count');
+  if (countBadge) countBadge.textContent = `${flagged.length} flagged`;
+
+  const list = document.getElementById('latency-guard-list');
+  if (!flagged.length) {
+    list.innerHTML = '<div class="selected-apis-empty">No calls flagged yet — they\'ll show up here once a captured response exceeds the threshold.</div>';
+    return;
+  }
+  list.innerHTML = flagged.slice().sort((a, b) => (b.duration || 0) - (a.duration || 0)).map(n => {
+    const urlShort = (n.url || '').replace(/^https?:\/\/[^\/]+/, '');
+    return `
+      <div class="selected-api-row" style="border-color:#ff5f6d55">
+        <span class="network-method ${n.method}">${n.method}</span>
+        <span class="network-url" title="${escapeHtml(n.url)}">${escapeHtml(urlShort)}</span>
+        <span class="slow-badge">${n.duration}ms</span>
+      </div>`;
+  }).join('');
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+
+function csvEscape(val) {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function networkEntriesToCsv(entries) {
+  const hasPortals = entries.some(req => req.portal);
+  const headers = [
+    ...(hasPortals ? ['Portal'] : []),
+    'Method', 'Full URL', 'Endpoint', 'Query Params', 'Host', 'Status',
+    'Status Text', 'Duration (ms)', `Slow (>${latencyThresholdMs}ms)`, 'Content Type', 'Request Headers',
+    'Request Body', 'Response Headers', 'Response Body', 'Timestamp'
+  ];
+  const rows = [headers.join(',')];
+
+  entries.forEach(req => {
+    const fullUrl = req.url || '';
+    let endpoint = fullUrl, host = '', queryParams = '';
+    try {
+      const urlObj = new URL(fullUrl);
+      endpoint = urlObj.pathname; host = urlObj.origin; queryParams = urlObj.search || '';
+    } catch (e) {}
+    const contentType = req.responseHeaders?.['content-type'] || req.responseHeaders?.['Content-Type'] || '';
+    const statusText = req.status >= 200 && req.status < 300 ? 'OK' :
+                       req.status >= 400 && req.status < 500 ? 'Client Error' :
+                       req.status >= 500 ? 'Server Error' : 'Pending';
+    rows.push([
+      ...(hasPortals ? [csvEscape(req.portal || '')] : []),
+      csvEscape(req.method), csvEscape(fullUrl), csvEscape(endpoint), csvEscape(queryParams),
+      csvEscape(host), csvEscape(req.status || ''), csvEscape(statusText), csvEscape(req.duration || ''),
+      csvEscape(isSlowEntry(req) ? 'YES' : ''),
+      csvEscape(contentType), csvEscape(JSON.stringify(req.requestHeaders || {})),
+      csvEscape(req.requestBody || ''), csvEscape(JSON.stringify(req.responseHeaders || {})),
+      csvEscape(req.responseBody || ''), csvEscape(req.timestamp || '')
+    ].join(','));
+  });
+  return rows.join('\n');
+}
+
+function downloadCsv(csvContent, filename) {
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = filename; link.style.display = 'none';
+  document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function exportNetworkToCsv() {
+  if (!networkLog.length) { toast('No network requests to export', 'err'); return; }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  downloadCsv(networkEntriesToCsv(networkLog), `network_requests_${timestamp}.csv`);
+  toast(`Exported ${networkLog.length} API calls to CSV`, 'ok');
+}
+
+function exportSelectedApisToCsv() {
+  const selected = getSelectedChainEntries();
+  if (!selected.length) { toast('No APIs selected — check the boxes next to the calls you want to export', 'err'); return; }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  downloadCsv(networkEntriesToCsv(selected), `selected_apis_${timestamp}.csv`);
+  toast(`Exported ${selected.length} selected API call(s) to CSV`, 'ok');
+}
+
+// ── Suite Runner (drives an external, already-instrumented Playwright project) ──
+
+const PW_ROOT_KEY = 'testgen_pw_project_root';
+let currentSuiteRunId = null;
+
+function initSuiteRunner() {
+  try {
+    const saved = localStorage.getItem(PW_ROOT_KEY);
+    if (saved) document.getElementById('pw-project-root').value = saved;
+  } catch {}
+}
+
+function runPlaywrightSuite() {
+  const projectRoot = document.getElementById('pw-project-root').value.trim();
+  const testArgs    = document.getElementById('pw-test-args').value.trim();
+  const sessionName = document.getElementById('pw-session-name').value.trim();
+  if (!projectRoot) { toast('Enter the path to the Playwright project first', 'err'); return; }
+  if (!testArgs)    { toast('Enter a test path or pytest args, e.g. -m otp_login_ui', 'err'); return; }
+  try { localStorage.setItem(PW_ROOT_KEY, projectRoot); } catch {}
+
+  const logEl = document.getElementById('pw-run-log');
+  logEl.classList.add('show');
+  logEl.textContent = '';
+  const status = document.getElementById('pw-run-status');
+  status.className = 'pw-run-status';
+  status.textContent = 'Starting...';
+  document.getElementById('btn-run-suite').disabled = true;
+
+  socket.emit('run_playwright_suite', { project_root: projectRoot, test_path: testArgs, session_name: sessionName });
+}
+
+function stopPlaywrightSuite() {
+  if (!currentSuiteRunId) return;
+  socket.emit('stop_playwright_suite', { run_id: currentSuiteRunId });
+}
+
+socket.on('playwright_run_started', (d) => {
+  currentSuiteRunId = d.run_id;
+  document.getElementById('pw-run-status').textContent = `Running (${d.run_id})...`;
+  document.getElementById('btn-stop-suite').style.display = 'inline-flex';
+  log(`Suite run started: ${d.cmd}`);
+});
+
+socket.on('playwright_run_log', (d) => {
+  const logEl = document.getElementById('pw-run-log');
+  logEl.textContent += d.line;
+  logEl.scrollTop = logEl.scrollHeight;
+});
+
+socket.on('playwright_run_done', async (d) => {
+  document.getElementById('btn-run-suite').disabled = false;
+  document.getElementById('btn-stop-suite').style.display = 'none';
+  currentSuiteRunId = null;
+
+  const ok = d.returncode === 0;
+  const status = document.getElementById('pw-run-status');
+  status.className = 'pw-run-status ' + (ok ? 'ok' : 'err');
+  status.textContent = ok ? '✅ Passed' : `❌ Exit code ${d.returncode}`;
+  toast(ok ? 'Suite finished — traffic captured' : 'Suite finished with failures — traffic still captured', ok ? 'ok' : 'err');
+
+  await refreshSessionsList();
+  const select = document.getElementById('session-select');
+  if (select && d.session_name && Array.from(select.options).some(o => o.value === d.session_name)) {
+    select.value = d.session_name;
+    loadSession();
+  }
+});
+
+socket.on('playwright_run_error', (d) => {
+  document.getElementById('btn-run-suite').disabled = false;
+  document.getElementById('btn-stop-suite').style.display = 'none';
+  currentSuiteRunId = null;
+  const status = document.getElementById('pw-run-status');
+  status.className = 'pw-run-status err';
+  status.textContent = '❌ ' + d.msg;
+  toast(d.msg, 'err');
+});
+
+// ── Sessions (persist a capture across restarts) ────────────────────────────────
+
+async function refreshSessionsList() {
+  const select = document.getElementById('session-select');
+  try {
+    const r = await fetch(BRIDGE_URL + '/api/sessions');
+    const d = await r.json();
+    const sessions = d.sessions || [];
+    if (!sessions.length) {
+      select.innerHTML = '<option value="">No saved sessions</option>';
+      return;
+    }
+    select.innerHTML = sessions.map(s =>
+      `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)} (${s.entry_count} calls)</option>`
+    ).join('');
+  } catch (e) {
+    select.innerHTML = '<option value="">Could not load sessions</option>';
+  }
+}
+
+async function saveSession() {
+  const nameInput = document.getElementById('session-name');
+  const name = nameInput.value.trim();
+  if (!name) { toast('Enter a session name first', 'err'); return; }
+  const body = {
+    name,
+    network:  networkLog,
+    selected: getSelectedChainEntries(),
+    scenario: document.getElementById('api-chain-scenario').value,
+    links:    lastChainLinks,
+  };
+  try {
+    const r = await fetch(BRIDGE_URL + '/api/sessions', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'err'); return; }
+    toast(`Session "${name}" saved`, 'ok');
+    nameInput.value = '';
+    refreshSessionsList();
+  } catch (e) {
+    toast(`Save failed: ${e.message}`, 'err');
+  }
+}
+
+async function loadSession() {
+  const name = document.getElementById('session-select').value;
+  if (!name) { toast('Pick a saved session first', 'err'); return; }
+  try {
+    const r = await fetch(`${BRIDGE_URL}/api/sessions/${encodeURIComponent(name)}`);
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'err'); return; }
+
+    networkLog = d.network || [];
+    selectedChainEntries = new Map((d.selected || []).map(n => [`${n.method}|${n.url}|${n.ts}`, n]));
+    lastChainLinks = (d.links || []).map(l => ({ ...l, included: true }));
+    document.getElementById('api-chain-scenario').value = d.scenario || '';
+
+    renderNetworkLog();
+    updateChainSelectedCount();
+    renderChainLinks();
+    toast(`Session "${name}" loaded`, 'ok');
+    if (browserOpen) {
+      log(`Session "${name}" loaded — a browser is still live, so the next network poll will overwrite this with fresh capture`, 'err');
+    }
+  } catch (e) {
+    toast(`Load failed: ${e.message}`, 'err');
+  }
+}
+
+async function deleteSession() {
+  const name = document.getElementById('session-select').value;
+  if (!name) { toast('Pick a saved session first', 'err'); return; }
+  try {
+    const r = await fetch(`${BRIDGE_URL}/api/sessions/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'err'); return; }
+    toast(`Session "${name}" deleted`, 'ok');
+    refreshSessionsList();
+  } catch (e) {
+    toast(`Delete failed: ${e.message}`, 'err');
+  }
+}
+
+// ── API chain selection ───────────────────────────────────────────────────────
+
+function toggleChainSelect(checkbox) {
+  const key = checkbox.getAttribute('data-chain-key');
+  if (checkbox.checked) {
+    const entry = networkLog.find(n => `${n.method}|${n.url}|${n.ts}` === key);
+    if (entry) selectedChainEntries.set(key, entry);
+  } else {
+    selectedChainEntries.delete(key);
+  }
+  updateChainSelectedCount();
+}
+
+function updateChainSelectedCount() {
+  const badge = document.getElementById('chain-selected-count');
+  if (badge) badge.textContent = `${selectedChainEntries.size} selected`;
+  renderSelectedApis();
+}
+
+function renderSelectedApis() {
+  const container = document.getElementById('selected-apis-list');
+  const entries = getSelectedChainEntries();
+  if (!entries.length) {
+    container.innerHTML = '<div class="selected-apis-empty">No APIs selected yet — check the boxes on the calls above to add them here.</div>';
+    return;
+  }
+  container.innerHTML = entries.map(n => {
+    const key = `${n.method}|${n.url}|${n.ts}`;
+    const urlShort = (n.url || '').replace(/^https?:\/\/[^\/]+/, '');
+    const portalBadge = n.portal ? `<span class="network-portal portal-${escapeHtml(n.portal)}" title="Captured from Portal ${escapeHtml(n.portal)}">${escapeHtml(n.portal)}</span>` : '';
+    const slowBadge = isSlowEntry(n) ? `<span class="slow-badge" title="Exceeds the ${latencyThresholdMs}ms Latency Guard threshold">⏱ ${n.duration}ms</span>` : '';
+    return `
+      <div class="selected-api-row"${isSlowEntry(n) ? ' style="border-color:#ff5f6d55"' : ''}>
+        <span class="network-method ${n.method}">${n.method}</span>
+        ${portalBadge}
+        <span class="network-url" title="${escapeHtml(n.url)}">${escapeHtml(urlShort)}</span>
+        ${slowBadge}
+        <button class="chain-remove-btn" data-chain-key="${escapeHtml(key)}" onclick="removeChainSelection(this)" title="Remove from selection">✕</button>
+      </div>`;
+  }).join('');
+}
+
+function removeChainSelection(btn) {
+  selectedChainEntries.delete(btn.getAttribute('data-chain-key'));
+  updateChainSelectedCount();
+  renderNetworkLog();
+}
+
+function selectAllApiCalls() {
+  networkLog.forEach(n => { if (n.isApi) selectedChainEntries.set(`${n.method}|${n.url}|${n.ts}`, n); });
+  updateChainSelectedCount();
+  renderNetworkLog();
+}
+
+function clearChainSelection() {
+  selectedChainEntries.clear();
+  lastChainLinks = [];
+  document.getElementById('chain-links-list').innerHTML = '';
+  updateChainSelectedCount();
+  renderNetworkLog();
+}
+
+function getSelectedChainEntries() {
+  return Array.from(selectedChainEntries.values()).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+}
+
+// ── Chain detection + generation ──────────────────────────────────────────────
+
+async function analyzeApiChain() {
+  const entries = getSelectedChainEntries();
+  if (entries.length < 2) { toast('Select at least 2 API calls to analyze a chain', 'err'); return; }
+  const btn = document.getElementById('btn-analyze-chain');
+  btn.disabled = true; btn.textContent = '⏳ Analyzing...';
+  try {
+    const r = await fetch(BRIDGE_URL + '/api/api-chain/detect', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ entries }),
+    });
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'err'); return; }
+    lastChainLinks = (d.links || []).map(l => ({ ...l, included: true }));
+    renderChainLinks();
+    toast(`Found ${lastChainLinks.length} chained value(s) across ${entries.length} calls`, 'ok');
+  } catch (e) {
+    toast(`Analyze failed: ${e.message}`, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '🔗 Analyze chain';
+  }
+}
+
+function renderChainLinks() {
+  const container = document.getElementById('chain-links-list');
+  if (!lastChainLinks.length) {
+    container.innerHTML = '<div style="color:var(--muted);padding:10px 0;font-size:12px">No value chaining detected between the selected calls — review the steps manually or adjust the selection.</div>';
+    return;
+  }
+  container.innerHTML = lastChainLinks.map((l, i) => `
+    <label style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;cursor:pointer;font-size:12px">
+      <input type="checkbox" ${l.included ? 'checked' : ''} onchange="lastChainLinks[${i}].included = this.checked">
+      <span>Step ${l.from_step}'s response field <b>${escapeHtml(l.from_path)}</b> (<code>${escapeHtml(l.value_preview)}</code>) → Step ${l.to_step}'s ${escapeHtml(l.location)} <b>${escapeHtml(l.location_detail || '')}</b></span>
+    </label>`).join('');
+}
+
+async function generateApiChainTest() {
+  const entries = getSelectedChainEntries();
+  if (!entries.length) { toast('Select at least one API call first', 'err'); return; }
+  const providerFields = getProviderFields();
+  if (!providerFields) return;
+  const scenario = document.getElementById('api-chain-scenario').value.trim();
+
+  const btn = document.getElementById('btn-gen-chain');
+  btn.disabled = true; btn.textContent = '⏳ Generating...';
+  document.getElementById('gen-progress').classList.add('show');
+  setProgress(20, 'Sending captured calls to the model...');
+  try {
+    const links = lastChainLinks.filter(l => l.included);
+    const r = await fetch(BRIDGE_URL + '/api/api-chain/generate', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ...providerFields, scenario, entries, links, max_tokens: 16000 }),
+    });
+    setProgress(70, 'Parsing generated files...');
+    const d = await r.json();
+    const text = d.content?.map(b=>b.text||'').join('') || d.error || '';
+    const parsed = parseScripts(text);
+    if (!parsed.length) { toast('Could not parse generated script', 'err'); setProgress(0,''); return; }
+    scripts = parsed;
+    setProgress(100, `✅ Generated ${scripts.length} file(s)`);
+    renderPreview();
+    setTimeout(() => showPanel('preview'), 400);
+    if (d.stop_reason === 'max_tokens') {
+      toast('Output was cut off (hit the model’s token limit) — the generated file(s) are likely incomplete', 'err');
+    } else {
+      toast(`Generated ${scripts.length} API chain test file(s)`, 'ok');
+    }
+  } catch (e) {
+    toast(`Generation failed: ${e.message}`, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '⚡ Generate API chain test';
+  }
+}
+
+function setProgress(p, msg) {
+  document.getElementById('prog-bar').style.width = p + '%';
+  document.getElementById('gen-status').textContent = msg;
+}
+
+function parseScripts(text) {
+  const files = [];
+  const re = /# FILE:\s*(\S+\.py)([\s\S]*?)(?=# FILE:|$)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    let content = m[2].trim().replace(/^```(?:python)?\n?/,'').replace(/\n?```$/,'').trim();
+    files.push({ filename: m[1].trim(), content });
+  }
+  if (!files.length && text.trim()) {
+    files.push({ filename: 'generated_test.py', content: text.trim() });
+  }
+  return files;
+}
+
+// ── Providers ─────────────────────────────────────────────────────────────────
+
+function setProvider(p) {
+  aiProvider = p;
+  document.getElementById('provider-anthropic').classList.toggle('selected', p === 'anthropic');
+  document.getElementById('provider-ollama').classList.toggle('selected', p === 'ollama');
+  document.getElementById('field-api-key').style.display = p === 'anthropic' ? 'flex' : 'none';
+  document.getElementById('field-ollama-model').style.display = p === 'ollama' ? 'flex' : 'none';
+  if (p === 'ollama' && !document.getElementById('ollama-model').dataset.loaded) refreshOllamaModels();
+}
+
+async function refreshOllamaModels() {
+  const select = document.getElementById('ollama-model');
+  select.innerHTML = '<option value="">Loading...</option>';
+  try {
+    const r = await fetch(BRIDGE_URL + '/api/ollama/models');
+    const d = await r.json();
+    if (d.error) { select.innerHTML = '<option value="">Ollama not reachable</option>'; toast(d.error, 'err'); return; }
+    if (!d.models || !d.models.length) { select.innerHTML = '<option value="">No models pulled — run `ollama pull ...`</option>'; return; }
+    select.innerHTML = d.models.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join('');
+    select.dataset.loaded = '1';
+  } catch (e) {
+    select.innerHTML = '<option value="">Ollama not reachable</option>';
+    toast(`Could not reach Ollama: ${e.message}`, 'err');
+  }
+}
+
+function getProviderFields() {
+  if (aiProvider === 'ollama') {
+    const model = document.getElementById('ollama-model').value;
+    if (!model) { toast('Pick an Ollama model first', 'err'); return null; }
+    return { provider: 'ollama', api_key: '', model };
+  }
+  const apiKey = document.getElementById('api-key').value.trim();
+  if (!apiKey) { toast('Enter an API key first', 'err'); return null; }
+  return { provider: 'anthropic', api_key: apiKey, model: '' };
+}
+
+// ── Preview / download ────────────────────────────────────────────────────────
+
+function renderPreview() {
+  const tabs = document.getElementById('preview-tabs');
+  const pans = document.getElementById('preview-panels');
+  tabs.innerHTML = ''; pans.innerHTML = '';
+  scripts.forEach((s,i) => {
+    const tab = document.createElement('div');
+    tab.className = 'preview-tab'+(i===0?' active':'');
+    tab.textContent = s.filename; tab.onclick = ()=>switchTab(i);
+    tabs.appendChild(tab);
+    const pane = document.createElement('div');
+    pane.className = 'code-view'+(i===0?' active':'');
+    pane.innerHTML = `
+      <div class="code-header">
+        <div class="file-name">${s.filename}</div>
+        <button class="btn btn-ghost btn-sm" onclick="copyScript(${i})">Copy</button>
+        <button class="btn btn-green btn-sm" onclick="dlScript(${i})">↓ Download</button>
+      </div>
+      <div class="code-scroll"><div class="code-block">${highlight(s.content)}</div></div>`;
+    pans.appendChild(pane);
+  });
+}
+function switchTab(i) {
+  document.querySelectorAll('.preview-tab').forEach((t,j)=>t.classList.toggle('active',i===j));
+  document.querySelectorAll('.code-view').forEach((p,j)=>p.classList.toggle('active',i===j));
+}
+function highlight(c) {
+  const escaped = c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const tokens = [];
+  const stash = (html) => { tokens.push(html); return ` ${tokens.length - 1} `; };
+  const code = escaped
+    .replace(/(#[^\n]*)/g, (m) => stash(`<span class="cm">${m}</span>`))
+    .replace(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g, (m) => stash(`<span class="st">${m}</span>`))
+    .replace(/\b(import|from|class|def|return|if|else|elif|for|in|and|or|not|True|False|None|try|except|with|as|assert|self|cls)\b/g,'<span class="kw">$1</span>')
+    .replace(/\b(requests|pytest|Session|json)\b/g,'<span class="dc">$1</span>');
+  return code.replace(/ (\d+) /g, (m, idx) => tokens[idx] !== undefined ? tokens[idx] : m);
+}
+function copyScript(i) { navigator.clipboard.writeText(scripts[i].content).then(()=>toast('Copied!','ok')); }
+function dlScript(i) {
+  const s = scripts[i];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([s.content], {type: 'text/plain'}));
+  a.download = s.filename;
+  a.click();
+}
+async function downloadAll() {
+  if (!scripts.length) { toast('Nothing generated yet', 'err'); return; }
+  try {
+    await fetch(BRIDGE_URL + '/api/scripts/save', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({scripts})});
+    toast('Saved to generated_scripts/', 'ok');
+  } catch {}
+  scripts.forEach((_,i)=>dlScript(i));
+}
+
+// ── Run tests ─────────────────────────────────────────────────────────────────
+
+async function runGeneratedTests() {
+  if (!scripts.length) { toast('Nothing generated yet', 'err'); return; }
+  const testFile = scripts.find(s => s.filename.startsWith('tests/') || s.filename.includes('test_'));
+  if (!testFile) { toast('No test file found in the generated output', 'err'); return; }
+
+  const btn = document.getElementById('btn-run-tests');
+  btn.disabled = true; btn.textContent = '⏳ Running...';
+  showRunResults('Saving files and running pytest — this hits the real API, may take a moment...', null);
+  try {
+    await fetch(BRIDGE_URL + '/api/scripts/save', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ scripts }),
+    });
+    const r = await fetch(BRIDGE_URL + '/api/scripts/run', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ test_file: testFile.filename }),
+    });
+    const d = await r.json();
+    if (d.error) { showRunResults(d.error, false); toast(d.error, 'err'); return; }
+    showRunResults((d.stdout || '') + (d.stderr ? '\n' + d.stderr : ''), d.passed);
+    toast(d.passed ? 'Tests passed' : 'Tests failed', d.passed ? 'ok' : 'err');
+  } catch (e) {
+    showRunResults(`Run failed: ${e.message}`, false);
+    toast(`Run failed: ${e.message}`, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '▶ Run tests';
+  }
+}
+
+function showRunResults(output, passed) {
+  const wrap = document.getElementById('run-results-wrap');
+  const status = document.getElementById('run-results-status');
+  wrap.classList.add('show');
+  wrap.classList.remove('pass', 'fail');
+  if (passed === true)  { wrap.classList.add('pass'); status.textContent = '✅ Tests passed'; }
+  else if (passed === false) { wrap.classList.add('fail'); status.textContent = '❌ Tests failed'; }
+  else status.textContent = 'Running...';
+  document.getElementById('run-results-body').textContent = output;
+}
+
+function closeRunResults() {
+  document.getElementById('run-results-wrap').classList.remove('show');
+}
+
+// ── Nav / misc ────────────────────────────────────────────────────────────────
+
+function showPanel(n) {
+  if (n === 'config') { openConfig(); return; }
+  ['capture','preview'].forEach(p => document.getElementById('panel-'+p).classList.toggle('active', p===n));
+  document.getElementById('step-1').classList.toggle('active', n==='capture');
+  document.getElementById('step-2').classList.toggle('active', n==='preview');
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function formatJsonBody(body) {
+  if (!body) return '(none)';
+  try { return JSON.stringify(JSON.parse(body), null, 2); } catch { return body; }
+}
+function log(msg, type='info') {
+  const el = document.getElementById('log'); if (!el) return;
+  const l = document.createElement('div');
+  l.className = 'log-line ' + type; l.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  el.appendChild(l); el.scrollTop = el.scrollHeight;
+}
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  setTimeout(()=>t.className='toast', 2500);
+}
+
+// ── Config overlay ────────────────────────────────────────────────────────────
+
+async function openConfig() {
+  document.getElementById('config-overlay').classList.add('show');
+  try {
+    const r = await fetch(BRIDGE_URL + '/api/config');
+    const d = await r.json();
+    document.getElementById('config-editor').value = JSON.stringify(d, null, 2);
+  } catch (e) { log('Could not load config: ' + e.message, 'err'); }
+}
+function closeConfig() { document.getElementById('config-overlay').classList.remove('show'); }
+async function saveConfig() {
+  const editor = document.getElementById('config-editor');
+  try {
+    const parsed = JSON.parse(editor.value);
+    await fetch(BRIDGE_URL + '/api/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(parsed) });
+    toast('Config saved!', 'ok');
+    closeConfig();
+  } catch (e) {
+    toast('Invalid JSON — fix and retry', 'err');
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+fetch(BRIDGE_URL + '/api/status').then(r=>r.json()).then(d=>{
+  if (d.connected) setConnected(true);
+  document.getElementById('target-url').value = d.target_url || 'https://example.com';
+  log(`Backend ready · Playwright: ${d.playwright_available ? 'available' : 'not installed'}`);
+}).catch(()=>log('Backend not reachable — is server.py running?', 'err'));
+refreshSessionsList();
+initLatencyGuard();
+initSuiteRunner();
+</script>
+</body>
+</html>
