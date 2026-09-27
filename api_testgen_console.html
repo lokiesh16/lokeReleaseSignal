@@ -295,6 +295,7 @@
     <div class="logo">api<span>✦</span>testgen</div>
     <div class="tagline">network capture · chain detection · pytest generation</div>
     <div class="spacer"></div>
+    <button class="btn btn-ghost btn-sm" id="downloadAppBtn" title="Download the local bridge server - a standalone build, no Python install needed. Unzip, then right-click the extracted app and choose Open once (Gatekeeper blocks unsigned apps on a plain double-click).">Download app</button>
     <div class="dot" id="conn-dot"></div>
     <div class="conn-label" id="conn-label">disconnected</div>
   </header>
@@ -548,6 +549,11 @@
 // explicitly instead of a same-origin relative path.
 const BRIDGE_URL = 'http://localhost:5002';
 const socket = io(BRIDGE_URL);
+
+const BRIDGE_BINARY_URL = 'https://github.com/lokiesh16/lokeReleaseSignal/releases/download/api-testgen-bridge-v1/ApiTestGenBridge.zip';
+document.getElementById('downloadAppBtn').addEventListener('click', () => {
+  window.open(BRIDGE_BINARY_URL, '_blank');
+});
 
 let networkLog = [];
 let networkPaused = false;
