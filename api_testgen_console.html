@@ -377,6 +377,38 @@
 
         <div class="card">
           <div class="flex-row" style="margin-bottom:6px">
+            <h3 style="margin:0;flex:1">🏃 Script Runner</h3>
+          </div>
+          <p>Run one existing test file from <code id="testloke-project-root">TESTLOKE_PROJECT_ROOT</code> as-is (its own venv, real Allure results), then publish that run's report to Cloudflare R2 for a shareable link — no separate terminal, same idea as mobile_agent's Test Scripts tab.</p>
+          <div class="field">
+            <label>Test file</label>
+            <select id="testloke-script-select" style="width:100%;background:rgba(255,255,255,0.045);backdrop-filter:blur(10px);border:1px solid var(--glass-border);border-radius:9px;padding:9px 14px;color:var(--text);font-family:var(--mono);font-size:12px">
+              <option value="">Loading...</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Run as</label>
+            <select id="testloke-mode-select" style="width:100%;background:rgba(255,255,255,0.045);backdrop-filter:blur(10px);border:1px solid var(--glass-border);border-radius:9px;padding:9px 14px;color:var(--text);font-family:var(--mono);font-size:12px">
+              <option value="auto" selected>Auto-detect (default)</option>
+              <option value="pytest">Force: pytest -v --alluredir=...</option>
+              <option value="script">Force: plain script (python file.py)</option>
+            </select>
+            <span style="font-size:11px;color:var(--muted)">Auto-detect looks at the file's own content (real <code>def test_*</code>/<code>class Test*</code>), not just its <code>test_*.py</code> name — some files in testLoke are named like tests but are standalone scripts meant to run directly.</span>
+          </div>
+          <div class="flex-row" style="margin-bottom:10px">
+            <button class="btn btn-primary btn-sm" id="btn-run-testloke" onclick="runTestlokeScript()">▶ Run</button>
+            <div class="spacer"></div>
+            <span id="testloke-run-status" class="pw-run-status"></span>
+          </div>
+          <pre class="pw-log-box" id="testloke-run-log"></pre>
+          <div class="flex-row" id="testloke-publish-row" style="margin-top:10px;display:none">
+            <button class="btn btn-ghost btn-sm" id="btn-publish-testloke" onclick="publishTestlokeReport()">☁ Publish report to Cloudflare</button>
+            <span id="testloke-publish-status" style="font-size:12px;font-family:var(--mono)"></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex-row" style="margin-bottom:6px">
             <h3 style="margin:0;flex:1">💾 Session</h3>
           </div>
           <p>Save the current capture (network log, selection, scenario, chain links) to disk so it survives a restart, or reload one you saved earlier.</p>
@@ -879,6 +911,97 @@ socket.on('playwright_run_error', (d) => {
   status.textContent = '❌ ' + d.msg;
   toast(d.msg, 'err');
 });
+
+// ── Script Runner (runs one existing test file from TESTLOKE_PROJECT_ROOT, ──
+// ── publishes its Allure report to Cloudflare R2) ────────────────────────────
+
+let currentTestlokeRunId = null;
+
+async function initScriptRunner() {
+  const select = document.getElementById('testloke-script-select');
+  try {
+    const r = await fetch(BRIDGE_URL + '/api/testloke/scripts');
+    const d = await r.json();
+    if (d.project_root) document.getElementById('testloke-project-root').textContent = d.project_root;
+    if (d.error) { select.innerHTML = `<option value="">${escapeHtml(d.error)}</option>`; return; }
+    if (!d.scripts || !d.scripts.length) { select.innerHTML = '<option value="">No test_*.py files found</option>'; return; }
+    select.innerHTML = d.scripts.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  } catch (e) {
+    select.innerHTML = '<option value="">Could not load scripts</option>';
+  }
+}
+
+function runTestlokeScript() {
+  const script = document.getElementById('testloke-script-select').value;
+  const mode = document.getElementById('testloke-mode-select').value;
+  if (!script) { toast('Pick a test file first', 'err'); return; }
+
+  const logEl = document.getElementById('testloke-run-log');
+  logEl.classList.add('show');
+  logEl.textContent = '';
+  const status = document.getElementById('testloke-run-status');
+  status.className = 'pw-run-status';
+  status.textContent = 'Starting...';
+  document.getElementById('btn-run-testloke').disabled = true;
+  document.getElementById('testloke-publish-row').style.display = 'none';
+  document.getElementById('testloke-publish-status').textContent = '';
+
+  socket.emit('run_testloke_script', { script, mode });
+}
+
+socket.on('testloke_run_started', (d) => {
+  currentTestlokeRunId = d.run_id;
+  document.getElementById('testloke-run-status').textContent = `Running ${d.script} (${d.mode})...`;
+  log(`Script run started: ${d.cmd}`);
+});
+
+socket.on('testloke_run_log', (d) => {
+  if (d.run_id !== currentTestlokeRunId) return;
+  const logEl = document.getElementById('testloke-run-log');
+  logEl.textContent += d.line;
+  logEl.scrollTop = logEl.scrollHeight;
+});
+
+socket.on('testloke_run_done', (d) => {
+  document.getElementById('btn-run-testloke').disabled = false;
+  const ok = d.returncode === 0;
+  const status = document.getElementById('testloke-run-status');
+  status.className = 'pw-run-status ' + (ok ? 'ok' : 'err');
+  status.textContent = (ok ? '✅ Passed' : `❌ Exit code ${d.returncode}`) + ` (ran as ${d.mode})`;
+  toast(ok ? 'Script passed' : 'Script finished with failures', ok ? 'ok' : 'err');
+  document.getElementById('testloke-publish-row').style.display = 'flex';
+});
+
+socket.on('testloke_run_error', (d) => {
+  document.getElementById('btn-run-testloke').disabled = false;
+  currentTestlokeRunId = null;
+  const status = document.getElementById('testloke-run-status');
+  status.className = 'pw-run-status err';
+  status.textContent = '❌ ' + d.msg;
+  toast(d.msg, 'err');
+});
+
+async function publishTestlokeReport() {
+  if (!currentTestlokeRunId) { toast('Run a script first', 'err'); return; }
+  const btn = document.getElementById('btn-publish-testloke');
+  const statusEl = document.getElementById('testloke-publish-status');
+  btn.disabled = true; btn.textContent = 'Publishing…';
+  statusEl.textContent = '';
+  try {
+    const r = await fetch(`${BRIDGE_URL}/api/testloke/publish/${encodeURIComponent(currentTestlokeRunId)}`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'publish failed');
+    statusEl.innerHTML = `<a href="${d.url}" target="_blank" rel="noopener" style="color:var(--ok,#4ade80)">${escapeHtml(d.url)}</a>`;
+    toast('Report published', 'ok');
+  } catch (e) {
+    statusEl.textContent = e.message;
+    toast(e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '☁ Publish report to Cloudflare';
+  }
+}
+
+initScriptRunner();
 
 // ── Sessions (persist a capture across restarts) ────────────────────────────────
 
