@@ -1233,6 +1233,10 @@
         <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></span>
         <span class="tab-label">AI Eye</span>
       </button>
+      <button class="tab tab-child" data-external-url="https://habi-api-testgen.val.run/" title="API Test Generator - opens in a new tab (separate tool, own console + bridge server)">
+        <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></span>
+        <span class="tab-label">API Test Generator</span>
+      </button>
       <div class="tab-group-label">Execution</div>
       <button class="tab tab-child" data-tab="recent-runs" title="Recent Runs">
         <span class="tab-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
@@ -2691,6 +2695,13 @@
   // ---------- tabs ----------
   document.querySelectorAll('.tab').forEach(btn => {
     btn.addEventListener('click', () => {
+      // A separate tool entirely (its own console + bridge server) - opens
+      // in a new tab instead of switching this console's own panels, so it
+      // never touches the currently-active tab/panel here.
+      if (btn.dataset.externalUrl) {
+        window.open(btn.dataset.externalUrl, '_blank');
+        return;
+      }
       document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
