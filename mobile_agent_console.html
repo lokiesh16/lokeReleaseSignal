@@ -4556,6 +4556,14 @@ ${clone.innerHTML}
         <input type="text" class="flow-bundle-id" data-slug="${escapeHtml(f.slug)}" value="${escapeHtml(f.bundle_id || '')}" placeholder="or type a custom bundle/package id" style="width:auto; flex:1 1 220px; min-width:160px; font-size:11px; padding:3px 6px;">
       </div>
 
+      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px; font-size:11px;" title="How long to pause between steps. Fast is just enough for the UI to settle (0.4s) - use Human speed to make a run watchable in real time, e.g. for a demo or to eyeball what's happening on screen.">
+        <span class="hint" style="font-size:11px; flex-shrink:0;">Playback speed:</span>
+        <select class="flow-step-delay" data-slug="${escapeHtml(f.slug)}" style="width:auto; flex:1 1 160px; font-size:11px; padding:3px 6px;">
+          <option value="">Fast (default)</option>
+          <option value="2">Human speed (~2s/step)</option>
+        </select>
+      </div>
+
       <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px; font-size:11px;" title="Optional - replays a saved precondition (e.g. login) deterministically, on the same app session, right before this flow's own steps. Aborts before this flow starts if the precondition itself fails.">
         <span class="hint" style="font-size:11px; flex-shrink:0;">Start from:</span>
         <select class="flow-precondition" data-slug="${escapeHtml(f.slug)}" data-platform="${escapeHtml(f.platform)}" style="width:auto; flex:1 1 200px; font-size:11px; padding:3px 6px;">
@@ -5488,6 +5496,12 @@ ${clone.innerHTML}
       const bundleIdInput = document.querySelector(`.flow-bundle-id[data-slug="${CSS.escape(slug)}"]`);
       const bundleIdValue = bundleIdInput ? bundleIdInput.value.trim() : '';
 
+      // One-off for just this run, same "not saved back to the flow" spirit
+      // as bundle ID above - blank ('') means "use replay_flow's own 0.4s
+      // default", not "run at 0 seconds".
+      const stepDelaySelect = document.querySelector(`.flow-step-delay[data-slug="${CSS.escape(slug)}"]`);
+      const stepDelayValue = stepDelaySelect ? stepDelaySelect.value : '';
+
       // Optional - replays a saved precondition (e.g. login) on the same
       // app session before this flow's own steps run. Blank means "just
       // this flow's own steps", exactly as it's always worked.
@@ -5516,6 +5530,7 @@ ${clone.innerHTML}
             precondition_email: preconditionLoginVisible && preconditionEmailInput ? preconditionEmailInput.value : undefined,
             precondition_password: preconditionLoginVisible && preconditionPasswordInput ? preconditionPasswordInput.value : undefined,
             run_api_script: runApiScript,
+            step_delay_seconds: stepDelayValue ? Number(stepDelayValue) : undefined,
           }),
         });
         const data = await res.json();
