@@ -40,7 +40,8 @@
     background-repeat: no-repeat;
   }
 
-  .shell { display: grid; grid-template-columns: 260px 1fr; grid-template-rows: 56px 1fr; height: 100vh; }
+  .shell { display: grid; grid-template-columns: 260px 1fr; grid-template-rows: 56px 1fr; height: 100vh; transition: grid-template-columns .18s ease; }
+  .shell.sidebar-collapsed { grid-template-columns: 68px 1fr; }
 
   .topbar {
     grid-column: 1/-1; display: flex; align-items: center; gap: 16px; padding: 0 24px;
@@ -62,7 +63,15 @@
     border-right: 1px solid var(--glass-border);
   }
   .sidebar-section { padding: 20px 16px 12px; }
-  .sidebar-title { font-size: 10px; font-family: var(--mono); color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+  .sidebar-section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .sidebar-title { font-size: 10px; font-family: var(--mono); color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 0; }
+  .sidebar-toggle-btn {
+    background: var(--glass); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border); border-radius: 6px; width: 22px; height: 22px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px;
+    cursor: pointer; transition: all .15s; line-height: 1;
+  }
+  .sidebar-toggle-btn:hover { color: var(--accent2); border-color: var(--accent); }
   .step { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: background .15s, border-color .15s; margin-bottom: 4px; border: 1px solid transparent; }
   .step:hover { background: var(--glass-strong); }
   .step.active { background: var(--glass-strong); border-color: var(--glass-border-strong); box-shadow: var(--glass-shadow); }
@@ -73,6 +82,13 @@
   .step.active .step-label { color: var(--accent2); }
   .step.done   .step-label { color: var(--green); }
   .sidebar-footer { margin-top: auto; padding: 12px 16px 16px; border-top: 1px solid var(--glass-border); }
+
+  .sidebar-collapsed .sidebar-title-text,
+  .sidebar-collapsed .step-label,
+  .sidebar-collapsed .footer-label { display: none; }
+  .sidebar-collapsed .sidebar-section-head { justify-content: center; }
+  .sidebar-collapsed .step { justify-content: center; padding: 8px; gap: 0; }
+  .sidebar-collapsed .sidebar-footer button { padding: 9px; }
 
   .main { overflow: hidden; display: flex; flex-direction: column; position: relative; z-index: 10; }
   .panel { display: none; flex-direction: column; height: 100%; overflow: hidden; }
@@ -302,7 +318,10 @@
 
   <aside class="sidebar">
     <div class="sidebar-section">
-      <div class="sidebar-title">Workflow</div>
+      <div class="sidebar-section-head">
+        <div class="sidebar-title"><span class="sidebar-title-text">Workflow</span></div>
+        <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Collapse sidebar">‹</button>
+      </div>
       <div class="step active" id="step-1" onclick="showPanel('capture')">
         <div class="step-num">1</div><div class="step-label">Capture traffic</div>
       </div>
@@ -311,7 +330,7 @@
       </div>
     </div>
     <div class="sidebar-footer">
-      <button class="btn btn-ghost btn-sm" style="width:100%" onclick="showPanel('config')">⚙ Framework config</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%" onclick="showPanel('config')" title="Framework config">⚙ <span class="footer-label">Framework config</span></button>
     </div>
   </aside>
 
@@ -348,6 +367,75 @@
             <input type="text" id="nav-url-b" placeholder="Navigate Portal B to..." style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-family:var(--mono);font-size:12px">
             <button class="btn btn-ghost btn-sm" onclick="navigateBrowser('B')">→ Go</button>
           </div>
+        </div>
+
+        <div class="card">
+          <div class="flex-row" style="margin-bottom:6px">
+            <h3 style="margin:0;flex:1">🌐 Network requests <span id="network-count" class="badge">0</span></h3>
+            <label style="font-size:11px;font-family:var(--mono);color:var(--muted);display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="network-api-only" checked onchange="refreshNetworkLog()"> API only
+            </label>
+            <button class="btn btn-ghost btn-sm" onclick="exportNetworkToCsv()">📥 Export CSV</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearNetworkLog()">Clear</button>
+          </div>
+          <p>Interact with the app in the opened browser window — logins, form submits, page loads. Calls appear here live.</p>
+          <div id="network-list" style="max-height:340px;overflow-y:auto;font-family:var(--mono);font-size:11px">
+            <div style="color:var(--muted);text-align:center;padding:20px">No requests captured yet. Interact with the page to see network calls.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="flex-row" style="margin-bottom:10px">
+            <h3 style="margin:0;flex:1">🔗 API chain test <span id="chain-selected-count" class="badge">0 selected</span></h3>
+            <button class="btn btn-ghost btn-sm" onclick="selectAllApiCalls()">Select all API calls</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearChainSelection()">Clear selection</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportSelectedApisToCsv()">📥 Export selected</button>
+          </div>
+          <div id="selected-apis-list" class="selected-apis-list">
+            <div class="selected-apis-empty">No APIs selected yet — check the boxes on the calls above to add them here.</div>
+          </div>
+
+          <div class="field">
+            <label>Scenario description</label>
+            <textarea id="api-chain-scenario" placeholder="e.g. Creating an order returns an id that a follow-up GET resolves with matching item/qty data" style="min-height:50px"></textarea>
+          </div>
+
+          <div id="chain-links-list" style="margin-bottom:10px"></div>
+
+          <div class="flex-row" style="margin-bottom:16px">
+            <button class="btn btn-ghost btn-sm" id="btn-analyze-chain" onclick="analyzeApiChain()">🔗 Analyze chain</button>
+            <div class="spacer"></div>
+          </div>
+
+          <div class="gen-options">
+            <div id="provider-anthropic" class="gen-option selected" onclick="setProvider('anthropic')">
+              <h4>Claude (Anthropic)</h4>
+              <p>Requires an API key. Best quality.</p>
+            </div>
+            <div id="provider-ollama" class="gen-option" onclick="setProvider('ollama')">
+              <h4>Ollama (free, local)</h4>
+              <p>Runs on your machine. No API key needed.</p>
+            </div>
+          </div>
+          <div class="field" id="field-api-key">
+            <label>Anthropic API key</label>
+            <input type="password" id="api-key" placeholder="sk-ant-...">
+          </div>
+          <div class="field" id="field-ollama-model" style="display:none">
+            <label>Ollama model <button type="button" class="btn btn-ghost btn-sm" onclick="refreshOllamaModels()" style="margin-left:6px">↻ Refresh</button></label>
+            <select id="ollama-model"></select>
+          </div>
+
+          <div class="gen-progress" id="gen-progress">
+            <div class="gen-status-text" id="gen-status">Generating...</div>
+            <div class="progress-bar-wrap"><div class="progress-bar" id="prog-bar"></div></div>
+          </div>
+
+          <div class="flex-row">
+            <button class="btn btn-primary" id="btn-gen-chain" onclick="generateApiChainTest()">⚡ Generate API chain test</button>
+            <button class="btn btn-ghost" id="btn-gen-standalone" onclick="generateStandaloneScript()">🐍 Generate standalone script</button>
+          </div>
+          <p style="font-size:11px;color:var(--muted);margin-top:6px">Chain test = pytest client + test file, for this tool's own runner. Standalone script = one plain <code>requests</code> file (no pytest), matching testLoke's Script Runner convention.</p>
         </div>
 
         <div class="card">
@@ -427,21 +515,6 @@
 
         <div class="card">
           <div class="flex-row" style="margin-bottom:6px">
-            <h3 style="margin:0;flex:1">🌐 Network requests <span id="network-count" class="badge">0</span></h3>
-            <label style="font-size:11px;font-family:var(--mono);color:var(--muted);display:flex;align-items:center;gap:6px">
-              <input type="checkbox" id="network-api-only" checked onchange="refreshNetworkLog()"> API only
-            </label>
-            <button class="btn btn-ghost btn-sm" onclick="exportNetworkToCsv()">📥 Export CSV</button>
-            <button class="btn btn-ghost btn-sm" onclick="clearNetworkLog()">Clear</button>
-          </div>
-          <p>Interact with the app in the opened browser window — logins, form submits, page loads. Calls appear here live.</p>
-          <div id="network-list" style="max-height:340px;overflow-y:auto;font-family:var(--mono);font-size:11px">
-            <div style="color:var(--muted);text-align:center;padding:20px">No requests captured yet. Interact with the page to see network calls.</div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="flex-row" style="margin-bottom:6px">
             <h3 style="margin:0;flex:1">⏱ Latency Guard <span id="latency-guard-count" class="badge">0 flagged</span></h3>
           </div>
           <p>Flags any captured call slower than the threshold below — tune it per test run (cold cache vs warm, staging vs prod) without touching code. Re-flags instantly if you change it after capturing.</p>
@@ -462,56 +535,6 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="flex-row" style="margin-bottom:10px">
-            <h3 style="margin:0;flex:1">🔗 API chain test <span id="chain-selected-count" class="badge">0 selected</span></h3>
-            <button class="btn btn-ghost btn-sm" onclick="selectAllApiCalls()">Select all API calls</button>
-            <button class="btn btn-ghost btn-sm" onclick="clearChainSelection()">Clear selection</button>
-            <button class="btn btn-ghost btn-sm" onclick="exportSelectedApisToCsv()">📥 Export selected</button>
-          </div>
-          <div id="selected-apis-list" class="selected-apis-list">
-            <div class="selected-apis-empty">No APIs selected yet — check the boxes on the calls above to add them here.</div>
-          </div>
-
-          <div class="field">
-            <label>Scenario description</label>
-            <textarea id="api-chain-scenario" placeholder="e.g. Creating an order returns an id that a follow-up GET resolves with matching item/qty data" style="min-height:50px"></textarea>
-          </div>
-
-          <div id="chain-links-list" style="margin-bottom:10px"></div>
-
-          <div class="flex-row" style="margin-bottom:16px">
-            <button class="btn btn-ghost btn-sm" id="btn-analyze-chain" onclick="analyzeApiChain()">🔗 Analyze chain</button>
-            <div class="spacer"></div>
-          </div>
-
-          <div class="gen-options">
-            <div id="provider-anthropic" class="gen-option selected" onclick="setProvider('anthropic')">
-              <h4>Claude (Anthropic)</h4>
-              <p>Requires an API key. Best quality.</p>
-            </div>
-            <div id="provider-ollama" class="gen-option" onclick="setProvider('ollama')">
-              <h4>Ollama (free, local)</h4>
-              <p>Runs on your machine. No API key needed.</p>
-            </div>
-          </div>
-          <div class="field" id="field-api-key">
-            <label>Anthropic API key</label>
-            <input type="password" id="api-key" placeholder="sk-ant-...">
-          </div>
-          <div class="field" id="field-ollama-model" style="display:none">
-            <label>Ollama model <button type="button" class="btn btn-ghost btn-sm" onclick="refreshOllamaModels()" style="margin-left:6px">↻ Refresh</button></label>
-            <select id="ollama-model"></select>
-          </div>
-
-          <div class="gen-progress" id="gen-progress">
-            <div class="gen-status-text" id="gen-status">Generating...</div>
-            <div class="progress-bar-wrap"><div class="progress-bar" id="prog-bar"></div></div>
-          </div>
-
-          <button class="btn btn-primary" id="btn-gen-chain" onclick="generateApiChainTest()">⚡ Generate API chain test</button>
-        </div>
-
       </div>
 
       <div class="log-wrap">
@@ -529,6 +552,7 @@
           <button class="btn btn-ghost btn-sm" onclick="showPanel('capture')">← Back to capture</button>
           <div class="spacer"></div>
           <button class="btn btn-ghost btn-sm" id="btn-run-tests" onclick="runGeneratedTests()">▶ Run tests</button>
+          <button class="btn btn-ghost btn-sm" id="btn-save-testloke" onclick="saveScriptsToTestloke()">💾 Save to testLoke project</button>
           <button class="btn btn-green btn-sm" onclick="downloadAll()">↓ Download all</button>
         </div>
       </div>
@@ -594,6 +618,7 @@ let selectedChainEntries = new Map(); // chainKey -> snapshotted entry, survives
 let lastChainLinks = [];
 let aiProvider = 'anthropic';
 let scripts = [];
+let lastGenerationMode = 'pytest'; // 'pytest' or 'standalone' — set by whichever Generate button was last used
 
 // ── Connection ────────────────────────────────────────────────────────────────
 
@@ -1191,21 +1216,37 @@ function renderChainLinks() {
 }
 
 async function generateApiChainTest() {
+  await runGeneration({
+    mode: 'pytest', btnId: 'btn-gen-chain',
+    idleLabel: '⚡ Generate API chain test', busyLabel: '⏳ Generating...',
+    successNoun: 'API chain test file(s)',
+  });
+}
+
+async function generateStandaloneScript() {
+  await runGeneration({
+    mode: 'standalone', btnId: 'btn-gen-standalone',
+    idleLabel: '🐍 Generate standalone script', busyLabel: '⏳ Generating...',
+    successNoun: 'standalone script(s)',
+  });
+}
+
+async function runGeneration({ mode, btnId, idleLabel, busyLabel, successNoun }) {
   const entries = getSelectedChainEntries();
   if (!entries.length) { toast('Select at least one API call first', 'err'); return; }
   const providerFields = getProviderFields();
   if (!providerFields) return;
   const scenario = document.getElementById('api-chain-scenario').value.trim();
 
-  const btn = document.getElementById('btn-gen-chain');
-  btn.disabled = true; btn.textContent = '⏳ Generating...';
+  const btn = document.getElementById(btnId);
+  btn.disabled = true; btn.textContent = busyLabel;
   document.getElementById('gen-progress').classList.add('show');
   setProgress(20, 'Sending captured calls to the model...');
   try {
     const links = lastChainLinks.filter(l => l.included);
     const r = await fetch(BRIDGE_URL + '/api/api-chain/generate', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ ...providerFields, scenario, entries, links, max_tokens: 16000 }),
+      body: JSON.stringify({ ...providerFields, scenario, entries, links, mode, max_tokens: 16000 }),
     });
     setProgress(70, 'Parsing generated files...');
     const d = await r.json();
@@ -1213,18 +1254,19 @@ async function generateApiChainTest() {
     const parsed = parseScripts(text);
     if (!parsed.length) { toast('Could not parse generated script', 'err'); setProgress(0,''); return; }
     scripts = parsed;
+    lastGenerationMode = mode;
     setProgress(100, `✅ Generated ${scripts.length} file(s)`);
     renderPreview();
     setTimeout(() => showPanel('preview'), 400);
     if (d.stop_reason === 'max_tokens') {
       toast('Output was cut off (hit the model’s token limit) — the generated file(s) are likely incomplete', 'err');
     } else {
-      toast(`Generated ${scripts.length} API chain test file(s)`, 'ok');
+      toast(`Generated ${scripts.length} ${successNoun}`, 'ok');
     }
   } catch (e) {
     toast(`Generation failed: ${e.message}`, 'err');
   } finally {
-    btn.disabled = false; btn.textContent = '⚡ Generate API chain test';
+    btn.disabled = false; btn.textContent = idleLabel;
   }
 }
 
@@ -1340,6 +1382,24 @@ async function downloadAll() {
   scripts.forEach((_,i)=>dlScript(i));
 }
 
+async function saveScriptsToTestloke() {
+  if (!scripts.length) { toast('Nothing generated yet', 'err'); return; }
+  const btn = document.getElementById('btn-save-testloke');
+  btn.disabled = true; btn.textContent = '⏳ Saving...';
+  try {
+    const r = await fetch(BRIDGE_URL + '/api/testloke/save-script', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ scripts }),
+    });
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'err'); return; }
+    toast(`Saved ${d.saved.length} file(s) into ${d.project_root}`, 'ok');
+  } catch (e) {
+    toast(`Save failed: ${e.message}`, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Save to testLoke project';
+  }
+}
+
 // ── Run tests ─────────────────────────────────────────────────────────────────
 
 async function runGeneratedTests() {
@@ -1385,6 +1445,25 @@ function closeRunResults() {
 }
 
 // ── Nav / misc ────────────────────────────────────────────────────────────────
+
+function toggleSidebar() {
+  const collapsed = document.querySelector('.shell').classList.toggle('sidebar-collapsed');
+  const btn = document.getElementById('sidebar-toggle-btn');
+  btn.textContent = collapsed ? '›' : '‹';
+  btn.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+  try { localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0'); } catch {}
+}
+
+(function restoreSidebarState() {
+  let collapsed = false;
+  try { collapsed = localStorage.getItem('sidebarCollapsed') === '1'; } catch {}
+  if (collapsed) {
+    document.querySelector('.shell').classList.add('sidebar-collapsed');
+    const btn = document.getElementById('sidebar-toggle-btn');
+    btn.textContent = '›';
+    btn.title = 'Expand sidebar';
+  }
+})();
 
 function showPanel(n) {
   if (n === 'config') { openConfig(); return; }
