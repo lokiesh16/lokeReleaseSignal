@@ -236,7 +236,40 @@
   }
   .run-results-wrap.pass .run-results-header { color: var(--green); }
   .run-results-wrap.fail .run-results-header { color: var(--red); }
-  .run-results-body { flex: 1; overflow: auto; padding: 12px 28px; font-family: var(--mono); font-size: 11px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; color: #c8c8e0; }
+  .run-results-body { flex: 1; overflow: auto; padding: 12px 28px; font-size: 12px; color: #c8c8e0; }
+  .run-log-raw { font-family: var(--mono); font-size: 11px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; color: #c8c8e0; margin: 0; }
+  .run-summary { display: flex; gap: 16px; font-family: var(--mono); font-size: 11px; margin-bottom: 12px; }
+  .run-summary .n-pass { color: var(--green); }
+  .run-summary .n-fail { color: var(--red); }
+  .run-context { color: var(--muted); font-size: 11px; font-family: var(--mono); white-space: pre-wrap; margin-bottom: 10px; }
+  .run-section-title {
+    font-size: 12px; font-weight: 700; color: var(--accent2); margin: 16px 0 6px;
+    padding-bottom: 5px; border-bottom: 1px solid var(--glass-border);
+  }
+  .run-section-title:first-of-type { margin-top: 0; }
+  .run-section-io {
+    background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px;
+    padding: 8px 10px; margin: 0 0 8px; font-family: var(--mono); font-size: 11px; color: var(--muted);
+  }
+  .run-section-io div { margin: 2px 0; word-break: break-word; }
+  .run-section-io b { color: var(--accent2); font-weight: 600; }
+  .run-scenario-summary {
+    margin-top: 20px; padding: 14px 16px; border: 1px solid var(--glass-border-strong);
+    border-radius: 10px; background: rgba(124,106,255,0.08);
+  }
+  .run-scenario-summary h4 { margin: 0 0 6px; font-size: 11px; color: var(--accent2); text-transform: uppercase; letter-spacing: .5px; }
+  .run-scenario-summary p { margin: 0; font-size: 12px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
+  .run-check { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; font-size: 12px; }
+  .run-check-icon { flex-shrink: 0; width: 14px; text-align: center; font-weight: 700; }
+  .run-check.pass .run-check-icon { color: var(--green); }
+  .run-check.fail .run-check-icon { color: var(--red); }
+  .run-check-body { flex: 1; min-width: 0; }
+  .run-check.fail .run-check-desc { color: var(--red); }
+  .run-check-detail { margin-top: 2px; color: var(--muted); font-size: 11px; }
+  .run-check-detail code { color: var(--accent2); font-family: var(--mono); }
+  .run-raw-toggle { margin-top: 16px; }
+  .run-raw-toggle summary { cursor: pointer; color: var(--muted); font-size: 11px; font-family: var(--mono); }
+  .run-raw-toggle .run-log-raw { margin-top: 8px; }
 
   .toast {
     position: fixed; bottom: 24px; right: 24px; border-radius: 10px; padding: 12px 18px; font-size: 13px; font-family: var(--mono);
@@ -594,9 +627,11 @@
         <div class="run-results-header">
           <span id="run-results-status">Test run</span>
           <div class="spacer"></div>
+          <button class="btn btn-ghost btn-sm" id="btn-copy-report-md" onclick="copyRunReportMarkdown()" title="Copy a Markdown version of this report — paste it into a Jira comment">📋 Copy as Markdown</button>
+          <button class="btn btn-ghost btn-sm" id="btn-publish-report" onclick="publishRunReport()" title="Upload a shareable HTML report to Cloudflare R2 — link it in a Jira ticket">☁ Publish report</button>
           <button class="btn btn-ghost btn-sm" onclick="closeRunResults()">Close</button>
         </div>
-        <pre class="run-results-body" id="run-results-body"></pre>
+        <div class="run-results-body" id="run-results-body"></div>
       </div>
     </div>
 
@@ -647,6 +682,7 @@ let lastChainLinks = [];
 let aiProvider = 'anthropic';
 let scripts = [];
 let lastGenerationMode = 'pytest'; // 'pytest' or 'standalone' — set by whichever Generate button was last used
+let lastRun = null; // { testFile, output, passed, returncode } — set after runGeneratedTests(), read by copy/publish-report
 
 // ── Connection ────────────────────────────────────────────────────────────────
 
@@ -1447,7 +1483,9 @@ async function runGeneratedTests() {
     });
     const d = await r.json();
     if (d.error) { showRunResults(d.error, false); toast(d.error, 'err'); return; }
-    showRunResults((d.stdout || '') + (d.stderr ? '\n' + d.stderr : ''), d.passed);
+    const output = (d.stdout || '') + (d.stderr ? '\n' + d.stderr : '');
+    showRunResults(output, d.passed);
+    lastRun = { testFile: testFile.filename, output, passed: d.passed, returncode: d.returncode };
     toast(d.passed ? 'Tests passed' : 'Tests failed', d.passed ? 'ok' : 'err');
   } catch (e) {
     showRunResults(`Run failed: ${e.message}`, false);
@@ -1457,15 +1495,204 @@ async function runGeneratedTests() {
   }
 }
 
+// Best-effort structure extraction from a standalone script's stdout: a
+// "Step N: <description>" (or "▶ <description>") line starts a new section,
+// optionally followed by one "  input: ..." and one "  output: ..." line for
+// that step's request/response, then one "  [PASS]/[FAIL] <description>"
+// line per check, with an optional "  -> before=X after=Y" (or a plain
+// "  -> <actual>") line right after a failing check giving the detail.
+// A trailing "SCENARIO SUMMARY:" line starts a free-form paragraph that
+// runs until a "=== VALIDATION ... ===" line. Mirrors report_convention in
+// prompt_config.json's standalone_script_testing block, so generated
+// scripts render as a real pass/fail breakdown here instead of a raw log
+// dump. Returns null if the output doesn't contain a single recognizable
+// check line, so the caller falls back to showing the raw log.
+function parseStandaloneLog(text) {
+  const sectionRe = /^\s*(?:▶\s*|Step\s+[\d.]+:\s*)(.+?)\s*$/;
+  const checkRe = /^\s*\[(PASS|FAIL)\]\s+(.+?)\s*$/;
+  const arrowOnlyRe = /^\s*->\s*(.+)$/;
+  const beforeAfterRe = /^before=(.*?)\s+after=(.*)$/;
+  const inputRe = /^\s*input:\s*(.*)$/i;
+  const outputRe = /^\s*output:\s*(.*)$/i;
+  const summaryStartRe = /^\s*SCENARIO SUMMARY:?\s*$/i;
+  const validationEndRe = /^\s*={3,}\s*VALIDATION/i;
+
+  const context = [];
+  const sections = [];
+  let current = null;
+  let anyCheck = false;
+  let inSummary = false;
+  const summaryLines = [];
+
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.replace(/\r$/, '');
+
+    if (inSummary) {
+      if (validationEndRe.test(line)) { inSummary = false; continue; }
+      summaryLines.push(line);
+      continue;
+    }
+    if (summaryStartRe.test(line)) { inSummary = true; continue; }
+
+    const mSection = sectionRe.exec(line);
+    if (mSection) { current = { name: mSection[1], input: '', output: '', checks: [] }; sections.push(current); continue; }
+
+    const mCheck = checkRe.exec(line);
+    if (mCheck) {
+      anyCheck = true;
+      const status = mCheck[1];
+      let rest = mCheck[2], description = rest, expected = '', actual = '';
+      const arrowIdx = rest.indexOf('  -> ');
+      if (arrowIdx !== -1) {
+        description = rest.slice(0, arrowIdx);
+        const detail = rest.slice(arrowIdx + 5);
+        const mBa = beforeAfterRe.exec(detail);
+        if (mBa) { expected = mBa[1]; actual = mBa[2]; } else { actual = detail; }
+      }
+      if (!current) { current = { name: '', input: '', output: '', checks: [] }; sections.push(current); }
+      current.checks.push({ description: description.trim(), expected, actual, status });
+      continue;
+    }
+
+    const mInput = inputRe.exec(line);
+    if (mInput && current && !current.checks.length) { current.input = mInput[1].trim(); continue; }
+
+    const mOutput = outputRe.exec(line);
+    if (mOutput && current && !current.checks.length) { current.output = mOutput[1].trim(); continue; }
+
+    const mArrow = arrowOnlyRe.exec(line);
+    if (mArrow && current && current.checks.length) {
+      const detail = mArrow[1];
+      const mBa = beforeAfterRe.exec(detail);
+      const last = current.checks[current.checks.length - 1];
+      if (mBa) { last.expected = mBa[1]; last.actual = mBa[2]; } else { last.actual = detail; }
+      continue;
+    }
+
+    if (!current && line.trim()) context.push(line);
+  }
+
+  if (!anyCheck) return null;
+  return { context, sections, summary: summaryLines.join('\n').trim() };
+}
+
+function renderStandaloneReport(parsed) {
+  const nPass = parsed.sections.reduce((n, s) => n + s.checks.filter(c => c.status === 'PASS').length, 0);
+  const nFail = parsed.sections.reduce((n, s) => n + s.checks.filter(c => c.status === 'FAIL').length, 0);
+
+  let html = `<div class="run-summary"><span class="n-pass">✓ ${nPass} passed</span><span class="n-fail">✗ ${nFail} failed</span></div>`;
+  if (parsed.context.length) {
+    html += `<div class="run-context">${escapeHtml(parsed.context.join('\n'))}</div>`;
+  }
+  parsed.sections.forEach(section => {
+    if (!section.checks.length) return;
+    if (section.name) html += `<div class="run-section-title">${escapeHtml(section.name)}</div>`;
+    if (section.input || section.output) {
+      html += '<div class="run-section-io">';
+      if (section.input)  html += `<div><b>input:</b> ${escapeHtml(section.input)}</div>`;
+      if (section.output) html += `<div><b>output:</b> ${escapeHtml(section.output)}</div>`;
+      html += '</div>';
+    }
+    section.checks.forEach(c => {
+      const cls = c.status === 'PASS' ? 'pass' : 'fail';
+      const icon = c.status === 'PASS' ? '✓' : '✗';
+      let detail = '';
+      if (c.status === 'FAIL' && (c.expected || c.actual)) {
+        detail = `<div class="run-check-detail">expected <code>${escapeHtml(c.expected || '—')}</code>, got <code>${escapeHtml(c.actual || '—')}</code></div>`;
+      } else if (c.status === 'FAIL' && c.actual) {
+        detail = `<div class="run-check-detail">${escapeHtml(c.actual)}</div>`;
+      }
+      html += `<div class="run-check ${cls}"><span class="run-check-icon">${icon}</span>` +
+              `<div class="run-check-body"><span class="run-check-desc">${escapeHtml(c.description)}</span>${detail}</div></div>`;
+    });
+  });
+  if (parsed.summary) {
+    html += `<div class="run-scenario-summary"><h4>Scenario summary</h4><p>${escapeHtml(parsed.summary)}</p></div>`;
+  }
+  return html;
+}
+
+// GitHub-flavored Markdown so this pastes cleanly into a Jira Cloud comment
+// (its editor auto-converts pasted markdown) without needing a hosted link.
+function standaloneReportToMarkdown(parsed, meta) {
+  const lines = [];
+  lines.push(`# ${meta.testFile}`, '');
+  lines.push(meta.passed ? '**Result: ✅ PASSED**' : `**Result: ❌ FAILED** (exit code ${meta.returncode})`, '');
+  const nPass = parsed.sections.reduce((n, s) => n + s.checks.filter(c => c.status === 'PASS').length, 0);
+  const nFail = parsed.sections.reduce((n, s) => n + s.checks.filter(c => c.status === 'FAIL').length, 0);
+  lines.push(`${nPass} passed, ${nFail} failed`, '');
+  parsed.sections.forEach(section => {
+    if (!section.checks.length) return;
+    if (section.name) lines.push(`## ${section.name}`, '');
+    if (section.input)  lines.push(`**input:** \`${section.input}\``);
+    if (section.output) lines.push(`**output:** \`${section.output}\``);
+    if (section.input || section.output) lines.push('');
+    section.checks.forEach(c => {
+      const box = c.status === 'PASS' ? '✅' : '❌';
+      lines.push(`- ${box} ${c.description}`);
+      if (c.status === 'FAIL' && (c.expected || c.actual)) {
+        lines.push(`  - expected \`${c.expected || '—'}\`, got \`${c.actual || '—'}\``);
+      }
+    });
+    lines.push('');
+  });
+  if (parsed.summary) {
+    lines.push('## Scenario summary', '', parsed.summary, '');
+  }
+  return lines.join('\n');
+}
+
+async function copyRunReportMarkdown() {
+  if (!lastRun) { toast('Run tests first', 'err'); return; }
+  const parsed = parseStandaloneLog(lastRun.output);
+  const md = parsed
+    ? standaloneReportToMarkdown(parsed, lastRun)
+    : `# ${lastRun.testFile}\n\n**Result: ${lastRun.passed ? '✅ PASSED' : '❌ FAILED'}**\n\n\`\`\`\n${lastRun.output}\n\`\`\`\n`;
+  try {
+    await navigator.clipboard.writeText(md);
+    toast('Markdown copied — paste into a Jira comment', 'ok');
+  } catch (e) {
+    toast(`Copy failed: ${e.message}`, 'err');
+  }
+}
+
+async function publishRunReport() {
+  if (!lastRun) { toast('Run tests first', 'err'); return; }
+  const btn = document.getElementById('btn-publish-report');
+  btn.disabled = true; btn.textContent = '⏳ Publishing...';
+  try {
+    const r = await fetch(BRIDGE_URL + '/api/scripts/publish-report', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ test_file: lastRun.testFile, log: lastRun.output, passed: lastRun.passed, returncode: lastRun.returncode }),
+    });
+    const d = await r.json();
+    if (d.error) { toast(d.error, 'err'); return; }
+    try { await navigator.clipboard.writeText(d.url); } catch {}
+    toast(`Report link copied: ${d.url}`, 'ok');
+  } catch (e) {
+    toast(`Publish failed: ${e.message}`, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '☁ Publish report';
+  }
+}
+
 function showRunResults(output, passed) {
   const wrap = document.getElementById('run-results-wrap');
   const status = document.getElementById('run-results-status');
+  const body = document.getElementById('run-results-body');
   wrap.classList.add('show');
   wrap.classList.remove('pass', 'fail');
   if (passed === true)  { wrap.classList.add('pass'); status.textContent = '✅ Tests passed'; }
   else if (passed === false) { wrap.classList.add('fail'); status.textContent = '❌ Tests failed'; }
-  else status.textContent = 'Running...';
-  document.getElementById('run-results-body').textContent = output;
+  else { status.textContent = 'Running...'; body.innerHTML = `<pre class="run-log-raw">${escapeHtml(output)}</pre>`; return; }
+
+  const parsed = parseStandaloneLog(output);
+  if (!parsed) {
+    body.innerHTML = `<pre class="run-log-raw">${escapeHtml(output)}</pre>`;
+    return;
+  }
+  body.innerHTML = renderStandaloneReport(parsed) +
+    `<details class="run-raw-toggle"><summary>Raw output</summary><pre class="run-log-raw">${escapeHtml(output)}</pre></details>`;
 }
 
 function closeRunResults() {
