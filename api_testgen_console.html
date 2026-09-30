@@ -349,11 +349,39 @@
           <p>Opens a real Chromium window via Playwright. Every fetch/XHR the page makes is captured — auth headers and bodies included.</p>
           <div class="field">
             <label>Target URL (Portal A)</label>
-            <input type="text" id="target-url" placeholder="https://example.com">
+            <select id="target-url">
+              <option value="">Select target URL...</option>
+              <optgroup label="Staging env">
+                <option value="https://hub-develop.habitnu.com/">https://hub-develop.habitnu.com/</option>
+                <option value="https://app-musc-develop.habitnu.com/">https://app-musc-develop.habitnu.com/</option>
+                <option value="https://app-develop.habitnu.com/">https://app-develop.habitnu.com/</option>
+                <option value="https://coaches-develop.habitnu.com/">https://coaches-develop.habitnu.com/</option>
+              </optgroup>
+              <optgroup label="Uat env">
+                <option value="https://hub-uat.habitnu.com/">https://hub-uat.habitnu.com/</option>
+                <option value="https://app-musc-uat.habitnu.com/">https://app-musc-uat.habitnu.com/</option>
+                <option value="https://app-uat.habitnu.com/">https://app-uat.habitnu.com/</option>
+                <option value="https://coaches-uat.habitnu.com/">https://coaches-uat.habitnu.com/</option>
+              </optgroup>
+            </select>
           </div>
           <div class="field">
             <label>Portal B URL <span style="opacity:0.6">— optional, opens a second window so you can capture APIs across both portals (e.g. Portal A creating data that Portal B then fetches)</span></label>
-            <input type="text" id="target-url-b" placeholder="https://other-portal.example.com">
+            <select id="target-url-b">
+              <option value="">Select target URL...</option>
+              <optgroup label="Staging env">
+                <option value="https://hub-develop.habitnu.com/">https://hub-develop.habitnu.com/</option>
+                <option value="https://app-musc-develop.habitnu.com/">https://app-musc-develop.habitnu.com/</option>
+                <option value="https://app-develop.habitnu.com/">https://app-develop.habitnu.com/</option>
+                <option value="https://coaches-develop.habitnu.com/">https://coaches-develop.habitnu.com/</option>
+              </optgroup>
+              <optgroup label="Uat env">
+                <option value="https://hub-uat.habitnu.com/">https://hub-uat.habitnu.com/</option>
+                <option value="https://app-musc-uat.habitnu.com/">https://app-musc-uat.habitnu.com/</option>
+                <option value="https://app-uat.habitnu.com/">https://app-uat.habitnu.com/</option>
+                <option value="https://coaches-uat.habitnu.com/">https://coaches-uat.habitnu.com/</option>
+              </optgroup>
+            </select>
           </div>
           <div class="flex-row">
             <button class="btn btn-primary btn-sm" id="btn-launch" onclick="launchBrowser()">▶ Launch browser(s)</button>
@@ -638,7 +666,7 @@ socket.on('error',          (d) => { log(d.msg, 'err'); toast(d.msg, 'err'); });
 function launchBrowser() {
   const urlA = document.getElementById('target-url').value.trim();
   const urlB = document.getElementById('target-url-b').value.trim();
-  if (!urlA) { toast('Enter a target URL (Portal A) first', 'err'); return; }
+  if (!urlA) { toast('Select a target URL (Portal A) first', 'err'); return; }
   socket.emit('start_browser', { url: urlA, portal: 'A' });
   if (urlB) {
     socket.emit('start_browser', { url: urlB, portal: 'B' });
