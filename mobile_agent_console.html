@@ -4195,6 +4195,38 @@ ${clone.innerHTML}
     }
   }
 
+  // Same as publishFlowReportCloudflare above, but pushes to the team's S3
+  // reports bucket (see /api/publish-flow-report-s3) so the report appears
+  // in the report browser under "mobile test run results". Also sends the
+  // run's report JSON - the browser's list entry is built from it.
+  async function publishFlowReportS3(slug) {
+    const statusEl = document.querySelector(`.flow-report-publish-status[data-slug="${CSS.escape(slug)}"]`);
+    const btn = document.querySelector(`.flow-publish-report-s3-btn[data-slug="${CSS.escape(slug)}"]`);
+    const originalLabel = btn ? btn.textContent : 'Publish to S3';
+    if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
+    if (statusEl) statusEl.textContent = '';
+    const built = await lsBuildFlowReportHtml(slug);
+    if (!built) {
+      if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
+      return;
+    }
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/publish-flow-report-s3', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({slug, html: built.doc, report: flowReportDataBySlug[slug]}),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'publish failed');
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Published to S3: <a href="${result.url}" target="_blank" rel="noopener">${escapeHtml(result.url)}</a></span>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  }
+
   // Master-detail layout: the left list only ever shows compact rows (name,
   // step count, a small live status pill) - clicking one renders its full
   // detail (setup/login controls, Run/Generate/Delete, and the execution
@@ -4590,6 +4622,7 @@ ${clone.innerHTML}
         <button class="copy flow-download-pdf-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download PDF summary</button>
         <button class="copy flow-publish-report-btn" data-slug="${escapeHtml(f.slug)}" title="Pushes this same report to lokeReleaseSignal (GitHub Pages) for a real shareable link - a downloaded .html file usually just shows raw source when opened on a phone." style="padding:6px 10px; font-size:12px;">Publish to GitHub</button>
         <button class="copy flow-publish-report-cf-btn" data-slug="${escapeHtml(f.slug)}" title="Uploads this same report to a Cloudflare R2 bucket for a real shareable link - an independent second destination, works whether or not GitHub is configured." style="padding:6px 10px; font-size:12px;">Publish to Cloudflare</button>
+        <button class="copy flow-publish-report-s3-btn" data-slug="${escapeHtml(f.slug)}" title="Uploads this same report to the team's S3 reports bucket, where it shows up in the report browser under mobile test run results." style="padding:6px 10px; font-size:12px;">Publish to S3</button>
         <span class="hint flow-report-path" data-report-path-for="${escapeHtml(f.slug)}" style="font-size:11px;"></span>
       </div>
       <div class="hint flow-report-publish-status" data-slug="${escapeHtml(f.slug)}" style="font-size:11.5px; margin-top:4px;"></div>
@@ -5248,6 +5281,7 @@ ${clone.innerHTML}
     const downloadPdfBtn = e.target.closest('.flow-download-pdf-btn');
     const publishReportBtn = e.target.closest('.flow-publish-report-btn');
     const publishReportCfBtn = e.target.closest('.flow-publish-report-cf-btn');
+    const publishReportS3Btn = e.target.closest('.flow-publish-report-s3-btn');
     const setupToggleBtn = e.target.closest('.flow-setup-script-toggle-btn');
     const setupSourceBtn = e.target.closest('.setup-script-source-btn');
     const setupCrumb = e.target.closest('.setup-script-crumb');
@@ -5441,6 +5475,10 @@ ${clone.innerHTML}
     }
     if (publishReportCfBtn) {
       publishFlowReportCloudflare(publishReportCfBtn.dataset.slug);
+      return;
+    }
+    if (publishReportS3Btn) {
+      publishFlowReportS3(publishReportS3Btn.dataset.slug);
       return;
     }
     if (editBtn) {
@@ -5706,6 +5744,7 @@ ${clone.innerHTML}
         <button class="copy flow-download-pdf-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download PDF summary</button>
         <button class="copy flow-publish-report-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Publish to GitHub</button>
         <button class="copy flow-publish-report-cf-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Publish to Cloudflare</button>
+        <button class="copy flow-publish-report-s3-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Publish to S3</button>
         <span class="hint flow-report-path" data-report-path-for="${escapeHtml(slug)}" style="font-size:11px;"></span>
         <div class="hint flow-report-publish-status" data-slug="${escapeHtml(slug)}" style="font-size:11px;"></div>
       </div>
@@ -5955,6 +5994,7 @@ ${clone.innerHTML}
     const downloadPdfBtn = e.target.closest('.flow-download-pdf-btn');
     const publishReportBtn = e.target.closest('.flow-publish-report-btn');
     const publishReportCfBtn = e.target.closest('.flow-publish-report-cf-btn');
+    const publishReportS3Btn = e.target.closest('.flow-publish-report-s3-btn');
     const runBtn = e.target.closest('.ts-run-btn');
 
     if (downloadBtn) { downloadReportHtml(downloadBtn.dataset.slug); return; }
@@ -5962,6 +6002,7 @@ ${clone.innerHTML}
     if (downloadPdfBtn) { downloadServerFile(downloadPdfBtn.dataset.slug, 'pdf'); return; }
     if (publishReportBtn) { publishFlowReport(publishReportBtn.dataset.slug); return; }
     if (publishReportCfBtn) { publishFlowReportCloudflare(publishReportCfBtn.dataset.slug); return; }
+    if (publishReportS3Btn) { publishFlowReportS3(publishReportS3Btn.dataset.slug); return; }
     if (!runBtn) return;
 
     await runTestTarget(runBtn.dataset.path, runBtn.dataset.slug, runBtn);
