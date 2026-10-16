@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Habi Final Run Console</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -3078,6 +3079,105 @@
 
   // ---------- run in browser (talks to local bridge server) ----------
   const BRIDGE_URL = 'http://localhost:5055';
+
+  // ---------- Google sign-in (S3 publishing + team flows) ----------
+  // Publishing run reports and sharing flows go to the team's S3 bucket,
+  // which only accepts a signed-in @habitnu.com Google account - there is
+  // no shared key to hand out. The ID token is sent to the local bridge as
+  // a Bearer header and forwarded to the S3 API, which verifies it. The
+  // client ID is public (same one the report browser uses); this page's
+  // origin must be listed under that OAuth client's "Authorized JavaScript
+  // origins", so sign-in doesn't work from a file:// copy of this page.
+  const GOOGLE_CLIENT_ID = '311656784052-khqf1lso0n1l6efmbaf93gst5qjrjf0j.apps.googleusercontent.com';
+  const GOOGLE_DOMAIN = 'habitnu.com';
+  const GOOGLE_AUTH_STORE = 'habitnu_google_auth';
+  function googleClaims(token) {
+    return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+  }
+  function readStoredGoogleAuth() {
+    try {
+      const a = JSON.parse(sessionStorage.getItem(GOOGLE_AUTH_STORE) || 'null');
+      return a && a.token && a.exp * 1000 > Date.now() + 60000 ? a : null;
+    } catch (e) { return null; }
+  }
+  let googleAuth = readStoredGoogleAuth();
+  function googleSignedIn() { return !!(googleAuth && googleAuth.exp * 1000 > Date.now() + 60000); }
+  function clearGoogleAuth() {
+    googleAuth = null;
+    try { sessionStorage.removeItem(GOOGLE_AUTH_STORE); } catch (e) {}
+  }
+  let googlePending = null;       // {resolve, reject, errEl, close} while the sign-in dialog is open
+  let googleInitialised = false;
+  function onGoogleCredential(resp) {
+    try {
+      const claims = googleClaims(resp.credential);
+      if (claims.hd !== GOOGLE_DOMAIN || !String(claims.email || '').endsWith('@' + GOOGLE_DOMAIN)) {
+        if (googlePending) googlePending.errEl.textContent = 'Use your @' + GOOGLE_DOMAIN + ' account - ' + (claims.email || 'that account') + ' isn\'t allowed.';
+        return;
+      }
+      googleAuth = {token: resp.credential, email: claims.email, exp: claims.exp};
+      try { sessionStorage.setItem(GOOGLE_AUTH_STORE, JSON.stringify(googleAuth)); } catch (e) {}
+      if (googlePending) { const p = googlePending; p.close(); p.resolve(googleAuth.token); }
+    } catch (e) {
+      if (googlePending) googlePending.errEl.textContent = 'Sign-in failed: ' + e.message;
+    }
+  }
+  // Resolves with a valid ID token, opening a small sign-in dialog if the
+  // person isn't signed in (or their ~1h token has expired). Rejects if
+  // they cancel or Google sign-in can't run here.
+  function ensureGoogleSignIn() {
+    if (googleSignedIn()) return Promise.resolve(googleAuth.token);
+    if (location.protocol === 'file:') {
+      return Promise.reject(new Error('Google sign-in doesn\'t work from a local file - open the console from its hosted URL.'));
+    }
+    if (!(window.google && google.accounts && google.accounts.id)) {
+      return Promise.reject(new Error('Google sign-in failed to load - check your internet connection and reload.'));
+    }
+    if (googlePending) return new Promise((resolve, reject) => {
+      const prev = googlePending;
+      googlePending = {...prev, resolve: t => { prev.resolve(t); resolve(t); }, reject: e => { prev.reject(e); reject(e); }};
+    });
+    return new Promise((resolve, reject) => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:10000; display:flex; align-items:center; justify-content:center;';
+      overlay.innerHTML = `
+        <div style="background:var(--ink-raised, var(--ink)); color:var(--paper); border:1px solid var(--ink-line-strong); border-radius:12px; padding:22px 24px; width:340px; max-width:92vw;">
+          <div style="font-weight:600; font-size:15px; margin-bottom:6px;">Sign in to continue</div>
+          <div style="font-size:12.5px; color:var(--paper-dim); margin-bottom:14px;">Use your @${GOOGLE_DOMAIN} Google account to publish reports and share flows with the team.</div>
+          <div class="google-signin-btn" style="min-height:44px;"></div>
+          <div class="google-signin-err" style="color:var(--alert); font-size:12px; margin-top:8px; min-height:16px;"></div>
+          <div style="text-align:right; margin-top:6px;"><button type="button" class="copy google-signin-cancel" style="padding:6px 12px; font-size:12px; background:var(--ink-line); color:var(--paper);">Cancel</button></div>
+        </div>`;
+      document.body.appendChild(overlay);
+      const close = () => { overlay.remove(); googlePending = null; };
+      googlePending = {resolve, reject, errEl: overlay.querySelector('.google-signin-err'), close};
+      overlay.querySelector('.google-signin-cancel').addEventListener('click', () => {
+        const p = googlePending; close(); p.reject(new Error('Sign-in cancelled.'));
+      });
+      if (!googleInitialised) {
+        google.accounts.id.initialize({client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential, hd: GOOGLE_DOMAIN});
+        googleInitialised = true;
+      }
+      google.accounts.id.renderButton(overlay.querySelector('.google-signin-btn'), {theme: 'outline', size: 'large', text: 'signin_with'});
+    });
+  }
+  // fetch() to the bridge with the signed-in person's Google token. If the
+  // S3 API says the token is no good (expired, wrong domain), sign in
+  // again once and retry.
+  async function bridgeFetchAuthed(path, options) {
+    options = options || {};
+    let res;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const token = await ensureGoogleSignIn();
+      res = await fetch(BRIDGE_URL + path, {...options, headers: {...(options.headers || {}), Authorization: 'Bearer ' + token}});
+      if (res.status !== 401) return res;
+      let body = {};
+      try { body = await res.clone().json(); } catch (e) {}
+      if (body.code !== 'auth') return res;
+      clearGoogleAuth();
+    }
+    return res;
+  }
   const LAUNCHER_URL = 'http://localhost:5056';
   const LAUNCHER_UNREACHABLE_MSG =
     'Launcher not reachable — run this ONCE and leave it running forever: python -m mobile_agent.launcher';
@@ -4211,7 +4311,7 @@ ${clone.innerHTML}
       return;
     }
     try {
-      const res = await fetch(BRIDGE_URL + '/api/publish-flow-report-s3', {
+      const res = await bridgeFetchAuthed('/api/publish-flow-report-s3', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({slug, html: built.doc, report: flowReportDataBySlug[slug]}),
@@ -4546,7 +4646,7 @@ ${clone.innerHTML}
           <button class="copy flow-run-btn" data-slug="${escapeHtml(f.slug)}" data-name="${escapeHtml(f.name)}" style="padding:6px 10px; font-size:12px;">${state && state.status === 'running' ? 'Running…' : 'Run'}</button>
           <button class="copy flow-edit-btn" data-slug="${escapeHtml(f.slug)}" title="Load this flow's steps into Test Builder to fix a locator, insert a step, or extend it - saving there updates this same flow in place." style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Edit</button>
           <button class="copy flow-gen-tests-btn" data-slug="${escapeHtml(f.slug)}" data-name="${escapeHtml(f.name)}" title="Generate a page object + pytest test class from this flow's steps" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Generate tests</button>
-          <button class="copy flow-share-btn" data-slug="${escapeHtml(f.slug)}" title="Publish this flow to the team's shared repo so teammates can import it" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Share with team</button>
+          <button class="copy flow-share-btn" data-slug="${escapeHtml(f.slug)}" title="Share this flow with the team (S3) so teammates can import it" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Share with team</button>
           <button class="copy flow-delete-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Delete</button>
         </div>
       </div>
@@ -4620,8 +4720,6 @@ ${clone.innerHTML}
         <button class="copy flow-download-report-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download HTML report</button>
         <button class="copy flow-download-csv-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download CSV summary</button>
         <button class="copy flow-download-pdf-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download PDF summary</button>
-        <button class="copy flow-publish-report-btn" data-slug="${escapeHtml(f.slug)}" title="Pushes this same report to lokeReleaseSignal (GitHub Pages) for a real shareable link - a downloaded .html file usually just shows raw source when opened on a phone." style="padding:6px 10px; font-size:12px;">Publish to GitHub</button>
-        <button class="copy flow-publish-report-cf-btn" data-slug="${escapeHtml(f.slug)}" title="Uploads this same report to a Cloudflare R2 bucket for a real shareable link - an independent second destination, works whether or not GitHub is configured." style="padding:6px 10px; font-size:12px;">Publish to Cloudflare</button>
         <button class="copy flow-publish-report-s3-btn" data-slug="${escapeHtml(f.slug)}" title="Uploads this same report to the team's S3 reports bucket, where it shows up in the report browser under mobile test run results." style="padding:6px 10px; font-size:12px;">Publish to S3</button>
         <span class="hint flow-report-path" data-report-path-for="${escapeHtml(f.slug)}" style="font-size:11px;"></span>
       </div>
@@ -4669,14 +4767,22 @@ ${clone.innerHTML}
       <div class="flows-team-row">
         <span class="flows-team-row-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><circle cx="19" cy="6" r="2.4"/><path d="M7 7.2L17 16.8M17 7.2L12 15.6"/></svg></span>
         <span class="flows-team-row-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
-        <button class="copy shared-flow-import-btn" data-path="${escapeHtml(f.path)}" data-slug="${escapeHtml(f.slug)}" style="padding:5px 14px; font-size:12px; background:none; border:1px solid var(--ink-line-strong); color:var(--circuit);">Import</button>
+        <button class="copy shared-flow-import-btn" data-source="${escapeHtml(f.source || 's3')}" data-path="${escapeHtml(f.path || '')}" data-slug="${escapeHtml(f.slug)}" style="padding:5px 14px; font-size:12px; background:none; border:1px solid var(--ink-line-strong); color:var(--circuit);">Import</button>
       </div>`).join('') : '<div class="empty-hint">Nothing published yet.</div>';
   }
-  async function loadSharedFlows() {
+  // The bucket is private, so the list needs a Google sign-in. On page load
+  // it only loads if already signed in this session (no surprise popup);
+  // clicking Refresh or "Sign in" prompts.
+  async function loadSharedFlows(promptSignIn) {
     const listEl = document.getElementById('sharedFlowsList');
     const countEl = document.getElementById('flowsTabCountTeam');
+    if (promptSignIn !== true && !googleSignedIn()) {
+      listEl.innerHTML = `<div class="empty-hint" style="font-size:11.5px;">Sign in with your @${GOOGLE_DOMAIN} account to see flows shared by the team.
+        <button class="copy shared-flows-signin-btn" style="margin-top:8px; padding:5px 14px; font-size:12px;">Sign in</button></div>`;
+      return;
+    }
     try {
-      const res = await fetch(BRIDGE_URL + '/api/shared-flows');
+      const res = await bridgeFetchAuthed('/api/shared-flows');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed to load shared flows');
       const flows = data.flows || [];
@@ -4687,7 +4793,10 @@ ${clone.innerHTML}
     }
   }
   loadSharedFlows();
-  document.getElementById('refreshSharedFlowsBtn').addEventListener('click', loadSharedFlows);
+  document.getElementById('refreshSharedFlowsBtn').addEventListener('click', () => loadSharedFlows(true));
+  document.getElementById('sharedFlowsList').addEventListener('click', e => {
+    if (e.target.closest('.shared-flows-signin-btn')) loadSharedFlows(true);
+  });
 
   // Preconditions tab's own card (badge/title/step-count/Edit button, via
   // startEditingFlow). "New precondition" is a plain tile (dashed border)
@@ -4747,13 +4856,14 @@ ${clone.innerHTML}
     if (!importBtn) return;
     const path = importBtn.dataset.path;
     const slug = importBtn.dataset.slug;
+    const source = importBtn.dataset.source || 's3';
     importBtn.disabled = true;
     importBtn.textContent = 'Importing…';
     try {
-      const res = await fetch(BRIDGE_URL + '/api/shared-flows/import', {
+      const res = await bridgeFetchAuthed('/api/shared-flows/import', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({path, slug}),
+        body: JSON.stringify({path, slug, source}),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed to import');
@@ -5410,7 +5520,7 @@ ${clone.innerHTML}
       shareBtn.textContent = 'Sharing…';
       statusEl.textContent = '';
       try {
-        const res = await fetch(BRIDGE_URL + '/api/shared-flows/publish', {
+        const res = await bridgeFetchAuthed('/api/shared-flows/publish', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({slug}),
@@ -5742,8 +5852,6 @@ ${clone.innerHTML}
         <button class="copy flow-download-report-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download HTML report</button>
         <button class="copy flow-download-csv-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download CSV summary</button>
         <button class="copy flow-download-pdf-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download PDF summary</button>
-        <button class="copy flow-publish-report-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Publish to GitHub</button>
-        <button class="copy flow-publish-report-cf-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Publish to Cloudflare</button>
         <button class="copy flow-publish-report-s3-btn" data-slug="${escapeHtml(slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Publish to S3</button>
         <span class="hint flow-report-path" data-report-path-for="${escapeHtml(slug)}" style="font-size:11px;"></span>
         <div class="hint flow-report-publish-status" data-slug="${escapeHtml(slug)}" style="font-size:11px;"></div>
