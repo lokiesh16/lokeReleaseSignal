@@ -1,0 +1,105 @@
+{
+  "api_testing": {
+    "framework": {
+      "library": "requests",
+      "test_runner": "pytest",
+      "note": "Two-file Page Object pattern, mirroring this codebase's existing UI Page Object convention (pages/<Portal>Pages/<feature>_page.py + BasePage). The API page class owns every implementation detail (URL building, auth headers, sending the request via call_api, returning parsed data). The test class owns only execution structure: instantiate the page class once, call its business-action methods in captured order, assert on what they return. Test methods run in a fixed sequence (via @pytest.mark.priority) because each step depends on state created by the previous one."
+    },
+    "shared_base_class": {
+      "path": "pages/api/base_api_page.py",
+      "class": "BaseApiPage",
+      "rule": "This file is created ONCE for the whole project (create it only if it does not already exist — never regenerate or duplicate it per feature). It owns: self.base_url = config.get_base_url() in __init__, a login(login_path, email, password) method that POSTs via call_api and returns the parsed body, and set_auth(token, extra_headers=None) which builds self.headers = build_auth_headers(...) for reuse by every later call on that page instance. Every feature-specific API page class inherits from it: class MedicationApiPage(BaseApiPage):."
+    },
+    "page_class": {
+      "file_path": "pages/api/<Portal>Pages/<feature>_api_page.py",
+      "class_naming": "<Feature>ApiPage, e.g. MedicationApiPage, OrdersApiPage — inherits BaseApiPage.",
+      "imports": [
+        "from pages.api.base_api_page import BaseApiPage",
+        "from utils.helpers import call_api"
+      ],
+      "owns_everything_implementation": "ALL of the following live ONLY in the page class, never in the test file: building each endpoint's URL from self.base_url and method arguments (ids, query params); calling call_api(method, url, headers=self.headers, json_payload=payload, expected_status=...) — never raw requests.<verb>(...); overriding login(email, password) to call super().login('<captured auth path>', email, password) with the portal's real captured login endpoint hardcoded; returning the parsed response body (or a specific extracted field) — never a Response object, never a status code.",
+      "method_naming": "One method per captured endpoint, named as a business action, not an HTTP verb: create_medication(user_id, payload), get_medication(user_id, medication_id), update_medication(user_id, medication_id, payload), archive_medication(user_id, medication_id) — never post_medication() or do_request().",
+      "no_test_data_or_assertions": "The page class never loads fixture files, never decides which payload to send, and never asserts on business field values (only call_api's internal status-code assertion applies) — it only knows HOW to call an endpoint given whatever ids/payload the test passes in. The test class decides WHAT data to send and WHAT to assert.",
+      "one_page_class_per_feature": "Group all endpoints for one resource/feature captured in this run into a single page class (e.g. every /medication endpoint into MedicationApiPage). Never invent an endpoint or a method for a path that wasn't captured."
+    },
+    "test_class": {
+      "file_path": "tests/APITests/<Portal>/test_<Feature>.py",
+      "class_naming": "Test<Feature>, matching the file name, e.g. TestMedication.",
+      "imports": [
+        "import pytest",
+        "from utils.config_manager import config",
+        "from utils.helpers import load_request_payload, load_response_payload, assert_nested_values",
+        "from pages.api.<Portal>Pages.<feature>_api_page import <Feature>ApiPage"
+      ],
+      "setup_class": "@classmethod def setup_class(cls): sets cls.page = <Feature>ApiPage() (instantiated exactly once), plus any fixed ids needed for the run (e.g. cls.userId = '...'), and initializes chaining placeholders to None (e.g. cls.medicationId = None). It does NOT call any page-class method itself — login and every subsequent call happen inside the priority-ordered test methods below.",
+      "login_and_auth": "The priority-1 test calls response_data = self.page.login(creds['usernameCoach_1'], creds['passwordCoach_1']) (creds from config.get_login_credentials()), asserts response_data['success'] is True and the token is present, persists it with config.set_auth_token(auth_token), then calls self.page.set_auth(auth_token) so every later call on cls.page is authenticated.",
+      "only_execution_and_data_selection": "Each test method: (1) loads/builds whatever payload or ids this step needs (load_request_payload(...), or a value stored on the class from a prior step), (2) calls exactly one self.page.<business_method>(...) — or a small shared instance helper on the test class that itself just calls one page method, when the same call is needed more than once (e.g. def create_medication(self): return self.page.create_medication(...)), (3) asserts on the dict returned, using assert_nested_values(response_data, expected_values) for multi-field/nested checks and plain asserts for single fields, (4) stores any id/value later tests need onto the class (self.__class__.medicationId = response_data['id']).",
+      "no_implementation_details": "NEVER build a URL, set headers manually, or call call_api/requests directly in the test file — every HTTP interaction goes through a self.page.<method>(...) call. If a test needs a new kind of call, add a method to the page class first, then call it from the test."
+    },
+    "auth_convention": "Build the auth header exactly as captured from the real login response — do not assume a scheme. This codebase's APIs use 'Authorization': 'Token token=' + token (NOT 'Bearer <token>'). If a captured call shows a different header name/scheme, match exactly what was captured instead of guessing — build_auth_headers/set_auth still apply, just pass the right extra_headers. Never hand-write the headers dict inline in either file, and never use a requests.Session().",
+    "ordering": {
+      "priority_marker": "Decorate every test method with @pytest.mark.priority(n), n starting at 1 and increasing in the exact order the captured API calls happened.",
+      "description_marker": "Decorate every test method with @pytest.mark.description(\"<one-line human description>\") alongside @pytest.mark.priority.",
+      "docstring": "Keep a short one-line docstring inside each test method restating the description marker."
+    },
+    "chaining_rules": {
+      "fresh_login_required": "NEVER reuse a captured/expired token verbatim. The priority-1 test always calls self.page.login(...) for a live token and persists it via config.set_auth_token(...).",
+      "store_chained_values_as_class_attributes": "Every id/value a later test needs (e.g. self.__class__.medicationId, self.__class__.medicationTime) is extracted from the dict a page-class method returned and assigned onto the TEST class right after the call that produced it — never hardcoded as a literal, never re-fetched redundantly.",
+      "no_invented_endpoints": "Only generate page-class methods for endpoints that appear in the captured API call sequence. Never invent an endpoint or guess a path that wasn't captured.",
+      "single_page_instance_per_test_class": "One self.page instance, created once in setup_class and reused (with headers set once via set_auth) across every test method in the class — never re-instantiate the page class per test method."
+    },
+    "payload_handling": {
+      "load_from_fixture_files": "Request bodies live in JSON files under payloads/requests/<Portal>/<name>.json and are loaded in the TEST file with load_request_payload('<Portal>/<name>.json') — never inline large JSON literals, and never load fixtures inside the page class.",
+      "expected_response_fixtures": "If an expected response body is captured and reused for comparison, load it the same way with load_response_payload('<Portal>/<name>.json') in the test file.",
+      "mutating_payloads_before_send": "When a captured payload needs a computed value (e.g. a Mongo ObjectId tied to today's date/time, or a value chained from a prior response), load and mutate the payload in the TEST method (payload['date'] = ..., payload['medication_time'] = str(object_id)) before passing it into self.page.<method>(...). Only import pymongo/bson.ObjectId/datetime in the test file when a step actually needs a computed id — not by default.",
+      "dict_helpers": "Use change_key_or_value_in_dict(payload, path, old_key, new_key=None, new_value=None) from utils.helpers in the test file when a nested key/value in a loaded payload needs to be swapped out."
+    },
+    "assertions": {
+      "status_asserted_inside_call_api": "Status codes are never asserted anywhere in either file directly — call_api(...) (called only from inside page-class methods) already asserts expected_status (default 200; the page-class method should accept/pass expected_status when a captured call expects something else) and raises before returning if it doesn't match.",
+      "nested_field_helper_pattern": "For a batch of expected fields on one response (including dotted paths for nested objects, e.g. 'medicine_strength.unit' or 'data.preferred_name'), build an expected_values = {...} dict in the test method and pass it to assert_nested_values(response_data, expected_values) — never hand-write the dotted-path walk inline.",
+      "single_field_checks_inline": "A single straightforward field check (e.g. assert response_data['id'] is not None) can stay as a plain inline assert in the test method — only reach for assert_nested_values when there are multiple fields to check on one response.",
+      "assert_on_parsed_data_only": "Assertions in the test method read from the dict a page-class method returned, or from class attributes populated earlier — never assert on a raw Response object or a status code."
+    },
+    "file_output": "Generate exactly TWO files per feature (plus pages/api/base_api_page.py the first time only, if it doesn't already exist): (1) pages/api/<Portal>Pages/<feature>_api_page.py — the page class, containing every URL/header/call_api detail; (2) tests/APITests/<Portal>/test_<Feature>.py — the test class, containing only setup_class, priority-ordered test methods that call self.page.<method>(...) and assert on the result, plus any tiny shared instance-helper methods that just call one page method. Never put call_api/requests/header/URL code in the test file, and never put fixture-loading/assertions/business-data decisions in the page class."
+  },
+  "config_manager": {
+    "class": "Config — imported as: from utils.config_manager import config",
+    "real_methods": [
+      "config.get_base_url()           — base API URL, read from config/config.yaml",
+      "config.get_login_credentials()  — returns a dict of persona-suffixed creds, e.g. {'usernameCoach_1': ..., 'passwordCoach_1': ...}",
+      "config.get_auth_token()         — returns the auth token most recently saved via set_auth_token, persisted in config/runtime.yaml",
+      "config.set_auth_token(token)    — saves the auth token to config/runtime.yaml for reuse between runs"
+    ],
+    "warning": "Confirm the exact persona key names in config.get_login_credentials() (e.g. 'usernameCoach_1' vs 'usernameUser_1') against config/config.yaml for the portal under test before generating tests — key naming is persona-specific, not uniform."
+  },
+  "helper_functions": {
+    "build_auth_headers(token, extra_headers=None)": "utils/helpers.py — returns {'Content-Type': 'application/json', 'Authorization': 'Token token=' + token}, merged with extra_headers if given. Used only inside BaseApiPage.set_auth — never called directly from a test.",
+    "call_api(method, url, headers=None, json_payload=None, expected_status=200)": "utils/helpers.py — sends the request, logs the method/url/payload/response, asserts response.status_code == expected_status, and returns response.json(). Used only inside page-class methods — never called directly from a test.",
+    "assert_nested_values(response_data, expected_values)": "utils/helpers.py — takes a dict of {'dotted.path': expected_value} (dotted paths walk nested objects) and asserts each one against response_data. Called from test methods after a page-class call returns."
+  },
+  "reference_example": {
+    "base_page": "pages/api/base_api_page.py",
+    "page_class": "pages/api/CoachesPortalPages/medication_api_page.py",
+    "test_class": "tests/APITests/CoachesPortal/test_addMedication_v2.py",
+    "note": "This trio is the concrete worked example the rules above describe — refactored from the original single-file tests/APITests/CoachesPortal/test_addMedication.py. Use it as the template shape for new features rather than the inline test_template blob that used to live in this config."
+  },
+  "standalone_script_testing": {
+    "framework": {
+      "library": "requests",
+      "test_runner": "none — a plain script executed directly with `python <file>.py`, never pytest, never imported as a module."
+    },
+    "note": "One self-contained file per scenario, no project imports (no pages/, no utils/, no config_manager, no pytest) — just `requests`, `os`, and stdlib, so it can be handed to anyone and run with zero setup beyond `pip install requests`.",
+    "imports": [
+      "import requests",
+      "import os"
+    ],
+    "base_url": "A module-level BASE_URL = \"<scheme>://<host>\" constant, taken exactly from the captured calls — never invented.",
+    "auth_convention": "Log in first via the real captured login endpoint (requests.post(f\"{BASE_URL}/<captured login path>\", json={...})), then build every later header as {\"authorization\": f\"Token token={token}\", \"accept\": \"application/json\"} — this codebase's APIs use 'Token token=', never 'Bearer'. If a captured call shows a different scheme, match exactly what was captured.",
+    "env_credentials": "Read login email/password from os.environ (generic names: MOBILE_AGENT_LOGIN_EMAIL / MOBILE_AGENT_LOGIN_PASSWORD), falling back to the literal values seen in the captured login request body as the os.environ.get(...) default — mirroring pages/api's auth_convention but with the credentials made overridable from the shell instead of a config file, since this script has no config_manager to read them from.",
+    "step_structure": "One clearly separated block per captured API call, in captured order: print a header line, make the request with requests (no Session object needed for a single-flow script), extract any chained values the next step needs directly from response.json(), and stop early (exit 1) if a call's status code isn't what was captured/expected — do not keep going and assert on data that was never fetched.",
+    "report_convention": "Before validating a step's response, print '\\nStep N: <step description>...', then exactly one '  objective: Verify that <what this step proves, one sentence>' line and one '  precondition: <what must already be true before this step runs, one sentence — or \"-\" if there genuinely is none, e.g. this is the very first step>' line, then exactly one '  input: <compact one-line repr/json of what was actually sent for this call — the payload/path params/query params, whatever is relevant>' line and one '  output: <compact one-line repr/json of the actual response body/fields this step's checks look at>' line — use repr() or json.dumps(..., default=str) so each stays on one line, never a multi-line pretty-printed blob, and never omit any of these four lines even when the check is trivial (e.g. a bare status-code check still shows input={} output={'status': 200, ...}). Then for every check on that response print exactly one line '  [PASS] <description>' when it holds or '  [FAIL] <description>' when it doesn't, and ALWAYS (pass or fail) follow it with exactly one '    -> expected=<the value/condition the check requires> actual=<the value actually observed>' line (compact, one line, e.g. '    -> expected=status 200 actual=status 200' or '    -> expected=calorie_target 2200 actual=calorie_target 2200') — collect failures in a list rather than raising. The '<description>' must be a plain-English test case (what is being verified, e.g. 'User portal water_target reflects the water quantity set on Hub'), not a code expression. After every step has run, print '\\nSCENARIO SUMMARY:' followed by a short (3-6 sentence) plain-English paragraph naming every scenario this script exercised and what each one proved end-to-end (written for a human skimming the report, not a restatement of the check lines above), then a final '=== VALIDATION PASSED ===' or '=== VALIDATION FAILED ===' line (listing every FAIL), then exit(1) if anything failed, exit(0) (or just fall through) otherwise. This exact shape ('  objective:'/'  precondition:'/'  input:'/'  output:' lines under every step, '[PASS]'/'[FAIL]' checks, and the 'SCENARIO SUMMARY:' block) is what the report builder parses into a manual-test-case-style table (Test Description / Test Data / Expected Result / Actual Result / Pass-Fail columns) — free-form prose checks, or a missing objective/precondition/input/output/summary block, won't render into that table.",
+    "no_invented_endpoints": "Only call endpoints that appear in the captured API call sequence — never invent one or guess a path that wasn't captured.",
+    "file_output": "Generate exactly ONE file: tests/APITests/<Portal>/test_<scenario>.py — the test_ prefix matches this project's existing script-discovery convention even though the file is not pytest-structured (no def test_*/class Test* inside it), so it still shows up in the Script Runner's picker and gets run as a plain script.",
+    "goal_coverage": "Derive the checks from the TEST SCENARIO goal, not from the raw captured calls. Identify every distinct thing the goal says must hold (e.g. for 'Food Nutrient fields updated on Hub reflect on the user portal': one check per updated field — calorie target, fiber target, each macro percentage, water quantity — verified on BOTH the source side after the update and the destination side, with the exact value that was submitted as the expected value). Do not stop at status-code checks; every field the goal mentions needs its own [PASS]/[FAIL] line comparing the submitted value to the value observed downstream."
+  }
+}

@@ -361,6 +361,9 @@
       <div class="step" id="step-2" onclick="showPanel('preview')">
         <div class="step-num">2</div><div class="step-label">Preview &amp; download</div>
       </div>
+      <div class="step" id="step-3" onclick="showPanel('ui')">
+        <div class="step-num">3</div><div class="step-label">Record UI test</div>
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="btn btn-ghost btn-sm" style="width:100%" onclick="showPanel('config')" title="Framework config">⚙ <span class="footer-label">Framework config</span></button>
@@ -601,6 +604,68 @@
       <div class="log-wrap">
         <div class="log-header">Log</div>
         <div class="log-body" id="log"></div>
+      </div>
+    </div>
+
+    <!-- Panel: UI recorder -->
+    <div class="panel" id="panel-ui">
+      <div class="panel-header">
+        <h2>Record a UI test</h2>
+        <p>Click through the app in the browser you launched on the Capture step. Each action is recorded here, turned into a Playwright test, and can be replayed in a fresh browser.</p>
+      </div>
+      <div class="panel-body">
+
+        <div class="card">
+          <div class="flex-row" style="margin-bottom:6px">
+            <h3 style="margin:0;flex:1">⏺ Recorder <span id="ui-rec-badge" class="badge">idle</span></h3>
+          </div>
+          <p>Launch the browser first (Capture step). Clicks, typing, dropdowns, checkboxes and Enter/Escape are captured as you use the app. A small toolbar appears in the page while recording: <b>🎯 Pick</b> lets you highlight any element <i>without clicking it</i>, then choose what to do with it — click, hover, scroll to it, wait for it, or assert its text / value / href / visibility. The toolbar also adds a timed <b>Wait</b> and scroll-to-top/bottom. In the list below, <b>＋</b> on any step inserts a wait after it or <b>splits the steps into separate test cases</b>. Esc leaves pick mode. Password-like fields are saved to an owner-only env file, not into the script.</p>
+          <div class="field">
+            <label>Portal to record</label>
+            <select id="ui-portal" style="width:100%;background:rgba(255,255,255,0.045);border:1px solid var(--glass-border);border-radius:9px;padding:9px 14px;color:var(--text);font-family:var(--mono);font-size:12px">
+              <option value="A" selected>Portal A</option>
+              <option value="B">Portal B</option>
+            </select>
+          </div>
+          <div class="flex-row">
+            <button class="btn btn-primary btn-sm" id="btn-ui-rec" onclick="uiToggleRecord()">⏺ Start recording</button>
+            <button class="btn btn-ghost btn-sm" id="btn-ui-replay" onclick="uiReplay()">▶ Replay steps</button>
+            <button class="btn btn-ghost btn-sm" onclick="uiClearSteps()">Clear steps</button>
+            <span id="ui-replay-status" class="pw-run-status"></span>
+          </div>
+          <p style="margin-top:8px;font-size:11px">Replay runs the steps in a fresh window (clean cookies) so you can check each one before generating. Stops at the first failure.</p>
+        </div>
+
+        <div class="card">
+          <h3>Recorded steps <span id="ui-step-count" class="badge">0</span></h3>
+          <div id="ui-steps" style="font-family:var(--mono);font-size:12px;display:flex;flex-direction:column;gap:6px;margin-top:8px">
+            <span style="color:var(--muted)">Nothing recorded yet.</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Generate &amp; run</h3>
+          <div class="name-row" style="margin-bottom:10px">
+            <input type="text" id="ui-test-name" placeholder="Scenario name, e.g. login and create order">
+            <button class="btn btn-primary btn-sm" onclick="uiGenerate()">⚙ Generate test</button>
+          </div>
+          <div class="flex-row" style="margin-bottom:10px;gap:16px;flex-wrap:wrap">
+            <label style="font-size:12px;color:var(--muted)" title="Every step waits up to this long for its element to appear / become clickable before failing. Used by Replay and written into the generated test (override with UI_TIMEOUT_MS).">Wait up to <input type="number" id="ui-timeout" value="15" min="1" step="1" style="width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text);font-family:var(--mono)"> s per step</label>
+            <label style="font-size:12px;color:var(--muted)" title="On: all test cases share one browser session, each continuing where the previous stopped (e.g. login once). Off: each case starts in a fresh browser."><input type="checkbox" id="ui-shared-session" checked> Test cases continue in one browser session</label>
+          </div>
+          <div class="flex-row" style="margin-bottom:10px">
+            <button class="btn btn-primary btn-sm" id="btn-ui-run" onclick="uiRun()" disabled>▶ Run test</button>
+            <button class="btn btn-danger btn-sm" id="btn-ui-run-stop" onclick="uiRunStop()" style="display:none">■ Stop</button>
+            <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="ui-headless"> headless</label>
+            <label style="font-size:12px;color:var(--muted)">slow-mo <input type="number" id="ui-slowmo" value="300" min="0" step="100" style="width:70px;background:rgba(255,255,255,0.045);border:1px solid var(--glass-border);border-radius:6px;padding:3px 6px;color:var(--text);font-family:var(--mono)"> ms</label>
+            <div class="spacer"></div>
+            <span id="ui-run-status" class="pw-run-status"></span>
+          </div>
+          <div id="ui-generated-file" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px"></div>
+          <pre class="pw-log-box" id="ui-code-box"></pre>
+          <pre class="pw-log-box" id="ui-run-log" style="margin-top:10px"></pre>
+        </div>
+
       </div>
     </div>
 
@@ -1720,11 +1785,212 @@ function toggleSidebar() {
   }
 })();
 
+// ── UI recorder ──────────────────────────────────────────────────────────────
+let uiReplayResults = {}, uiLastSteps = [];
+let uiRecording = false, uiGeneratedFile = null, uiRunId = null;
+
+function uiDescribeLocator(l) {
+  if (!l) return '';
+  if (l.kind === 'pw') return l.py;
+  const nth = l.nth != null ? ` #${l.nth + 1}` : '';
+  if (l.kind === 'role') return `${l.role} "${l.name}"${nth}`;
+  if (l.kind === 'css') return `css ${l.value}${nth}`;
+  return `${l.kind} "${l.value}"${nth}`;
+}
+
+let uiInsertOpen = null, uiDraft = { ms: 1000, name: '' };
+let uiCheckResults = {};   // step id -> {count} from the quick Check (live browser, current page)
+function uiRunTo(id) {
+  if (!browserOpen) { toast('Launch the browser first (Capture step)', 'err'); return; }
+  uiReplayResults = {}; uiCheckResults = {};
+  renderUiSteps(uiLastSteps);
+  socket.emit('ui_replay', { upto_id: id, portal: document.getElementById('ui-portal').value,
+                             slow_mo: parseInt(document.getElementById('ui-slowmo').value, 10) || 0, timeout_s: uiTimeout() });
+}
+function uiQuickCheck(id) {
+  const st = uiLastSteps.find(x => x.id === id);
+  if (!st || !st.locator) return;
+  socket.emit('ui_locator_check', { id, locator: st.locator, portal: document.getElementById('ui-portal').value });
+}
+let uiEditLoc = null, uiLocDraft = '';   // step id whose selector is being edited, and its draft text
+function uiLocSelector(l) { return !l ? '' : l.kind === 'pw' ? l.selector : l.kind === 'css' ? l.value : ''; }
+function uiToggleEditLoc(id) {
+  uiEditLoc = uiEditLoc === id ? null : id;
+  const st = uiLastSteps.find(x => x.id === id);
+  uiLocDraft = st ? uiLocSelector(st.locator) : '';
+  renderUiSteps(uiLastSteps);
+}
+function uiCheckLoc(id) {
+  if (!uiLocDraft.trim()) { toast('Type a selector first', 'err'); return; }
+  socket.emit('ui_locator_check', { id, selector: uiLocDraft, portal: document.getElementById('ui-portal').value });
+}
+function uiSaveLoc(id) {
+  delete uiCheckResults[id];
+  socket.emit('ui_step_set_locator', { id, selector: uiLocDraft });
+  uiEditLoc = null;
+}
+const UI_INPUT_STYLE = 'background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 8px;color:var(--text);font-family:var(--mono);font-size:12px';
+
+function uiToggleInsert(id) { uiInsertOpen = uiInsertOpen === id ? null : id; renderUiSteps(uiLastSteps); }
+function uiInsertWait(afterId) {
+  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'wait', value: String(uiDraft.ms) } });
+  uiInsertOpen = null;
+}
+function uiInsertCase(afterId) {
+  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'case', value: uiDraft.name } });
+  uiDraft.name = ''; uiInsertOpen = null;
+}
+
+function renderUiSteps(steps) {
+  uiLastSteps = steps;
+  const box = document.getElementById('ui-steps');
+  const actions = steps.filter(s => s.type !== 'case');
+  const cases = steps.filter(s => s.type === 'case').length;
+  document.getElementById('ui-step-count').textContent = actions.length + (cases ? ` · ${cases} test case${cases > 1 ? 's' : ''}` : '');
+  if (!steps.length) { box.innerHTML = '<span style="color:var(--muted)">Nothing recorded yet.</span>'; return; }
+  const verb = { goto: 'Go to', click: 'Click', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
+                 press: 'Press', press_page: 'Press', assert_text: 'Assert text', assert_value: 'Assert value',
+                 assert_visible: 'Assert visible', assert_attr: 'Assert attr', hover: 'Hover', scroll_into_view: 'Scroll to',
+                 wait_for: 'Wait for', wait: 'Wait (ms)', scroll_page: 'Scroll page', note: 'Note' };
+  const editable = ['fill', 'select', 'press', 'press_page', 'assert_text', 'assert_value', 'assert_attr', 'wait_for', 'wait', 'scroll_page'];
+  let n = 0, caseNo = 0;
+  box.innerHTML = steps.map((s) => {
+    if (s.type === 'case') {
+      caseNo += 1;
+      return `<div class="flex-row" style="gap:8px;margin-top:${caseNo > 1 ? 12 : 0}px;padding:6px 10px;background:rgba(124,106,255,0.12);border:1px solid #4c3f8a;border-radius:8px">`
+        + `<b style="white-space:nowrap">📋 Test case ${caseNo}</b>`
+        + `<input type="text" value="${escapeHtml(s.value)}" onchange="uiUpdateStep(${s.id}, this.value)" style="flex:1;${UI_INPUT_STYLE}">`
+        + `<button class="btn btn-ghost btn-sm" title="Remove this split (its steps join the case above)" onclick="socket.emit('ui_step_delete',{id:${s.id}})">✕</button></div>`;
+    }
+    n += 1;
+    const target = s.type === 'goto' ? escapeHtml(s.value) : !s.locator ? '' : escapeHtml(uiDescribeLocator(s.locator) + (s.attr ? ` [${s.attr}]` : ''));
+    let val = '';
+    if (s.type === 'fill' && s.secret) val = '<span class="badge">secret → env var</span>';
+    else if (editable.includes(s.type)) val = `<input type="text" value="${escapeHtml(s.value)}" onchange="uiUpdateStep(${s.id}, this.value)" style="flex:1;min-width:80px;${UI_INPUT_STYLE}">`;
+    else if (s.type === 'note') val = `<span style="color:var(--muted)">${escapeHtml(s.value)}</span>`;
+    const r = uiReplayResults[s.id];
+    const mark = !r ? '' : r.ok ? '<span style="color:var(--green)">✓</span>' : '<span style="color:var(--red)">✗</span>';
+    const errLine = r && !r.ok ? `<div style="color:var(--red);font-size:11px;padding-left:30px;white-space:pre-wrap">${escapeHtml(r.error)}${r.screenshot ? `<br><img src="data:image/jpeg;base64,${r.screenshot}" style="max-width:360px;border:1px solid var(--border);border-radius:6px;margin-top:4px">` : ''}</div>` : '';
+    const c = uiCheckResults[s.id];
+    const chk = c ? (c.count === 1 ? ' <span class="badge" style="color:var(--green)">✓ 1 match</span>'
+                  : c.count === 0 ? ' <span class="badge" style="color:var(--red)">✗ 0 matches</span>'
+                  : ` <span class="badge" style="color:var(--yellow,#f59e0b)">⚠ ${c.count} matches</span>`) : '';
+    const open = uiInsertOpen === s.id;
+    const editing = uiEditLoc === s.id;
+    const hint = r && !r.ok && /matched 0/.test(r.error || '') ? '<div style="color:var(--yellow,#f59e0b);font-size:11px;padding-left:30px;margin-top:2px">The locator finds nothing on the page at this point. Click ✎ to type a better selector (try a data-testid, an id, or a CSS path), and use Check to see what it matches.</div>' : '';
+    const locRow = editing && s.locator ? `<div class="flex-row" style="gap:8px;margin:6px 0 4px 30px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:8px;flex-wrap:wrap">`
+        + `<span>✎ Selector</span><input type="text" placeholder="e.g. [data-testid=&quot;save&quot;]   or   .card >> text=lbs   or   xpath=//button[2]" value="${escapeHtml(uiLocDraft)}" oninput="uiLocDraft=this.value" style="flex:1;min-width:240px;${UI_INPUT_STYLE}">`
+        + `<button class="btn btn-ghost btn-sm" onclick="uiCheckLoc(${s.id})" title="Counts what it matches in the live recording browser and outlines it">Check</button>`
+        + `<button class="btn btn-primary btn-sm" onclick="uiSaveLoc(${s.id})">Use this</button></div>` : '';
+    const insertRow = open ? `<div class="flex-row" style="gap:8px;margin:6px 0 4px 30px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:8px;flex-wrap:wrap">`
+        + `<span>⏱ Wait</span><input type="number" min="0" step="250" value="${uiDraft.ms}" oninput="uiDraft.ms=this.value" style="width:80px;${UI_INPUT_STYLE}"><span>ms</span>`
+        + `<button class="btn btn-ghost btn-sm" onclick="uiInsertWait(${s.id})">Add wait here</button>`
+        + `<span style="color:var(--muted);margin:0 6px">|</span>`
+        + `<span>📋 New test case</span><input type="text" placeholder="name (optional)" value="${escapeHtml(uiDraft.name)}" oninput="uiDraft.name=this.value" style="width:180px;${UI_INPUT_STYLE}">`
+        + `<button class="btn btn-ghost btn-sm" onclick="uiInsertCase(${s.id})" title="Steps after this one start a new test case">Split after this step</button></div>` : '';
+    return `<div><div class="flex-row" style="gap:8px"><span style="width:14px">${mark}</span><span style="color:var(--muted);width:22px">${n}.</span>`
+         + `<b style="width:88px">${verb[s.type] || s.type}</b><span style="flex:1;word-break:break-all">${s.type === 'note' ? '' : target}${chk}</span>${val}`
+         + (s.locator ? `<button class="btn btn-ghost btn-sm" title="Check: how many elements does this locator match in the live browser right now? (non-mutating; only meaningful if the browser is on this step's screen)" onclick="uiQuickCheck(${s.id})">🔍</button>` : '')
+         + `<button class="btn btn-ghost btn-sm" title="Run to here: replay steps 1–${n} in a fresh window and outline this step's element" onclick="uiRunTo(${s.id})">▶</button>`
+         + (s.locator ? `<button class="btn btn-ghost btn-sm" title="Edit this step's selector" onclick="uiToggleEditLoc(${s.id})">✎</button>` : '')
+         + `<button class="btn btn-ghost btn-sm" title="Insert a wait, or split into a new test case, after this step" onclick="uiToggleInsert(${s.id})">${open ? '−' : '＋'}</button>`
+         + `<button class="btn btn-ghost btn-sm" title="Remove step" onclick="socket.emit('ui_step_delete',{id:${s.id}})">✕</button></div>${locRow}${insertRow}${errLine}${hint}</div>`;
+  }).join('');
+}
+
+function uiSetRecording(on) {
+  uiRecording = on;
+  const badge = document.getElementById('ui-rec-badge');
+  badge.textContent = on ? '● recording' : 'idle';
+  badge.style.color = on ? 'var(--red)' : '';
+  document.getElementById('btn-ui-rec').textContent = on ? '■ Stop recording' : '⏺ Start recording';
+}
+
+function uiToggleRecord() {
+  if (uiRecording) { socket.emit('ui_record_stop'); return; }
+  if (!browserOpen) { toast('Launch the browser first (Capture step)', 'err'); return; }
+  socket.emit('ui_record_start', { portal: document.getElementById('ui-portal').value });
+}
+function uiClearSteps() { uiReplayResults = {}; uiCheckResults = {}; socket.emit('ui_steps_clear'); }
+function uiReplay() {
+  if (!browserOpen) { toast('Launch the browser first (Capture step)', 'err'); return; }
+  uiReplayResults = {}; uiCheckResults = {};
+  renderUiSteps(uiLastSteps);
+  socket.emit('ui_replay', { portal: document.getElementById('ui-portal').value,
+                             slow_mo: parseInt(document.getElementById('ui-slowmo').value, 10) || 0,
+                             timeout_s: uiTimeout() });
+}
+function uiUpdateStep(id, value) { socket.emit('ui_step_update', { id, value }); }
+
+function uiTimeout() { return Math.max(1, parseFloat(document.getElementById('ui-timeout').value) || 15); }
+function uiGenerate() {
+  socket.emit('ui_generate', { name: document.getElementById('ui-test-name').value, timeout_s: uiTimeout(),
+                               shared_session: document.getElementById('ui-shared-session').checked });
+}
+function uiRun() {
+  if (!uiGeneratedFile) { toast('Generate the test first', 'err'); return; }
+  const box = document.getElementById('ui-run-log');
+  box.textContent = ''; box.classList.add('show');
+  socket.emit('ui_run', { file: uiGeneratedFile, headless: document.getElementById('ui-headless').checked,
+                          slow_mo: parseInt(document.getElementById('ui-slowmo').value, 10) || 0 });
+}
+function uiRunStop() { socket.emit('ui_run_stop', { run_id: uiRunId }); }
+
+function uiRunButtons(running) {
+  document.getElementById('btn-ui-run').disabled = running || !uiGeneratedFile;
+  document.getElementById('btn-ui-run-stop').style.display = running ? '' : 'none';
+}
+
+socket.on('ui_locator_checked', (d) => {
+  if (d.ok && d.id != null) { uiCheckResults[d.id] = { count: d.count }; renderUiSteps(uiLastSteps); }
+  if (!d.ok) { toast('Selector error: ' + d.error, 'err'); return; }
+  toast(d.count === 1 ? 'Matches 1 element (outlined in the browser)' : d.count === 0 ? 'Matches 0 elements on the current page' : `Matches ${d.count} elements - too broad, the test will use the first`, d.count === 1 ? 'ok' : 'err');
+});
+socket.on('ui_replay_started', () => {
+  document.getElementById('btn-ui-replay').disabled = true;
+  const st = document.getElementById('ui-replay-status'); st.className = 'pw-run-status'; st.textContent = 'replaying…';
+});
+socket.on('ui_replay_step', (d) => { uiReplayResults[d.id] = d; renderUiSteps(uiLastSteps); });
+socket.on('ui_replay_done', (d) => {
+  document.getElementById('btn-ui-replay').disabled = false;
+  const st = document.getElementById('ui-replay-status');
+  const failed = !d.ok || d.failed_at != null;
+  st.className = 'pw-run-status ' + (failed ? 'err' : 'ok');
+  st.textContent = d.error ? ('✗ ' + d.error) : failed ? '✗ a step failed - fix or delete it, then replay again' : '✓ all steps passed';
+});
+socket.on('ui_steps', (d) => { uiSetRecording(d.recording); renderUiSteps(d.steps || []); });
+socket.on('ui_generated', (d) => {
+  uiGeneratedFile = d.file;
+  const box = document.getElementById('ui-code-box');
+  box.textContent = d.code; box.classList.add('show');
+  document.getElementById('ui-generated-file').textContent =
+    'Saved to generated_scripts/' + d.file + (d.secrets.length ? '  ·  secrets: ' + d.secrets.join(', ') : '');
+  uiRunButtons(false);
+  toast('UI test generated');
+});
+socket.on('ui_run_started', (d) => {
+  uiRunId = d.run_id; uiRunButtons(true);
+  const st = document.getElementById('ui-run-status'); st.className = 'pw-run-status'; st.textContent = 'running…';
+});
+socket.on('ui_run_log', (d) => {
+  const box = document.getElementById('ui-run-log');
+  box.classList.add('show'); box.textContent += d.line; box.scrollTop = box.scrollHeight;
+});
+socket.on('ui_run_done', (d) => {
+  uiRunButtons(false);
+  const st = document.getElementById('ui-run-status');
+  st.className = 'pw-run-status ' + (d.returncode === 0 ? 'ok' : 'err');
+  st.textContent = d.returncode === 0 ? '✓ passed' : '✗ failed (exit ' + d.returncode + ')';
+});
+socket.on('ui_run_error', (d) => { uiRunButtons(false); toast(d.msg, 'err'); });
+socket.emit('ui_get_steps');
+
 function showPanel(n) {
   if (n === 'config') { openConfig(); return; }
-  ['capture','preview'].forEach(p => document.getElementById('panel-'+p).classList.toggle('active', p===n));
+  ['capture','preview','ui'].forEach(p => document.getElementById('panel-'+p).classList.toggle('active', p===n));
   document.getElementById('step-1').classList.toggle('active', n==='capture');
   document.getElementById('step-2').classList.toggle('active', n==='preview');
+  document.getElementById('step-3').classList.toggle('active', n==='ui');
 }
 
 function escapeHtml(str) {
