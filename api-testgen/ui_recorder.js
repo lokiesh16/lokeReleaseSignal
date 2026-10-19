@@ -356,11 +356,11 @@
     host.style.cssText = 'all:initial;position:fixed;top:0;left:0;width:0;height:0;overflow:visible;pointer-events:none;z-index:2147483647';
     root = host.attachShadow({ mode: 'open' });
     root.innerHTML = '<style>' + CSS_TEXT + '</style><div id="box"></div><div id="menu"></div>' +
-      '<div id="bar"><span class="rec">&#9679; REC</span><button id="pick" title="Select an element without clicking it (Esc to leave)">&#127919; Pick</button>' +
+      '<div id="bar"><span class="rec" id="rec">&#9679; REC</span><button id="pick" title="Select an element without clicking it (Esc to leave)">&#127919; Pick</button>' +
       '<button id="anchor" title="Prefer locators anchored to the nearest label (ignores a field\'s current value, e.g. a date or selected option)">&#9875; Anchor</button>' +
       '<input id="ms" type="number" value="1000" min="0" step="250" title="milliseconds"><button id="wait">&#9201; Wait</button>' +
       '<button id="top" title="Scroll to top">&#10514;</button><button id="bot" title="Scroll to bottom">&#10515;</button><span id="msg"></span></div>';
-    ['box', 'menu', 'pick', 'anchor', 'ms', 'wait', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
+    ['box', 'menu', 'rec', 'pick', 'anchor', 'ms', 'wait', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
     ui.pick.onclick = function () { pickOn ? exitPick() : enterPick(); };
     ui.anchor.onclick = function () {
       anchorOn = !anchorOn; ui.anchor.classList.toggle('on', anchorOn);
@@ -501,12 +501,13 @@
   }, true);
   window.addEventListener('scroll', function () { if (selEl) drawBox(selEl); }, true);
 
-  window.__tgSetRec = function (on, showToolbar, anchor) {
+  window.__tgSetRec = function (on, showToolbar, anchor, label) {
     recOn = !!on;
     anchorOn = !!anchor;
     if (on && showToolbar) ensureUi();
     if (host) host.style.display = (on && showToolbar) ? '' : 'none';
     if (ui.anchor) ui.anchor.classList.toggle('on', anchorOn);
+    if (ui.rec) ui.rec.innerHTML = '&#9679; REC' + (label ? ' &middot; ' + label : '');   // which portal, when recording several
     if (!on) exitPick();
   };
 
@@ -514,7 +515,7 @@
   function syncState() {
     try {
       var p = window.__tgRecordStep && window.__tgRecordStep({ type: '__state' });
-      if (p && p.then) p.then(function (st) { if (st) window.__tgSetRec(st.rec, st.toolbar, st.anchor); });
+      if (p && p.then) p.then(function (st) { if (st) window.__tgSetRec(st.rec, st.toolbar, st.anchor, st.label); });
     } catch (e) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncState);
