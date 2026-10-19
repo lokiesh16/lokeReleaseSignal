@@ -1813,7 +1813,7 @@ function uiDescribeLocator(l) {
   return `${l.kind} "${l.value}"${nth}`;
 }
 
-let uiInsertOpen = null, uiDraft = { ms: 1000, name: '' };
+let uiInsertOpen = null, uiDraft = { ms: 1000, name: '', url: '', portal: 'A' };
 let uiCheckResults = {};   // step id -> {count} from the quick Check (live browser, current page)
 function uiRunTo(id) {
   if (!browserOpen) { toast('Launch the browser first (Capture step)', 'err'); return; }
@@ -1856,6 +1856,12 @@ function uiInsertWait(afterId) {
   socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'wait', value: String(uiDraft.ms) } });
   uiInsertOpen = null;
 }
+function uiInsertGoto(afterId) {
+  const url = (uiDraft.url || '').trim();
+  if (!url) { toast('Enter a URL to go to', 'err'); return; }
+  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'goto', value: url, portal: uiDraft.portal || 'A' } });
+  uiDraft.url = ''; uiInsertOpen = null;
+}
 function uiInsertCase(afterId) {
   socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'case', value: uiDraft.name } });
   uiDraft.name = ''; uiInsertOpen = null;
@@ -1872,7 +1878,7 @@ function renderUiSteps(steps) {
                  press: 'Press', press_page: 'Press', assert_text: 'Assert text', assert_value: 'Assert value',
                  assert_visible: 'Assert visible', assert_attr: 'Assert attr', hover: 'Hover', scroll_into_view: 'Scroll to',
                  wait_for: 'Wait for', wait: 'Wait (ms)', scroll_page: 'Scroll page', note: 'Note' };
-  const editable = ['fill', 'select', 'press', 'press_page', 'assert_text', 'assert_value', 'assert_attr', 'wait_for', 'wait', 'scroll_page'];
+  const editable = ['goto', 'fill', 'select', 'press', 'press_page', 'assert_text', 'assert_value', 'assert_attr', 'wait_for', 'wait', 'scroll_page'];
   const multiPortal = steps.some(x => x.portal === 'B');   // only label steps when more than one portal is involved
   let n = 0, caseNo = 0;
   box.innerHTML = steps.map((s) => {
@@ -1885,7 +1891,7 @@ function renderUiSteps(steps) {
     }
     n += 1;
     const ptag = multiPortal ? `<span class="badge" style="margin-right:6px;${s.portal === 'B' ? 'color:#38bdf8' : ''}">${s.portal || 'A'}</span>` : '';
-    const target = s.type === 'goto' ? escapeHtml(s.value) : !s.locator ? '' : escapeHtml(uiDescribeLocator(s.locator) + (s.attr ? ` [${s.attr}]` : ''));
+    const target = s.type === 'goto' ? '' : !s.locator ? '' : escapeHtml(uiDescribeLocator(s.locator) + (s.attr ? ` [${s.attr}]` : ''));
     let val = '';
     if (s.type === 'fill' && s.secret) val = '<span class="badge">secret → env var</span>';
     else if (editable.includes(s.type)) val = `<input type="text" value="${escapeHtml(s.value)}" onchange="uiUpdateStep(${s.id}, this.value)" style="flex:1;min-width:80px;${UI_INPUT_STYLE}">`;
@@ -1910,6 +1916,10 @@ function renderUiSteps(steps) {
     const insertRow = open ? `<div class="flex-row" style="gap:8px;margin:6px 0 4px 30px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:8px;flex-wrap:wrap">`
         + `<span>⏱ Wait</span><input type="number" min="0" step="250" value="${uiDraft.ms}" oninput="uiDraft.ms=this.value" style="width:80px;${UI_INPUT_STYLE}"><span>ms</span>`
         + `<button class="btn btn-ghost btn-sm" onclick="uiInsertWait(${s.id})">Add wait here</button>`
+        + `<span style="color:var(--muted);margin:0 6px">|</span>`
+        + `<span>🌐 Go to</span><input type="text" placeholder="https://… (opens/navigates that portal)" value="${escapeHtml(uiDraft.url)}" oninput="uiDraft.url=this.value" style="width:230px;${UI_INPUT_STYLE}">`
+        + `<select onchange="uiDraft.portal=this.value" style="${UI_INPUT_STYLE}"><option value="A"${uiDraft.portal !== 'B' ? ' selected' : ''}>Portal A</option><option value="B"${uiDraft.portal === 'B' ? ' selected' : ''}>Portal B</option></select>`
+        + `<button class="btn btn-ghost btn-sm" onclick="uiInsertGoto(${s.id})" title="Inserts a Go-to step after this one">Add</button>`
         + `<span style="color:var(--muted);margin:0 6px">|</span>`
         + `<span>📋 New test case</span><input type="text" placeholder="name (optional)" value="${escapeHtml(uiDraft.name)}" oninput="uiDraft.name=this.value" style="width:180px;${UI_INPUT_STYLE}">`
         + `<button class="btn btn-ghost btn-sm" onclick="uiInsertCase(${s.id})" title="Steps after this one start a new test case">Split after this step</button></div>` : '';

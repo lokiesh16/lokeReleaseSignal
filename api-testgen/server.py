@@ -605,8 +605,11 @@ def playwright_worker():
                 ui_rec.update(recording=True, portals=portals, portal=portals[0], toolbar=cmd.get("toolbar", True))
                 if not keep:
                     ui_rec.update(steps=[], next_id=1, loaded_name=None)
+            known = {st.get("portal", "A") for st in ui_rec["steps"]}
             for p in portals:
-                if not keep:
+                if not keep or p not in known:
+                    # Fresh recording, or appending a portal the list hasn't used yet: start it with a
+                    # "Go to" for the page it is on now, so replay opens it on the right page.
                     pg = pw["pages"][p]
                     _ui_add_step({"type": "goto", "value": pg.url, "url": pg.url}, p)
                 _set_page_recording(p, True, ui_rec["toolbar"])
@@ -666,10 +669,18 @@ def playwright_worker():
                     rpages[portal] = pg
                 return rpages[portal]
 
+            opened = set()
             try:
                 for pos, s in enumerate(steps):
-                    rpage = replay_page(s.get("portal", "A"))
+                    portal = s.get("portal", "A")
+                    rpage = replay_page(portal)
                     try:
+                        if s.get("type") == "goto":
+                            opened.add(portal)
+                        elif portal not in opened and s.get("url") and s.get("type") not in ("wait", "note", "case"):
+                            # No "Go to" for this portal yet: open it on the page this step was recorded on.
+                            rpage.goto(s["url"])
+                            opened.add(portal)
                         if cmd.get("highlight_last") and pos == len(steps) - 1 and s.get("locator"):
                             # "Run to here": show which element this step's locator found, then act on it.
                             try:
@@ -998,7 +1009,7 @@ def ui_step_insert(data):
     waits and for splitting the list into test cases ('case' markers)."""
     data = data or {}
     after_id, step = data.get("after_id"), dict(data.get("step") or {})
-    if step.get("type") not in ("wait", "case"):
+    if step.get("type") not in ("wait", "case", "goto"):
         emit("error", {"msg": "Unsupported step type"}); return
     with ui_rec_lock:
         steps = ui_rec["steps"]
@@ -1016,8 +1027,17 @@ def ui_step_insert(data):
                 idx += 1
                 n_cases = 1
             step["value"] = (step.get("value") or "").strip() or f"Test case {n_cases + 1}"
+        elif step["type"] == "goto":
+            url = (step.get("value") or "").strip()
+            if not url:
+                emit("error", {"msg": "Enter a URL"}); return
+            step.update(value=url, url=url, portal=step.get("portal") if step.get("portal") in ("A", "B") else "A")
         else:
             step["value"] = str(step.get("value") or 1000)
+        if step["type"] != "goto" and "portal" not in step:
+            # A hand-added wait/case belongs to the window of the step it follows.
+            prev = steps[idx - 1] if idx > 0 else None
+            step["portal"] = (prev or {}).get("portal", "A")
         steps.insert(idx, new_step(step))
     _ui_emit_steps()
 

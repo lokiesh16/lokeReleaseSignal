@@ -166,12 +166,23 @@ def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
 
     uses_b = any(st.get("portal") == "B" for st in steps)
     funcs, used = [], set()
+    opened = set()   # portals that have been navigated somewhere so far
     for n, (cname, csteps) in enumerate(cases, 1):
         lines = []
-        # Fresh-session mode: every case after the first starts from the page it began on.
-        if multi and not shared_session and n > 1 and csteps[0].get("type") != "goto" and csteps[0].get("url"):
-            lines.append(f"page.goto({_s(csteps[0]['url'])})")
-        lines += [ln for ln in (_render_step(s, secrets) for s in csteps) if ln]
+        if not shared_session:
+            opened = set()   # fresh browser per case: every portal starts blank again
+        for st in csteps:
+            portal = st.get("portal", "A")
+            if st.get("type") == "goto":
+                opened.add(portal)
+            elif portal not in opened and st.get("url") and st.get("type") not in ("wait", "note", "case"):
+                # No explicit "Go to" before this step (e.g. steps appended later, or a fresh case):
+                # open the portal on the page the step was recorded on, instead of a blank tab.
+                lines.append(_for_portal(f"page.goto({_s(st['url'])})", portal))
+                opened.add(portal)
+            line = _render_step(st, secrets)
+            if line:
+                lines.append(line)
         fn = f"test_{slug}_{n:02d}_{slugify(cname)}" if multi else f"test_{slug}"
         while fn in used:
             fn += "_x"
