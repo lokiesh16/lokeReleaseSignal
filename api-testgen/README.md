@@ -57,7 +57,9 @@ in the sidebar.
    adds the rest: **🎯 Pick** highlights an element *without clicking it* and
    offers a menu — click, hover, scroll into view, wait for element, assert
    visible / text / value / href — plus a timed **Wait** and scroll top/bottom.
-   Esc leaves pick mode. **▶ Replay steps** checks them in a fresh window.
+   Esc leaves pick mode. **⚓ Anchor** locates controls by their nearest label
+   (e.g. the button under “Date of Birth”) rather than their current text, for
+   values that change; every step also keeps such an alternative you can swap in with ✎. **▶ Replay steps** checks them in a fresh window.
 3. Name the scenario and **Generate test** → a self-contained
    pytest + Playwright file at `generated_scripts/ui_tests/test_<name>.py`.
    Locators prefer test-id > role+name > label > placeholder > text > css.

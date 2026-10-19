@@ -20,7 +20,7 @@
 
   var committed = new WeakMap();                   // element -> last value we reported
   var host = null, root = null, ui = {};           // toolbar (created lazily)
-  var recOn = false, pickOn = false, selEl = null;
+  var recOn = false, pickOn = false, selEl = null, anchorOn = false;   // anchorOn: prefer label-anchored locators
 
   function isOurs(e) {
     return !!(host && e.composedPath && e.composedPath().indexOf(host) >= 0);
@@ -134,8 +134,60 @@
     return null;
   }
 
+  // ── value-independent locators ────────────────────────────────────────────
+  // A control whose visible text is the data itself (a date picker button showing
+  // "6 October 2000", a dropdown showing the chosen option) can't be found by that
+  // text - it changes. Anchor on the stable label next to it instead:
+  //   //label[normalize-space(.)='Date of Birth']/following-sibling::div[1]//button
+  // Verified with the browser's own XPath engine, which Playwright's `xpath=` uses too.
+  function xq(t) {                                       // XPath string literal
+    if (t.indexOf("'") < 0) return "'" + t + "'";
+    if (t.indexOf('"') < 0) return '"' + t + '"';
+    return "concat('" + t.split("'").join("',\"'\",'") + "')";
+  }
+  function xpathAll(x) {
+    var r = document.evaluate(x, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null), a = [];
+    for (var i = 0; i < r.snapshotLength; i++) a.push(r.snapshotItem(i));
+    return a;
+  }
+  function anchorText(n, ownText) {                      // a sibling that reads like a field label
+    if (n.tagName === 'LABEL') return norm(n.textContent);
+    if (n.children.length > 1) return '';
+    var t = norm(n.textContent);
+    return (t && t.length <= 40 && t !== ownText && !/^[\d\s.,:/-]+$/.test(t)) ? t : '';
+  }
+  var INTERACTIVE = 'button,a[href],input,select,textarea,summary,[role=button],[role=link],[role=combobox],[role=checkbox],' +
+                    '[role=radio],[role=tab],[role=menuitem],[role=option],[role=switch],[role=textbox]';
+  function labelAnchoredLocator(el) {
+    // Land on the control itself (the button), not the span/icon inside it that the pointer happened to hit.
+    var hit = el.closest(INTERACTIVE);
+    if (hit && hit !== el) el = hit;
+    var own = norm(el.textContent), node = el;
+    for (var depth = 0; depth < 6 && node && node !== document.body && node !== document.documentElement; depth++, node = node.parentElement) {
+      for (var sib = node.previousElementSibling; sib; sib = sib.previousElementSibling) {
+        var label = anchorText(sib, own);
+        if (!label) continue;
+        var follow = [], k = 0, n = sib.nextElementSibling;
+        while (n) { if (n.tagName === node.tagName) { k++; if (n === node) break; } n = n.nextElementSibling; }
+        if (!n) break;
+        var x = '//' + sib.tagName.toLowerCase() + '[normalize-space(.)=' + xq(label) + ']' +
+                '/following-sibling::' + node.tagName.toLowerCase() + '[' + k + ']' +
+                (node === el ? '' : '//' + el.tagName.toLowerCase());
+        var hits = xpathAll(x), idx = hits.indexOf(el);   // `el` is the control here, not the raw pick
+        if (idx < 0) break;                              // this label doesn't lead to el; try a higher level
+        if (hits.length > 1) x = '(' + x + ')[' + (idx + 1) + ']';
+        return { kind: 'css', value: 'xpath=' + x, anchor: label };
+      }
+    }
+    return null;
+  }
+
   function buildLocator(el) {
-    return playwrightLocator(el) || buildLocatorFallback(el);
+    var primary = playwrightLocator(el) || buildLocatorFallback(el), anchored = null;
+    try { anchored = labelAnchoredLocator(el); } catch (e) {}
+    if (anchored && anchorOn) { anchored.alts = [primary]; return anchored; }   // ⚓ mode: value-independent first
+    if (anchored) primary.alts = [anchored];                                    // otherwise keep it as an alternative
+    return primary;
   }
 
   function buildLocatorFallback(el) {
@@ -305,10 +357,16 @@
     root = host.attachShadow({ mode: 'open' });
     root.innerHTML = '<style>' + CSS_TEXT + '</style><div id="box"></div><div id="menu"></div>' +
       '<div id="bar"><span class="rec">&#9679; REC</span><button id="pick" title="Select an element without clicking it (Esc to leave)">&#127919; Pick</button>' +
+      '<button id="anchor" title="Prefer locators anchored to the nearest label (ignores a field\'s current value, e.g. a date or selected option)">&#9875; Anchor</button>' +
       '<input id="ms" type="number" value="1000" min="0" step="250" title="milliseconds"><button id="wait">&#9201; Wait</button>' +
       '<button id="top" title="Scroll to top">&#10514;</button><button id="bot" title="Scroll to bottom">&#10515;</button><span id="msg"></span></div>';
-    ['box', 'menu', 'pick', 'ms', 'wait', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
+    ['box', 'menu', 'pick', 'anchor', 'ms', 'wait', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
     ui.pick.onclick = function () { pickOn ? exitPick() : enterPick(); };
+    ui.anchor.onclick = function () {
+      anchorOn = !anchorOn; ui.anchor.classList.toggle('on', anchorOn);
+      try { window.__tgRecordStep({ type: '__anchor', value: anchorOn }); } catch (e) {}
+      say(anchorOn ? 'Anchor on: locators use the nearest label' : 'Anchor off');
+    };
     ui.wait.onclick = function () { send({ type: 'wait', value: String(parseInt(ui.ms.value, 10) || 0) }); say('Added: wait ' + ui.ms.value + 'ms'); };
     ui.top.onclick = function () { window.scrollTo(0, 0); send({ type: 'scroll_page', value: 'top' }); say('Added: scroll to top'); };
     ui.bot.onclick = function () { window.scrollTo(0, document.documentElement.scrollHeight); send({ type: 'scroll_page', value: 'bottom' }); say('Added: scroll to bottom'); };
@@ -344,6 +402,7 @@
   function trunc(t, n) { return t.length > n ? t.slice(0, n - 1) + '…' : t; }
 
   function describe(loc) {
+    if (loc.anchor) return '\u2693 label "' + loc.anchor + '"';
     if (loc.kind === 'pw') return loc.py;
     var d = loc.kind === 'role' ? loc.role + ' "' + loc.name + '"' : loc.kind + ' ' + JSON.stringify(loc.value);
     return loc.nth != null ? d + ' #' + (loc.nth + 1) : d;
@@ -442,10 +501,12 @@
   }, true);
   window.addEventListener('scroll', function () { if (selEl) drawBox(selEl); }, true);
 
-  window.__tgSetRec = function (on, showToolbar) {
+  window.__tgSetRec = function (on, showToolbar, anchor) {
     recOn = !!on;
+    anchorOn = !!anchor;
     if (on && showToolbar) ensureUi();
     if (host) host.style.display = (on && showToolbar) ? '' : 'none';
+    if (ui.anchor) ui.anchor.classList.toggle('on', anchorOn);
     if (!on) exitPick();
   };
 
@@ -453,7 +514,7 @@
   function syncState() {
     try {
       var p = window.__tgRecordStep && window.__tgRecordStep({ type: '__state' });
-      if (p && p.then) p.then(function (st) { if (st) window.__tgSetRec(st.rec, st.toolbar); });
+      if (p && p.then) p.then(function (st) { if (st) window.__tgSetRec(st.rec, st.toolbar, st.anchor); });
     } catch (e) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncState);
