@@ -37,6 +37,7 @@ from flask_socketio import SocketIO, emit
 
 from api_chain_analyzer import detect_api_chains
 from ui_test_generator import generate_ui_test, slugify, replay_step, resolve_locator, describe_failure
+from ui_run_report import build_report
 
 
 def _app_dir():
@@ -319,6 +320,7 @@ ui_rec_lock = threading.Lock()
 # the files are owner-only and the folder is gitignored.
 UI_RECORDINGS_DIR = os.environ.get("UI_RECORDINGS_DIR") or os.path.join(BASE_DIR, "ui_recordings")
 UI_AUTOSAVE_FILE = os.path.join(UI_RECORDINGS_DIR, ".autosave.json")
+UI_REPORTS_DIR = os.environ.get("UI_REPORTS_DIR") or os.path.join(BASE_DIR, "ui_reports")
 ui_rec["loaded_name"] = None   # name of the saved recording being edited, if any
 
 
@@ -670,10 +672,35 @@ def playwright_worker():
                 return rpages[portal]
 
             opened = set()
+            want_report = bool(cmd.get("report"))
+            report_rows, run_t0, finals = [], time.time(), {}
+
+            def report_row(pg, st, ok, t0, error=None, shot=None):
+                """What a report needs per step: duration, what the page showed afterwards, a screenshot."""
+                row = {"id": st["id"], "ok": ok, "ms": int((time.time() - t0) * 1000), "error": error}
+                try:
+                    row["url"], row["title"] = pg.url, pg.title()
+                except Exception:
+                    pass
+                if st.get("type") in ("assert_text", "assert_value") and st.get("locator"):
+                    try:   # the value actually observed, next to the one expected (most useful when the assertion failed)
+                        el = resolve_locator(pg, st["locator"]).first
+                        row["saw"] = (el.input_value() if st["type"] == "assert_value" else el.inner_text())[:200]
+                    except Exception:
+                        pass
+                if shot is None and st.get("type") not in ("case", "note", "wait"):
+                    try:
+                        shot = base64.b64encode(pg.screenshot(type="jpeg", quality=55)).decode("ascii")
+                    except Exception:
+                        shot = None
+                row["shot"] = shot
+                return row
+
             try:
                 for pos, s in enumerate(steps):
                     portal = s.get("portal", "A")
                     rpage = replay_page(portal)
+                    step_t0 = time.time()
                     try:
                         if s.get("type") == "goto":
                             opened.add(portal)
@@ -692,6 +719,8 @@ def playwright_worker():
                                 pass
                         replay_step(rpage, s, pw_expect)
                         res = {"id": s["id"], "ok": True}
+                        if want_report:
+                            report_rows.append(report_row(rpage, s, True, step_t0))
                     except Exception as e:
                         failed_at = s["id"]
                         res = {"id": s["id"], "ok": False, "error": describe_failure(rpage, s, e)}
@@ -699,12 +728,22 @@ def playwright_worker():
                             res["screenshot"] = base64.b64encode(rpage.screenshot(type="jpeg", quality=50)).decode("ascii")
                         except Exception:
                             pass
+                        if want_report:
+                            report_rows.append(report_row(rpage, s, False, step_t0,
+                                                          error=res["error"], shot=res.get("screenshot")))
                     with app.app_context():
                         socketio.emit("ui_replay_step", res)
                     if failed_at is not None:
                         break
                     if slow:
                         rpage.wait_for_timeout(slow)
+                finals = {}
+                if want_report:
+                    for pt, pg in rpages.items():   # "Final screen": each portal's window as the run ended
+                        try:
+                            finals[pt] = base64.b64encode(pg.screenshot(type="jpeg", quality=60)).decode("ascii")
+                        except Exception:
+                            pass
                 if failed_at is None and rpages:
                     next(iter(rpages.values())).wait_for_timeout(1500 if cmd.get("highlight_last") else 800)   # let the user see the end state
             finally:
@@ -713,7 +752,10 @@ def playwright_worker():
                         c.close()
                     except Exception:
                         pass
-            _put_result(cmd, {"ok": True, "failed_at": failed_at})
+            _put_result(cmd, {"ok": True, "failed_at": failed_at,
+                              "report": report_rows if want_report else None,
+                              "finals": finals if want_report else None,
+                              "total_ms": int((time.time() - run_t0) * 1000)})
 
         elif action == "dom_snapshot":
             page = get_page_for(cmd)
@@ -1112,13 +1154,30 @@ def ui_replay(data):
         emit("error", {"msg": "Nothing recorded yet"}); return
     emit("ui_replay_started", {})
 
+    want_report = bool(data.get("report"))
+    run_name = (data.get("name") or "").strip() or (ui_rec.get("loaded_name") or "UI test")
+    started = datetime.now()
+
     def run():
         res = pw_call({"action": "ui_replay", "portal": portal, "steps": steps, "slow_mo": data.get("slow_mo") or 0,
                        "timeout_s": data.get("timeout_s") or 15,
-                       "highlight_last": upto is not None}, timeout=600)
+                       "highlight_last": upto is not None, "report": want_report}, timeout=600)
+        report_info = None
+        if want_report and res.get("ok") and res.get("report") is not None:
+            try:
+                html_text = build_report(run_name, steps, res["report"], res.get("finals"), started, res.get("total_ms", 0))
+                folder = f"{slugify(run_name)}_{started.strftime('%Y%m%d-%H%M%S')}"
+                os.makedirs(os.path.join(UI_REPORTS_DIR, folder), exist_ok=True)
+                with open(os.path.join(UI_REPORTS_DIR, folder, "index.html"), "w", encoding="utf-8") as f:
+                    f.write(html_text)
+                report_info = {"folder": folder, "url": f"/api/ui-reports/{folder}/index.html",
+                               "passed": res.get("failed_at") is None}
+            except Exception as e:
+                print(f"UI report failed: {e}")
+                report_info = {"error": str(e)}
         with app.app_context():
             socketio.emit("ui_replay_done", {"ok": res.get("ok", False), "failed_at": res.get("failed_at"),
-                                             "error": res.get("error")})
+                                             "error": res.get("error"), "report": report_info})
 
     threading.Thread(target=run, daemon=True).start()
 
@@ -1214,6 +1273,44 @@ def delete_ui_recording(slug):
             ui_rec["loaded_name"] = None   # the steps stay in the editor, just no longer tied to a saved file
     _ui_emit_steps()
     return jsonify({"ok": True})
+
+
+_REPORT_FOLDER_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+
+def _report_path(folder):
+    if not _REPORT_FOLDER_RE.match(folder or ""):
+        return None
+    path = os.path.join(UI_REPORTS_DIR, folder, "index.html")
+    return path if os.path.isfile(path) else None
+
+
+@app.route("/api/ui-reports/<folder>/index.html", methods=["GET"])
+def view_ui_report(folder):
+    path = _report_path(folder)
+    if not path:
+        return jsonify({"error": "Report not found"}), 404
+    return send_from_directory(os.path.dirname(path), "index.html")
+
+
+@app.route("/api/ui-reports/<folder>/publish", methods=["POST"])
+def publish_ui_report(folder):
+    """Uploads one report to Cloudflare R2 as reports/<folder>/index.html and returns its PUBLIC url.
+    Only ever runs when the user clicks Publish - the page contains screenshots of the app."""
+    path = _report_path(folder)
+    if not path:
+        return jsonify({"error": "Report not found"}), 404
+    import cf_r2
+    if not cf_r2.is_configured():
+        return jsonify({"error": "Cloudflare R2 is not configured - see CLOUDFLARE_R2_* in .env"}), 400
+    try:
+        with open(path, encoding="utf-8") as f:
+            url = cf_r2.publish_html_report(f"reports/{folder}", "index.html", f.read())
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"publish failed: {e}"}), 500
+    return jsonify({"url": url})
 
 
 @socketio.on("ui_generate")

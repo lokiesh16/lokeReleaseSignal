@@ -635,6 +635,12 @@
             <button class="btn btn-ghost btn-sm" onclick="uiClearSteps()">Clear steps</button>
             <span id="ui-replay-status" class="pw-run-status"></span>
           </div>
+          <div class="flex-row" style="margin-top:8px;gap:14px;flex-wrap:wrap">
+            <label style="font-size:12px;color:var(--muted)" title="Takes a screenshot after every step during Replay and builds a shareable HTML report (goal, expected result, verdict, issues, steps with screenshots, final screen). Makes the replay a little slower.">
+              <input type="checkbox" id="ui-report"> 📄 Create an HTML report when replaying
+            </label>
+            <span id="ui-report-row" style="display:none;font-size:12px"></span>
+          </div>
           <p style="margin-top:8px;font-size:11px">Replay runs the steps in a fresh window (clean cookies) so you can check each one before generating. Stops at the first failure.</p>
         </div>
 
@@ -2031,7 +2037,9 @@ function uiReplay() {
   if (!browserOpen) { toast('Launch the browser first (Capture step)', 'err'); return; }
   uiReplayResults = {}; uiCheckResults = {};
   renderUiSteps(uiLastSteps);
-  socket.emit('ui_replay', { portal: document.getElementById('ui-portal').value,
+  document.getElementById('ui-report-row').style.display = 'none';
+  socket.emit('ui_replay', { report: document.getElementById('ui-report').checked, name: document.getElementById('ui-test-name').value || uiLoadedName || '',
+                             portal: document.getElementById('ui-portal').value,
                              slow_mo: parseInt(document.getElementById('ui-slowmo').value, 10) || 0,
                              timeout_s: uiTimeout() });
 }
@@ -2066,7 +2074,30 @@ socket.on('ui_replay_started', () => {
   const st = document.getElementById('ui-replay-status'); st.className = 'pw-run-status'; st.textContent = 'replaying…';
 });
 socket.on('ui_replay_step', (d) => { uiReplayResults[d.id] = d; renderUiSteps(uiLastSteps); });
+function uiShowReport(rep) {
+  const row = document.getElementById('ui-report-row');
+  if (!rep) { row.style.display = 'none'; return; }
+  if (rep.error) { row.style.display = ''; row.innerHTML = `<span style="color:var(--red)">Report failed: ${escapeHtml(rep.error)}</span>`; return; }
+  row.style.display = '';
+  row.innerHTML = `📄 Report ready (${rep.passed ? 'PASS' : 'FAIL'}) — <a href="${BRIDGE_URL}${rep.url}" target="_blank" style="color:var(--accent)">Open</a>`
+    + ` <button class="btn btn-ghost btn-sm" id="ui-report-publish" onclick="uiPublishReport('${rep.folder}')" title="Uploads this report to Cloudflare R2 and gives a public link">☁ Publish</button> <span id="ui-report-link"></span>`;
+}
+async function uiPublishReport(folder) {
+  if (!confirm('Publish this report to a public link on Cloudflare R2?\n\nIt contains screenshots of the app and the step values (passwords are masked). Anyone with the link can view it.')) return;
+  const btn = document.getElementById('ui-report-publish'), out = document.getElementById('ui-report-link');
+  btn.disabled = true; btn.textContent = 'Publishing…';
+  try {
+    const r = await fetch(`${BRIDGE_URL}/api/ui-reports/${encodeURIComponent(folder)}/publish`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'publish failed');
+    out.innerHTML = `<a href="${escapeHtml(d.url)}" target="_blank" style="color:var(--accent)">${escapeHtml(d.url)}</a>`;
+    try { await navigator.clipboard.writeText(d.url); toast('Report published - link copied'); } catch (e) { toast('Report published'); }
+  } catch (e) { toast(e.message, 'err'); }
+  btn.disabled = false; btn.textContent = '☁ Publish';
+}
+
 socket.on('ui_replay_done', (d) => {
+  uiShowReport(d.report);
   document.getElementById('btn-ui-replay').disabled = false;
   const st = document.getElementById('ui-replay-status');
   const failed = !d.ok || d.failed_at != null;
