@@ -217,6 +217,7 @@
     var val = el.value;
     if (committed.get(el) === val) return;
     committed.set(el, val);
+    if (val === '') { send({ type: 'clear', locator: buildLocator(el) }); return; }
     var isSecret = (el.getAttribute('type') || '').toLowerCase() === 'password' ||
                    /pass(word)?|secret|token|otp|cvv|cvc/i.test((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('autocomplete') || ''));
     send({ type: 'fill', locator: buildLocator(el), value: val, secret: !!isSecret });
@@ -244,6 +245,11 @@
     if (tg === 'input' && (target.type === 'checkbox' || target.type === 'radio')) return;
     if (!e.isTrusted) return;                      // script-fired clicks aren't user actions
     send({ type: 'click', locator: buildLocator(target) });
+  }, true);
+
+  document.addEventListener('focusin', function (e) {
+    var el = e.target;
+    if (el instanceof Element && !isOurs(e) && isTextEntry(el) && !el.isContentEditable && !committed.has(el)) committed.set(el, el.value);
   }, true);
 
   document.addEventListener('change', function (e) {
@@ -280,14 +286,14 @@
   var CSS_TEXT =
     ':host{all:initial}*{box-sizing:border-box;font:12px/1.3 -apple-system,Segoe UI,sans-serif}' +
     '#bar{position:fixed;top:10px;right:10px;display:flex;align-items:center;gap:6px;background:#111827;color:#f9fafb;' +
-    'padding:6px 8px;border-radius:9px;box-shadow:0 4px 18px rgba(0,0,0,.35)}' +
+    'padding:6px 8px;border-radius:9px;box-shadow:0 4px 18px rgba(0,0,0,.35);pointer-events:auto}' +
     '.rec{color:#f87171;font-weight:600}#msg{color:#86efac;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
     'button{background:#374151;color:#f9fafb;border:0;border-radius:6px;padding:5px 9px;cursor:pointer}' +
     'button:hover{background:#4b5563}button.on{background:#7c6aff}' +
     'input{width:62px;background:#1f2937;color:#f9fafb;border:1px solid #4b5563;border-radius:6px;padding:4px 6px}' +
     '#box{position:fixed;display:none;pointer-events:none;border:2px solid #7c6aff;background:rgba(124,106,255,.14);border-radius:3px}' +
     '#menu{position:fixed;display:none;flex-direction:column;gap:3px;background:#111827;padding:6px;border-radius:9px;' +
-    'box-shadow:0 6px 22px rgba(0,0,0,.4);max-width:330px}' +
+    'box-shadow:0 6px 22px rgba(0,0,0,.4);max-width:330px;pointer-events:auto}' +
     '#menu .hd{color:#9ca3af;font-size:11px;padding:2px 4px 5px;word-break:break-all}' +
     '#menu button{text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
     '#menu .row{display:flex;gap:4px}#menu .row button{flex:1;text-align:center}';
@@ -295,7 +301,7 @@
   function ensureUi() {
     if (host || !document.documentElement) return;
     host = document.createElement('div');
-    host.style.cssText = 'all:initial;position:fixed;top:0;left:0;z-index:2147483647';
+    host.style.cssText = 'all:initial;position:fixed;top:0;left:0;width:0;height:0;overflow:visible;pointer-events:none;z-index:2147483647';
     root = host.attachShadow({ mode: 'open' });
     root.innerHTML = '<style>' + CSS_TEXT + '</style><div id="box"></div><div id="menu"></div>' +
       '<div id="bar"><span class="rec">&#9679; REC</span><button id="pick" title="Select an element without clicking it (Esc to leave)">&#127919; Pick</button>' +
@@ -352,6 +358,7 @@
     var ops = [['Click', 'click'], ['Hover', 'hover'], ['Scroll into view', 'scroll_into_view'],
                ['Wait for element', 'wait_for'], ['Assert visible', 'assert_visible']];
     if (!isField && text && text.length <= 200) ops.push(['Assert text: "' + trunc(text, 40) + '"', 'assert_text']);
+    if (isField && !isToggle && tag !== 'select') ops.splice(1, 0, ['Clear field', 'clear']);
     if (isField && !isToggle && type !== 'password') ops.push(['Assert value: "' + trunc(String(el.value || ''), 40) + '"', 'assert_value']);
     if (href) ops.push(['Assert href: ' + trunc(href, 40), 'assert_attr']);
 
@@ -381,7 +388,7 @@
 
   function applyOp(op, el) {
     var loc = buildLocator(el), tag = el.tagName.toLowerCase();
-    var label = { click: 'click', hover: 'hover', scroll_into_view: 'scroll', wait_for: 'wait for element',
+    var label = { click: 'click', clear: 'clear', hover: 'hover', scroll_into_view: 'scroll', wait_for: 'wait for element',
                   assert_visible: 'assert visible', assert_text: 'assert text', assert_value: 'assert value', assert_attr: 'assert href' }[op];
     var isToggle = tag === 'input' && /^(checkbox|radio)$/i.test(el.getAttribute('type') || '');
     drawBox(el, '#22c55e');
@@ -391,6 +398,8 @@
       // Checkboxes/radios report their own check/uncheck step; anything else is recorded here.
       if (!isToggle) send({ type: 'click', locator: loc });
       try { target.click(); } catch (e) {}
+    } else if (op === 'clear') {
+      send({ type: 'clear', locator: loc, perform: true });  // done by Playwright so frameworks see real input events
     } else if (op === 'hover') {
       send({ type: 'hover', locator: loc, perform: true });   // real mouse move, done by Playwright
     } else if (op === 'scroll_into_view') {

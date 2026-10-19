@@ -75,6 +75,8 @@ def _render_step(s, secrets):
             secrets[var] = s.get("value", "")
             return f'{_locator(loc)}.fill(os.environ["{var}"])'
         return f"{_locator(loc)}.fill({_s(s.get('value'))})"
+    if t == "clear":
+        return f"{_locator(loc)}.clear()"
     if t == "select":
         return f"{_locator(loc)}.select_option(label={_s(s.get('value'))})"
     if t == "check":
@@ -255,6 +257,8 @@ def replay_step(page, step, expect):
         resolve_locator(page, loc).click()
     elif t == "fill":
         resolve_locator(page, loc).fill(val or "")
+    elif t == "clear":
+        resolve_locator(page, loc).clear()
     elif t == "select":
         resolve_locator(page, loc).select_option(label=val)
     elif t == "check":
