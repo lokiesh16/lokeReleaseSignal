@@ -8,3 +8,4 @@ generated_scripts/*
 sessions/*
 !sessions/.gitkeep
 ui_recordings/*
+ui_reports/*

@@ -73,6 +73,13 @@ more (append)**), and save again or delete it. Steps are also autosaved, so a
 restart doesn't lose them. Files live in `ui_recordings/` (owner-only, gitignored)
 and contain the recorded values, passwords included.
 
+**HTML run report:** tick *Create an HTML report when replaying* before **▶ Replay
+steps**. It takes a screenshot after every step and writes `ui_reports/<name>_<time>/index.html`
+(Goal, Expected result, Verdict, Issues found, numbered Steps with what was seen,
+timings and screenshots, Final screen per portal). Open it from the panel; **☁ Publish**
+uploads it to Cloudflare R2 as `reports/<name>_<time>/index.html` (only when you click it —
+the link is public). Passwords are masked.
+
 **Cross-portal flows:** launch Portal A and Portal B on the Capture step, then
 choose *Both* when recording. Steps from either window are recorded in order and
 tagged A/B; replay opens one fresh window per portal (separate logins) and the
