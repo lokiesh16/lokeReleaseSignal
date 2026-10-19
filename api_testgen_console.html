@@ -619,7 +619,7 @@
           <div class="flex-row" style="margin-bottom:6px">
             <h3 style="margin:0;flex:1">⏺ Recorder <span id="ui-rec-badge" class="badge">idle</span></h3>
           </div>
-          <p>Launch the browser first (Capture step). Clicks, typing, dropdowns, checkboxes and Enter/Escape are captured as you use the app. A small toolbar appears in the page while recording: <b>🎯 Pick</b> lets you highlight any element <i>without clicking it</i>, then choose what to do with it — click, hover, scroll to it, wait for it, or assert its text / value / href / visibility. The toolbar also adds a timed <b>Wait</b> and scroll-to-top/bottom. In the list below, <b>＋</b> on any step inserts a wait after it or <b>splits the steps into separate test cases</b>. Esc leaves pick mode. Password-like fields are saved to an owner-only env file, not into the script.</p>
+          <p>Launch the browser first (Capture step). Clicks, typing, dropdowns, checkboxes and Enter/Escape are captured as you use the app. A small toolbar appears in the page while recording: <b>🎯 Pick</b> lets you highlight any element <i>without clicking it</i>, then choose what to do with it — click, hover, scroll to it, wait for it, or assert its text / value / href / visibility. <b>⚓ Anchor</b> makes the recorder locate controls by their nearest label (e.g. the button under “Date of Birth”) instead of their current text, so values that change — dates, selected options — don't break the test. The toolbar also adds a timed <b>Wait</b> and scroll-to-top/bottom. In the list below, <b>＋</b> on any step inserts a wait after it or <b>splits the steps into separate test cases</b>. Esc leaves pick mode. Password-like fields are saved to an owner-only env file, not into the script.</p>
           <div class="field">
             <label>Portal to record</label>
             <select id="ui-portal" style="width:100%;background:rgba(255,255,255,0.045);border:1px solid var(--glass-border);border-radius:9px;padding:9px 14px;color:var(--text);font-family:var(--mono);font-size:12px">
@@ -1804,6 +1804,7 @@ let uiRecording = false, uiGeneratedFile = null, uiRunId = null;
 
 function uiDescribeLocator(l) {
   if (!l) return '';
+  if (l.anchor) return '⚓ label "' + l.anchor + '" → control next to it';
   if (l.kind === 'pw') return l.py;
   const nth = l.nth != null ? ` #${l.nth + 1}` : '';
   if (l.kind === 'role') return `${l.role} "${l.name}"${nth}`;
@@ -1836,6 +1837,11 @@ function uiToggleEditLoc(id) {
 function uiCheckLoc(id) {
   if (!uiLocDraft.trim()) { toast('Type a selector first', 'err'); return; }
   socket.emit('ui_locator_check', { id, selector: uiLocDraft, portal: document.getElementById('ui-portal').value });
+}
+function uiUseAlt(id, index) {
+  delete uiCheckResults[id];
+  socket.emit('ui_step_use_alt', { id, index });
+  uiEditLoc = null;
 }
 function uiSaveLoc(id) {
   delete uiCheckResults[id];
@@ -1894,7 +1900,10 @@ function renderUiSteps(steps) {
     const locRow = editing && s.locator ? `<div class="flex-row" style="gap:8px;margin:6px 0 4px 30px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:8px;flex-wrap:wrap">`
         + `<span>✎ Selector</span><input type="text" placeholder="e.g. [data-testid=&quot;save&quot;]   or   .card >> text=lbs   or   xpath=//button[2]" value="${escapeHtml(uiLocDraft)}" oninput="uiLocDraft=this.value" style="flex:1;min-width:240px;${UI_INPUT_STYLE}">`
         + `<button class="btn btn-ghost btn-sm" onclick="uiCheckLoc(${s.id})" title="Counts what it matches in the live recording browser and outlines it">Check</button>`
-        + `<button class="btn btn-primary btn-sm" onclick="uiSaveLoc(${s.id})">Use this</button></div>` : '';
+        + `<button class="btn btn-primary btn-sm" onclick="uiSaveLoc(${s.id})">Use this</button>`
+        + ((s.locator.alts || []).length ? `<div style="flex-basis:100%;display:flex;flex-direction:column;gap:4px;margin-top:4px"><span style="color:var(--muted);font-size:11px">Other locators recorded for this element (⚓ ones don't depend on its current text/value):</span>`
+            + s.locator.alts.map((a, i) => `<button class="btn btn-ghost btn-sm" style="text-align:left;justify-content:flex-start;white-space:normal" onclick="uiUseAlt(${s.id}, ${i})" title="${escapeHtml(a.value || a.selector || '')}">Use: ${escapeHtml(uiDescribeLocator(a))}</button>`).join('') + `</div>` : '')
+        + `</div>` : '';
     const insertRow = open ? `<div class="flex-row" style="gap:8px;margin:6px 0 4px 30px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:8px;flex-wrap:wrap">`
         + `<span>⏱ Wait</span><input type="number" min="0" step="250" value="${uiDraft.ms}" oninput="uiDraft.ms=this.value" style="width:80px;${UI_INPUT_STYLE}"><span>ms</span>`
         + `<button class="btn btn-ghost btn-sm" onclick="uiInsertWait(${s.id})">Add wait here</button>`

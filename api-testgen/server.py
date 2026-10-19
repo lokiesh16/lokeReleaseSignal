@@ -308,7 +308,7 @@ def _put_result(cmd, result):
 # Playwright binding while a recording is active. One recording at a time,
 # bound to one portal; the UI edits/reads this list over Socket.IO.
 
-ui_rec = {"recording": False, "portal": "A", "steps": [], "next_id": 1, "toolbar": True}
+ui_rec = {"recording": False, "portal": "A", "steps": [], "next_id": 1, "toolbar": True, "anchor": False}
 ui_pending = []  # (portal, step) actions the in-page picker wants Playwright to really perform (hover)
 ui_rec_lock = threading.Lock()
 
@@ -392,7 +392,11 @@ def _ui_binding(source, step):
     a recording is live (so the toolbar survives navigations); anything else is a step."""
     portal = getattr(source["page"], "_portal_id", "A")
     if step.get("type") == "__state":
-        return {"rec": ui_rec["recording"] and portal == ui_rec["portal"], "toolbar": ui_rec["toolbar"]}
+        return {"rec": ui_rec["recording"] and portal == ui_rec["portal"], "toolbar": ui_rec["toolbar"],
+                "anchor": ui_rec.get("anchor", False)}
+    if step.get("type") == "__anchor":   # the toolbar's ⚓ toggle; remembered across page loads
+        ui_rec["anchor"] = bool(step.get("value"))
+        return None
     perform = step.pop("perform", False)
     _ui_add_step(step, portal)
     if perform and ui_rec["recording"] and portal == ui_rec["portal"]:
@@ -419,7 +423,8 @@ def _set_page_recording(portal, on, toolbar):
     page = pw["pages"].get(portal)
     if page is not None:
         try:
-            page.evaluate("([on, tb]) => window.__tgSetRec && window.__tgSetRec(on, tb)", [on, toolbar])
+            page.evaluate("([on, tb, an]) => window.__tgSetRec && window.__tgSetRec(on, tb, an)",
+                          [on, toolbar, ui_rec.get("anchor", False)])
         except Exception:
             pass
 
@@ -1011,6 +1016,25 @@ def ui_step_set_locator(data):
     _ui_emit_steps()
 
 
+@socketio.on("ui_step_use_alt")
+def ui_step_use_alt(data):
+    """Swaps in one of the alternative locators recorded with the step (e.g. the label-anchored,
+    value-independent one); the replaced locator becomes an alternative in turn."""
+    sid, idx = (data or {}).get("id"), (data or {}).get("index")
+    with ui_rec_lock:
+        for st in ui_rec["steps"]:
+            if st.get("id") == sid and st.get("locator"):
+                alts = list((st["locator"].get("alts") or []))
+                if not isinstance(idx, int) or not 0 <= idx < len(alts):
+                    break
+                chosen = dict(alts[idx])
+                old = {k: v for k, v in st["locator"].items() if k != "alts"}
+                chosen["alts"] = [a for i, a in enumerate(alts) if i != idx] + [old]
+                st["locator"] = chosen
+                break
+    _ui_emit_steps()
+
+
 @socketio.on("ui_locator_check")
 def ui_locator_check(data):
     """Counts (and briefly outlines) what a selector matches in the live recording page."""
@@ -1243,6 +1267,41 @@ explore_runs = {}    # run_id -> {"stop": bool}, checked once per loop iteration
 explore_results = {}  # run_id -> finished run's data (incl. per-step screenshots), until /api/explore/publish consumes it
 
 
+_SECRET_IN_TEXT_RE = re.compile(r"(?i)\b(pass(?:word|wd)?|pwd|secret|token|api[_-]?key|otp|cvv)\b(\s*[=:]\s*)(\S+)")
+
+
+def _redact_secrets(text):
+    """Masks `password=...`-style values in free text that gets echoed into case names,
+    the on-screen summary and published reports. (The model still receives the real goal -
+    it has to type the password.)"""
+    return _SECRET_IN_TEXT_RE.sub(lambda m: m.group(1) + m.group(2) + "***", text or "")
+
+
+def _usage_of(result):
+    """(input_tokens, output_tokens) from a call_llm result - Anthropic's `usage` block or
+    the equivalent call_ollama builds. Cache reads/writes count as input."""
+    u = (result or {}).get("usage") if isinstance(result, dict) else None
+    if not u:
+        return 0, 0
+    inp = (u.get("input_tokens") or 0) + (u.get("cache_creation_input_tokens") or 0) + (u.get("cache_read_input_tokens") or 0)
+    return inp, (u.get("output_tokens") or 0)
+
+
+def _count_tokens(state, emit_log, result, label=""):
+    """Adds one model call's usage to the run's running totals and logs it."""
+    i, o = _usage_of(result)
+    t = state.setdefault("tokens", {"in": 0, "out": 0, "calls": 0})
+    t["in"] += i
+    t["out"] += o
+    t["calls"] += 1
+    if i or o:
+        emit_log(f"{label}  🔢 {i:,} in / {o:,} out  (run total {t['in'] + t['out']:,})", "info")
+
+
+def _fmt_tokens(t):
+    return f"{t['in']:,} in / {t['out']:,} out = {t['in'] + t['out']:,} tokens over {t['calls']} model call(s)"
+
+
 def _format_explore_prompt(goal, step, max_steps, history, url, title, elements, console_errors):
     hist_lines = [f"  Step {h['step']}: {h['desc']} → {h['result']}" for h in history[-8:]]
     history_block = "\n".join(hist_lines) if hist_lines else "  (none yet — this is the first step)"
@@ -1307,6 +1366,10 @@ Rules:
 - Use "blocked" if a real problem stops you (error message, broken button, unexpected response, missing
   element) — put the concrete problem in "finding", this becomes bug-report feedback.
 - Don't wander beyond what the goal requires.
+- Behave like a careful human tester following one instruction: do what the goal says and nothing more. Do
+  NOT try extra scenarios (wrong passwords, empty fields, other users...) unless the goal asks for them.
+- If your last action succeeded but the page hasn't visibly changed yet, the app may still be loading: use
+  "wait" once before repeating the same action. Never click the same button twice in a row hoping it works.
 """
 
 
@@ -1375,10 +1438,12 @@ def _parse_case_plan(text, fallback_goal):
              "instruction": fallback_goal}]
 
 
-def _run_case(emit_log, state, instruction, portal, provider, api_key, model, ollama_url, max_steps, label):
+def _run_case(emit_log, state, instruction, portal, provider, api_key, model, ollama_url, max_steps, label, screenshots=False):
     """Runs one planned test case's own click/type/.../done-or-blocked loop, continuing
     on whatever page state the previous case left the browser in (no reset in between —
     that's what lets a later case assume an earlier case's login/setup already happened)."""
+    # Screenshots only feed the optional HTML report (the model reads the page as text), and
+    # capturing one makes a visible browser flicker, so they're opt-in.
     history = []
     outcome, finding = "step_limit", ""
 
@@ -1399,6 +1464,7 @@ def _run_case(emit_log, state, instruction, portal, provider, api_key, model, ol
             snap.get("elements", []), snap.get("console_errors", []),
         )
         result, _ = call_llm(provider, prompt, max_tokens=500, api_key=api_key, model=model, ollama_url=ollama_url)
+        _count_tokens(state, emit_log, result, label)
         text = "".join(b.get("text", "") for b in result.get("content", [])) if isinstance(result, dict) else ""
         if not text:
             emit_log(f"{label}Model call failed: {(result or {}).get('error', 'no response')}", "err")
@@ -1420,20 +1486,23 @@ def _run_case(emit_log, state, instruction, portal, provider, api_key, model, ol
             outcome, finding = "done", action.get("finding", "Goal appears satisfied.")
             emit_log(f"{label}✅ Done: {finding}", "ok")
             history.append({"step": step + 1, "desc": f"confirm: {finding}", "result": "ok",
-                             "screenshot": _take_screenshot(portal)})
+                             "screenshot": (_take_screenshot(portal) if screenshots else None)})
             break
         if kind == "blocked":
             outcome, finding = "blocked", action.get("finding", "Blocked — could not proceed.")
             emit_log(f"{label}🚫 Blocked: {finding}", "err")
             history.append({"step": step + 1, "desc": f"blocked: {finding}", "result": "error: blocked",
-                             "screenshot": _take_screenshot(portal)})
+                             "screenshot": (_take_screenshot(portal) if screenshots else None)})
             break
 
         if kind == "click":
             desc = f"click [{action.get('ref')}]"
             exec_res = pw_call({"action": "click_ref", "portal": portal, "ref": action.get("ref")}, timeout=10)
         elif kind == "type":
-            desc = f"type into [{action.get('ref')}]: '{action.get('text', '')}'"
+            # Never echo what was typed into a password field into the log / published report.
+            target = next((e for e in snap.get("elements", []) if e.get("ref") == action.get("ref")), {})
+            shown = "••••••" if (target.get("type") or "").lower() == "password" else action.get("text", "")
+            desc = f"type into [{action.get('ref')}]: '{shown}'"
             exec_res = pw_call({"action": "type_ref", "portal": portal, "ref": action.get("ref"),
                                  "text": action.get("text", ""),
                                  "submit_after_type": bool(action.get("submit_after_type"))}, timeout=10)
@@ -1455,7 +1524,7 @@ def _run_case(emit_log, state, instruction, portal, provider, api_key, model, ol
         ok = bool(exec_res.get("ok"))
         emit_log(f"{label}  → {desc} ({'ok' if ok else 'error: ' + str(exec_res.get('error'))})", "ok" if ok else "err")
         history.append({"step": step + 1, "desc": desc, "result": "ok" if ok else f"error: {exec_res.get('error')}",
-                         "screenshot": _take_screenshot(portal)})
+                         "screenshot": (_take_screenshot(portal) if screenshots else None)})
         time.sleep(0.6)
     else:
         finding = finding or "Reached the step limit before the case was confirmed done."
@@ -1464,19 +1533,29 @@ def _run_case(emit_log, state, instruction, portal, provider, api_key, model, ol
     return outcome, finding, history
 
 
-def run_explore_loop(run_id, goal, portal, provider, api_key, model, ollama_url, max_steps, max_cases, record_steps=False):
+def run_explore_loop(run_id, goal, portal, provider, api_key, model, ollama_url, max_steps, max_cases, record_steps=False, screenshots=False, broaden=False):
     state = explore_runs[run_id]
 
     def emit_log(msg, kind="info"):
         with app.app_context():
             socketio.emit("explore_log", {"run_id": run_id, "msg": msg, "kind": kind})
 
-    emit_log(f"Planning test cases for: {goal}")
-    plan_prompt = _format_case_plan_prompt(goal, max_cases)
-    plan_result, _ = call_llm(provider, plan_prompt, max_tokens=2000, api_key=api_key, model=model, ollama_url=ollama_url)
-    plan_text = "".join(b.get("text", "") for b in plan_result.get("content", [])) if isinstance(plan_result, dict) else ""
-    cases_plan = _parse_case_plan(plan_text, goal)[:max_cases]
-    emit_log(f"📋 Planned {len(cases_plan)} case(s): " + "; ".join(c["name"] for c in cases_plan))
+    if broaden:
+        emit_log(f"Planning test cases for: {_redact_secrets(goal)}")
+        plan_prompt = _format_case_plan_prompt(goal, max_cases)
+        plan_result, _ = call_llm(provider, plan_prompt, max_tokens=2000, api_key=api_key, model=model, ollama_url=ollama_url)
+        _count_tokens(state, emit_log, plan_result, "[plan] ")
+        plan_text = "".join(b.get("text", "") for b in plan_result.get("content", [])) if isinstance(plan_result, dict) else ""
+        cases_plan = _parse_case_plan(plan_text, goal)[:max_cases]
+        emit_log(f"📋 Planned {len(cases_plan)} case(s): " + "; ".join(_redact_secrets(c["name"]) for c in cases_plan))
+    else:
+        # Act like a human tester given one instruction: do what it says, nothing more. No
+        # planning call, so no invented edge/negative cases (and one fewer model call).
+        first_line = _redact_secrets(goal.strip().splitlines()[0] if goal.strip() else "Goal")
+        cases_plan = [{"name": first_line[:120], "category": "Happy path", "objective": _redact_secrets(goal), "instruction": goal}]
+        emit_log("Following your goal as written - one case, no extra edge or negative cases.")
+    state.setdefault("tokens", {"in": 0, "out": 0, "calls": 0})
+    plan_tokens = dict(state["tokens"])
 
     snap0 = pw_call({"action": "dom_snapshot", "portal": portal}, timeout=15)
     start_url = snap0.get("url") if snap0.get("ok") else None
@@ -1501,10 +1580,14 @@ def run_explore_loop(run_id, goal, portal, provider, api_key, model, ollama_url,
         emit_log(f"{label}▶ {case['name']} — {case['objective']}")
         if record_steps:
             _ui_add_step({"type": "case", "value": case["name"]}, portal)
+        before = dict(state.get("tokens") or {"in": 0, "out": 0, "calls": 0})
         outcome, finding, history = _run_case(
             emit_log, state, case["instruction"], portal, provider, api_key, model, ollama_url, max_steps, label,
+            screenshots,
         )
-        cases_results.append({**case, "outcome": outcome, "finding": finding, "history": history})
+        now = state.get("tokens") or {"in": 0, "out": 0, "calls": 0}
+        case_tokens = {k: now[k] - before[k] for k in ("in", "out", "calls")}
+        cases_results.append({**case, "outcome": outcome, "finding": finding, "history": history, "tokens": case_tokens})
 
     if record_steps:
         pw_call({"action": "ui_record_stop", "portal": portal}, timeout=15)
@@ -1522,18 +1605,25 @@ def run_explore_loop(run_id, goal, portal, provider, api_key, model, ollama_url,
         overall_outcome = "partial"
     summary = f"{passed}/{len(cases_results)} passed" if cases_results else "no cases ran"
 
-    feedback_lines = [f"Goal: {goal}", f"Cases: {summary}"]
+    feedback_lines = [f"Goal: {_redact_secrets(goal)}", f"Cases: {summary}"]
     for c in cases_results:
+        tk = c.get("tokens") or {"in": 0, "out": 0}
         feedback_lines.append(f"  [{c['category']}] {c['name']} — {c['outcome']}"
-                               + (f": {c['finding']}" if c['finding'] else ""))
+                               + (f": {c['finding']}" if c['finding'] else "")
+                               + (f"  ({tk['in'] + tk['out']:,} tokens)" if tk["in"] + tk["out"] else ""))
+    run_tokens = state.get("tokens") or {"in": 0, "out": 0, "calls": 0}
+    if run_tokens["calls"]:
+        feedback_lines.append(f"Tokens: {_fmt_tokens(run_tokens)} (planning: {plan_tokens['in'] + plan_tokens['out']:,})")
     feedback_text = "\n".join(feedback_lines)
 
-    explore_results[run_id] = {"goal": goal, "cases": cases_results, "start_url": start_url, "portal": portal}
+    explore_results[run_id] = {"goal": _redact_secrets(goal), "cases": cases_results, "start_url": start_url, "portal": portal,
+                               "tokens": run_tokens}
 
     with app.app_context():
         socketio.emit("explore_done", {
             "run_id": run_id, "outcome": overall_outcome, "summary": summary, "feedback": feedback_text,
             "recorded_steps": len(ui_rec["steps"]) if record_steps else None,
+            "tokens": run_tokens,
             "cases": [{"name": c["name"], "category": c["category"], "outcome": c["outcome"], "finding": c["finding"]}
                       for c in cases_results],
         })
@@ -1563,7 +1653,7 @@ def explore_start(data):
     threading.Thread(
         target=run_explore_loop,
         args=(run_id, goal, portal, provider, api_key, data.get("model", ""), data.get("ollama_url", ""),
-              max_steps, max_cases, bool(data.get("record_steps"))),
+              max_steps, max_cases, bool(data.get("record_steps")), bool(data.get("screenshots")), bool(data.get("broaden"))),
         daemon=True,
     ).start()
     emit("explore_started", {"run_id": run_id})
@@ -1583,8 +1673,10 @@ _CASE_CATEGORY_CLASS = {
 }
 
 
-def _build_explore_report_html(goal, cases, start_url, portal):
+def _build_explore_report_html(goal, cases, start_url, portal, tokens=None):
     rows = []
+    cases = [{**c, "name": _redact_secrets(c.get("name", "")), "objective": _redact_secrets(c.get("objective", "")),
+              "finding": _redact_secrets(c.get("finding", ""))} for c in cases]
     for case_idx, case in enumerate(cases):
         status_cls, status_label = {
             "done": ("pass", "PASS"), "blocked": ("fail", "FAIL"),
@@ -1664,7 +1756,8 @@ td.num {{ color:#8a8aa0; }}
 </style></head><body>
 <h1>AI Explore report <span class="status {'pass' if passed == len(cases) else 'warn'}">{passed}/{len(cases)} PASSED</span></h1>
 <p class="path">Generated UI test cases · {len(cases)} case(s) · Portal {html.escape(portal)}</p>
-<div class="goal-label">CONTEXT</div><pre class="goal-text">{html.escape(goal)}</pre>
+<div class="goal-label">CONTEXT</div><pre class="goal-text">{html.escape(_redact_secrets(goal))}</pre>
+{('<div class="goal-label">AI TOKENS USED</div><pre class="goal-text">' + html.escape(_fmt_tokens(tokens)) + '</pre>') if tokens and tokens.get("calls") else ''}
 {table}
 </body></html>"""
 
@@ -1679,7 +1772,7 @@ def publish_explore_report(run_id):
     if not cf_r2.is_configured():
         return jsonify({"error": "Cloudflare R2 is not configured — see CLOUDFLARE_R2_* in .env"}), 400
 
-    report_html = _build_explore_report_html(data["goal"], data["cases"], data["start_url"], data["portal"])
+    report_html = _build_explore_report_html(data["goal"], data["cases"], data["start_url"], data["portal"], data.get("tokens"))
     timestamp = time.strftime("%Y-%m-%d_%H-%M-%S", time.gmtime())
     slug = re.sub(r"[^a-zA-Z0-9_.-]", "_", data["goal"][:40]) or "explore"
     filename = f"{slug}_{timestamp}.html"
@@ -2419,7 +2512,9 @@ def call_ollama(prompt, model=None, max_tokens=16000, ollama_url=None):
             # Normalize to Anthropic's stop_reason vocabulary so callers can check
             # response["stop_reason"] == "max_tokens" regardless of provider.
             stop_reason = "max_tokens" if data.get("done_reason") == "length" else data.get("done_reason")
-            return {"content": [{"type": "text", "text": text}], "stop_reason": stop_reason}, 200
+            return {"content": [{"type": "text", "text": text}], "stop_reason": stop_reason,
+                    "usage": {"input_tokens": data.get("prompt_eval_count") or 0,
+                              "output_tokens": data.get("eval_count") or 0}}, 200
     except TimeoutError:
         return {"error": timeout_msg}, 504
     except urllib.error.URLError as e:

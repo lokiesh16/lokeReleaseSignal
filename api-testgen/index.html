@@ -422,12 +422,7 @@
           <div class="flex-row" style="margin-bottom:6px">
             <h3 style="margin:0;flex:1">🤖 AI Explore <span id="explore-status-badge" class="badge">idle</span></h3>
           </div>
-          <p>Give it a one-line goal and it first plans a broad set of test cases around it — happy path, edge
-            cases, negative/validation cases, boundaries — then drives the already-open browser itself through
-            each one in turn, clicking/typing/navigating, judging success/failure purely from the page (DOM +
-            console errors) like a manual UI tester. Independent of the API capture/chain-test workflow below —
-            it doesn't touch the network log or generate any scripts. Uses the same provider/API key as "API
-            chain test" below.</p>
+          <p>Give it a goal in plain words and it drives the already-open browser itself, like a human tester: clicking, typing and navigating to do exactly what you describe, and judging success or failure from the page (DOM + console errors). By default it runs just that one case. Tick <b>Also explore edge/negative cases</b> to have it first plan extra scenarios around your goal (wrong passwords, empty fields, boundaries) and run them all. Independent of the API capture/chain-test workflow below — it doesn't touch the network log or generate API scripts. Uses the same provider/API key as "API chain test" below.</p>
           <div class="field">
             <label>Goal</label>
             <textarea id="explore-goal" placeholder="e.g. Log in with lokesh+test@habitnu.com/Qwerty@1234 and test logging water on the home page's hydration widget" style="min-height:50px"></textarea>
@@ -440,9 +435,12 @@
                 <option value="B">B</option>
               </select>
             </label>
+            <label style="font-size:11px;font-family:var(--mono);color:var(--muted);display:flex;align-items:center;gap:6px" title="Off (default): the AI does exactly what your goal says, like a human tester - one case, no extra scenarios. On: it first plans extra edge/negative/boundary cases around your goal and runs them all.">
+              <input type="checkbox" id="explore-broaden" onchange="document.getElementById('explore-max-cases').disabled = !this.checked"> Also explore edge/negative cases
+            </label>
             <label style="font-size:11px;font-family:var(--mono);color:var(--muted);display:flex;align-items:center;gap:6px">
               Max cases
-              <input type="number" id="explore-max-cases" value="6" min="1" max="12" style="width:50px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:4px 8px;color:var(--text);font-family:var(--mono);font-size:12px">
+              <input type="number" id="explore-max-cases" value="6" disabled min="1" max="12" style="width:50px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:4px 8px;color:var(--text);font-family:var(--mono);font-size:12px">
             </label>
             <label style="font-size:11px;font-family:var(--mono);color:var(--muted);display:flex;align-items:center;gap:6px">
               Max steps/case
@@ -450,6 +448,9 @@
             </label>
             <label style="font-size:11px;font-family:var(--mono);color:var(--muted);display:flex;align-items:center;gap:6px" title="Capture what the AI does as editable UI test steps (replaces steps already in the recorder)">
               <input type="checkbox" id="explore-record-steps" checked> Record as UI test steps
+            </label>
+            <label style="font-size:11px;font-family:var(--mono);color:var(--muted);display:flex;align-items:center;gap:6px" title="Takes a screenshot after every action for the published report. Makes the browser flicker and slows the run; the AI itself doesn't use them.">
+              <input type="checkbox" id="explore-screenshots"> Screenshots for report
             </label>
             <div class="spacer"></div>
             <button class="btn btn-primary btn-sm" id="btn-explore-start" onclick="startExplore()">🤖 Start exploring</button>
@@ -652,7 +653,7 @@
           <div class="flex-row" style="margin-bottom:6px">
             <h3 style="margin:0;flex:1">⏺ Recorder <span id="ui-rec-badge" class="badge">idle</span></h3>
           </div>
-          <p>Launch the browser first (Capture step). Clicks, typing, dropdowns, checkboxes and Enter/Escape are captured as you use the app. A small toolbar appears in the page while recording: <b>🎯 Pick</b> lets you highlight any element <i>without clicking it</i>, then choose what to do with it — click, hover, scroll to it, wait for it, or assert its text / value / href / visibility. The toolbar also adds a timed <b>Wait</b> and scroll-to-top/bottom. In the list below, <b>＋</b> on any step inserts a wait after it or <b>splits the steps into separate test cases</b>. Esc leaves pick mode. Password-like fields are saved to an owner-only env file, not into the script.</p>
+          <p>Launch the browser first (Capture step). Clicks, typing, dropdowns, checkboxes and Enter/Escape are captured as you use the app. A small toolbar appears in the page while recording: <b>🎯 Pick</b> lets you highlight any element <i>without clicking it</i>, then choose what to do with it — click, hover, scroll to it, wait for it, or assert its text / value / href / visibility. <b>⚓ Anchor</b> makes the recorder locate controls by their nearest label (e.g. the button under “Date of Birth”) instead of their current text, so values that change — dates, selected options — don't break the test. The toolbar also adds a timed <b>Wait</b> and scroll-to-top/bottom. In the list below, <b>＋</b> on any step inserts a wait after it or <b>splits the steps into separate test cases</b>. Esc leaves pick mode. Password-like fields are saved to an owner-only env file, not into the script.</p>
           <div class="field">
             <label>Portal to record</label>
             <select id="ui-portal" style="width:100%;background:rgba(255,255,255,0.045);border:1px solid var(--glass-border);border-radius:9px;padding:9px 14px;color:var(--text);font-family:var(--mono);font-size:12px">
@@ -1371,6 +1372,7 @@ let uiRecording = false, uiGeneratedFile = null, uiRunId = null;
 
 function uiDescribeLocator(l) {
   if (!l) return '';
+  if (l.anchor) return '⚓ label "' + l.anchor + '" → control next to it';
   if (l.kind === 'pw') return l.py;
   const nth = l.nth != null ? ` #${l.nth + 1}` : '';
   if (l.kind === 'role') return `${l.role} "${l.name}"${nth}`;
@@ -1403,6 +1405,11 @@ function uiToggleEditLoc(id) {
 function uiCheckLoc(id) {
   if (!uiLocDraft.trim()) { toast('Type a selector first', 'err'); return; }
   socket.emit('ui_locator_check', { id, selector: uiLocDraft, portal: document.getElementById('ui-portal').value });
+}
+function uiUseAlt(id, index) {
+  delete uiCheckResults[id];
+  socket.emit('ui_step_use_alt', { id, index });
+  uiEditLoc = null;
 }
 function uiSaveLoc(id) {
   delete uiCheckResults[id];
@@ -1461,7 +1468,10 @@ function renderUiSteps(steps) {
     const locRow = editing && s.locator ? `<div class="flex-row" style="gap:8px;margin:6px 0 4px 30px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:8px;flex-wrap:wrap">`
         + `<span>✎ Selector</span><input type="text" placeholder="e.g. [data-testid=&quot;save&quot;]   or   .card >> text=lbs   or   xpath=//button[2]" value="${escapeHtml(uiLocDraft)}" oninput="uiLocDraft=this.value" style="flex:1;min-width:240px;${UI_INPUT_STYLE}">`
         + `<button class="btn btn-ghost btn-sm" onclick="uiCheckLoc(${s.id})" title="Counts what it matches in the live recording browser and outlines it">Check</button>`
-        + `<button class="btn btn-primary btn-sm" onclick="uiSaveLoc(${s.id})">Use this</button></div>` : '';
+        + `<button class="btn btn-primary btn-sm" onclick="uiSaveLoc(${s.id})">Use this</button>`
+        + ((s.locator.alts || []).length ? `<div style="flex-basis:100%;display:flex;flex-direction:column;gap:4px;margin-top:4px"><span style="color:var(--muted);font-size:11px">Other locators recorded for this element (⚓ ones don't depend on its current text/value):</span>`
+            + s.locator.alts.map((a, i) => `<button class="btn btn-ghost btn-sm" style="text-align:left;justify-content:flex-start;white-space:normal" onclick="uiUseAlt(${s.id}, ${i})" title="${escapeHtml(a.value || a.selector || '')}">Use: ${escapeHtml(uiDescribeLocator(a))}</button>`).join('') + `</div>` : '')
+        + `</div>` : '';
     const insertRow = open ? `<div class="flex-row" style="gap:8px;margin:6px 0 4px 30px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:8px;flex-wrap:wrap">`
         + `<span>⏱ Wait</span><input type="number" min="0" step="250" value="${uiDraft.ms}" oninput="uiDraft.ms=this.value" style="width:80px;${UI_INPUT_STYLE}"><span>ms</span>`
         + `<button class="btn btn-ghost btn-sm" onclick="uiInsertWait(${s.id})">Add wait here</button>`
@@ -1681,7 +1691,9 @@ function startExplore() {
   document.getElementById('explore-status-badge').textContent = 'planning...';
 
   socket.emit('explore_start', { ...providerFields, goal, portal, max_steps: maxSteps, max_cases: maxCases,
-                                 record_steps: document.getElementById('explore-record-steps').checked });
+                                 record_steps: document.getElementById('explore-record-steps').checked,
+                                 screenshots: document.getElementById('explore-screenshots').checked,
+                                 broaden: document.getElementById('explore-broaden').checked });
 }
 
 function stopExplore() {

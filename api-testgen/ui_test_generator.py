@@ -123,7 +123,13 @@ def split_cases(name, steps):
                 cur = (name or "scenario", [])
                 cases.append(cur)
             cur[1].append(s)
-    return [c for c in cases if c[1]]
+    cases = [c for c in cases if c[1]]
+    # An opening page load that sits above the first split would become a test of its own
+    # that only opens the page - fold it into the first real case instead.
+    if len(cases) > 1 and all(st.get("type") in ("goto", "note") for st in cases[0][1]):
+        cases[1] = (cases[1][0], cases[0][1] + cases[1][1])
+        cases = cases[1:]
+    return cases
 
 
 def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
