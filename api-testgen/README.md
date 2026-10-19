@@ -65,6 +65,12 @@ in the sidebar.
 4. **Run test** replays it in a fresh browser (headed, with optional slow-mo)
    and streams the pytest output.
 
+**Saved recordings:** name and save the steps (💾), reload one later to edit it
+(change values, fix selectors, add waits, split cases, delete steps, or **Record
+more (append)**), and save again or delete it. Steps are also autosaved, so a
+restart doesn't lose them. Files live in `ui_recordings/` (owner-only, gitignored)
+and contain the recorded values, passwords included.
+
 Password-like fields are never written into the script: they're read from an
 env var (e.g. `UI_PASSWORD`), with the recorded value kept in an owner-only
 `.<name>.env` next to the test.

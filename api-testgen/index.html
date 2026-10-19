@@ -662,11 +662,24 @@
           </div>
           <div class="flex-row">
             <button class="btn btn-primary btn-sm" id="btn-ui-rec" onclick="uiToggleRecord()">⏺ Start recording</button>
+            <button class="btn btn-ghost btn-sm" id="btn-ui-rec-append" onclick="uiToggleRecord(true)" style="display:none" title="Keep the steps below and add new ones at the end (use the browser's current page as the starting point)">⏺ Record more (append)</button>
             <button class="btn btn-ghost btn-sm" id="btn-ui-replay" onclick="uiReplay()">▶ Replay steps</button>
             <button class="btn btn-ghost btn-sm" onclick="uiClearSteps()">Clear steps</button>
             <span id="ui-replay-status" class="pw-run-status"></span>
           </div>
           <p style="margin-top:8px;font-size:11px">Replay runs the steps in a fresh window (clean cookies) so you can check each one before generating. Stops at the first failure.</p>
+        </div>
+
+        <div class="card">
+          <div class="flex-row" style="margin-bottom:6px">
+            <h3 style="margin:0;flex:1">💾 Saved recordings <span id="ui-editing-badge" class="badge" style="display:none"></span></h3>
+          </div>
+          <p>Save the steps below under a name, reload one later to edit it (change values, fix selectors, add waits, split cases, delete steps, or append more), then save again. Steps are also autosaved, so a restart won't lose them. Saved files contain recorded values (including passwords) and are kept owner-only in <code>ui_recordings/</code>.</p>
+          <div class="name-row" style="margin-bottom:10px">
+            <input type="text" id="ui-save-name" placeholder="Recording name, e.g. set target weight">
+            <button class="btn btn-primary btn-sm" onclick="uiSaveRecording()" title="Saves under this name; overwrites a recording with the same name">💾 Save</button>
+          </div>
+          <div id="ui-saved-list" style="display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:12px"><span style="color:var(--muted)">No saved recordings yet.</span></div>
         </div>
 
         <div class="card">
@@ -1415,7 +1428,7 @@ function renderUiSteps(steps) {
   const cases = steps.filter(s => s.type === 'case').length;
   document.getElementById('ui-step-count').textContent = actions.length + (cases ? ` · ${cases} test case${cases > 1 ? 's' : ''}` : '');
   if (!steps.length) { box.innerHTML = '<span style="color:var(--muted)">Nothing recorded yet.</span>'; return; }
-  const verb = { goto: 'Go to', click: 'Click', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
+  const verb = { goto: 'Go to', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
                  press: 'Press', press_page: 'Press', assert_text: 'Assert text', assert_value: 'Assert value',
                  assert_visible: 'Assert visible', assert_attr: 'Assert attr', hover: 'Hover', scroll_into_view: 'Scroll to',
                  wait_for: 'Wait for', wait: 'Wait (ms)', scroll_page: 'Scroll page', note: 'Note' };
@@ -1465,6 +1478,84 @@ function renderUiSteps(steps) {
   }).join('');
 }
 
+// ── saved recordings ──
+let uiLoadedName = null, uiSnapshot = null;
+// Canonical JSON (sorted keys) so the same steps compare equal however the server ordered the fields.
+function uiCanon(v) {
+  return JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x))
+    ? Object.keys(x).sort().reduce((o, key) => (o[key] = x[key], o), {}) : x);
+}
+function uiDirty() { return uiLoadedName != null && uiSnapshot !== uiCanon(uiLastSteps); }
+function uiUpdateEditingBadge() {
+  const b = document.getElementById('ui-editing-badge');
+  if (!b) return;
+  b.style.display = uiLoadedName ? '' : 'none';
+  b.textContent = uiLoadedName ? `editing: ${uiLoadedName}${uiDirty() ? '  ● unsaved changes' : ''}` : '';
+  b.style.color = uiDirty() ? 'var(--yellow,#f59e0b)' : '';
+}
+
+async function uiRefreshSaved() {
+  const box = document.getElementById('ui-saved-list');
+  try {
+    const r = await (await fetch(BRIDGE_URL + '/api/ui-recordings')).json();
+    const list = r.recordings || [];
+    if (!list.length) { box.innerHTML = '<span style="color:var(--muted)">No saved recordings yet.</span>'; return; }
+    box.innerHTML = list.map(x => {
+      const when = x.saved_at ? new Date(x.saved_at).toLocaleString() : '';
+      const cur = uiLoadedName === x.name;
+      return `<div class="flex-row" style="gap:8px"><b style="flex:1;word-break:break-all">${cur ? '▶ ' : ''}${escapeHtml(x.name)}</b>`
+        + `<span style="color:var(--muted)">${x.steps} steps${x.cases ? ` · ${x.cases} cases` : ''} · ${escapeHtml(when)}</span>`
+        + `<button class="btn btn-ghost btn-sm" onclick="uiLoadRecording('${escapeHtml(x.file)}')" title="Load into the editor to edit it">✎ Load / edit</button>`
+        + `<button class="btn btn-ghost btn-sm" onclick="uiDeleteRecording('${escapeHtml(x.file)}', '${escapeHtml(x.name).replace(/'/g, "\\'")}')" title="Delete this saved recording">🗑</button></div>`;
+    }).join('');
+  } catch (e) { box.innerHTML = '<span style="color:var(--red)">Could not reach the bridge.</span>'; }
+}
+
+async function uiSaveRecording() {
+  const name = (document.getElementById('ui-save-name').value || '').trim();
+  if (!name) { toast('Give the recording a name', 'err'); return; }
+  if (!uiLastSteps.length) { toast('Nothing to save yet', 'err'); return; }
+  const exists = Array.from(document.querySelectorAll('#ui-saved-list b')).some(b => b.textContent.replace('▶ ', '') === name);
+  if (exists && uiLoadedName !== name && !confirm(`A recording named "${name}" already exists. Overwrite it?`)) return;
+  const settings = { timeout_s: uiTimeout(), shared_session: document.getElementById('ui-shared-session').checked,
+                     test_name: document.getElementById('ui-test-name').value };
+  const res = await fetch(BRIDGE_URL + '/api/ui-recordings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                               body: JSON.stringify({ name, settings }) });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Save failed', 'err'); return; }
+  uiLoadedName = d.name; uiSnapshot = uiCanon(uiLastSteps);
+  uiUpdateEditingBadge(); uiRefreshSaved();
+  toast(`Saved "${d.name}" (${d.steps} steps)`);
+}
+
+async function uiLoadRecording(file) {
+  if (uiRecording) { toast('Stop recording first', 'err'); return; }
+  if (uiDirty() && !confirm('You have unsaved changes to the recording being edited. Load another and discard them?')) return;
+  if (!uiDirty() && uiLoadedName == null && uiLastSteps.length && !confirm(`Replace the ${uiLastSteps.length} unsaved steps in the list with this saved recording?`)) return;
+  const res = await fetch(BRIDGE_URL + '/api/ui-recordings/' + encodeURIComponent(file));
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Load failed', 'err'); return; }
+  uiReplayResults = {}; uiCheckResults = {};
+  uiLoadedName = d.name; uiSnapshot = uiCanon(d.steps || []);
+  document.getElementById('ui-save-name').value = d.name;
+  const st = d.settings || {};
+  if (st.test_name) document.getElementById('ui-test-name').value = st.test_name; else document.getElementById('ui-test-name').value = d.name;
+  if (st.timeout_s) document.getElementById('ui-timeout').value = st.timeout_s;
+  if (st.shared_session != null) document.getElementById('ui-shared-session').checked = !!st.shared_session;
+  uiUpdateEditingBadge(); uiRefreshSaved();
+  toast(`Loaded "${d.name}" - edit the steps, then Save`);
+}
+
+async function uiDeleteRecording(file, name) {
+  if (!confirm(`Delete the saved recording "${name}"? This can't be undone.\n\n(Steps currently in the editor are not affected.)`)) return;
+  const res = await fetch(BRIDGE_URL + '/api/ui-recordings/' + encodeURIComponent(file), { method: 'DELETE' });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Delete failed', 'err'); return; }
+  if (uiLoadedName === name) { uiLoadedName = null; uiSnapshot = null; }
+  uiUpdateEditingBadge(); uiRefreshSaved();
+  toast(`Deleted "${name}"`);
+}
+
 function uiSetRecording(on) {
   uiRecording = on;
   const badge = document.getElementById('ui-rec-badge');
@@ -1473,10 +1564,12 @@ function uiSetRecording(on) {
   document.getElementById('btn-ui-rec').textContent = on ? '■ Stop recording' : '⏺ Start recording';
 }
 
-function uiToggleRecord() {
+function uiToggleRecord(append) {
   if (uiRecording) { socket.emit('ui_record_stop'); return; }
   if (!browserOpen) { toast('Launch the browser first (Capture step)', 'err'); return; }
-  socket.emit('ui_record_start', { portal: document.getElementById('ui-portal').value });
+  const hasSteps = uiLastSteps.length > 0;
+  if (hasSteps && !append && !confirm(`Start a new recording? This replaces the ${uiLastSteps.length} steps currently in the list.\n\n(Use "Record more (append)" to keep them, or Save them first.)`)) return;
+  socket.emit('ui_record_start', { portal: document.getElementById('ui-portal').value, keep_steps: !!append && hasSteps });
 }
 function uiClearSteps() { uiReplayResults = {}; uiCheckResults = {}; socket.emit('ui_steps_clear'); }
 function uiReplay() {
@@ -1525,7 +1618,17 @@ socket.on('ui_replay_done', (d) => {
   st.className = 'pw-run-status ' + (failed ? 'err' : 'ok');
   st.textContent = d.error ? ('✗ ' + d.error) : failed ? '✗ a step failed - fix or delete it, then replay again' : '✓ all steps passed';
 });
-socket.on('ui_steps', (d) => { uiSetRecording(d.recording); renderUiSteps(d.steps || []); });
+socket.on('ui_steps', (d) => {
+  uiSetRecording(d.recording);
+  renderUiSteps(d.steps || []);
+  const first = uiLoadedName === null && uiSnapshot === null;   // page just (re)loaded: adopt the server's state
+  uiLoadedName = d.loaded_name || null;
+  if (uiLoadedName && first) uiSnapshot = uiCanon(d.steps || []);
+  if (!uiLoadedName) uiSnapshot = null;
+  document.getElementById('btn-ui-rec-append').style.display = (!d.recording && (d.steps || []).length) ? '' : 'none';
+  uiUpdateEditingBadge();
+});
+uiRefreshSaved();
 socket.on('ui_generated', (d) => {
   uiGeneratedFile = d.file;
   const box = document.getElementById('ui-code-box');

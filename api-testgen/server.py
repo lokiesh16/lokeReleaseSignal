@@ -313,9 +313,57 @@ ui_pending = []  # (portal, step) actions the in-page picker wants Playwright to
 ui_rec_lock = threading.Lock()
 
 
+# Saved recordings live as one JSON file each (plus a rolling autosave) so work
+# survives a restart/crash. They hold real recorded values - including any
+# password-like input, which the generated test keeps out of its source - so
+# the files are owner-only and the folder is gitignored.
+UI_RECORDINGS_DIR = os.environ.get("UI_RECORDINGS_DIR") or os.path.join(BASE_DIR, "ui_recordings")
+UI_AUTOSAVE_FILE = os.path.join(UI_RECORDINGS_DIR, ".autosave.json")
+ui_rec["loaded_name"] = None   # name of the saved recording being edited, if any
+
+
+def _write_private_json(path, obj):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, path)   # never leaves a half-written file behind
+
+
+def _ui_autosave():
+    try:
+        with ui_rec_lock:
+            payload = {"steps": list(ui_rec["steps"]), "loaded_name": ui_rec.get("loaded_name")}
+        _write_private_json(UI_AUTOSAVE_FILE, payload)
+    except Exception as e:
+        print(f"UI autosave failed: {e}")
+
+
+def _ui_restore_autosave():
+    try:
+        with open(UI_AUTOSAVE_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        steps = data.get("steps") or []
+        if steps:
+            ui_rec["steps"] = steps
+            ui_rec["next_id"] = max((x.get("id", 0) for x in steps), default=0) + 1
+            ui_rec["loaded_name"] = data.get("loaded_name")
+            print(f"Restored {len(steps)} recorded UI step(s) from autosave.")
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"Could not restore UI autosave: {e}")
+
+
 def _ui_emit_steps():
     with app.app_context():
-        socketio.emit("ui_steps", {"steps": list(ui_rec["steps"]), "recording": ui_rec["recording"]})
+        socketio.emit("ui_steps", {"steps": list(ui_rec["steps"]), "recording": ui_rec["recording"],
+                                   "loaded_name": ui_rec.get("loaded_name")})
+    _ui_autosave()
+
+
+_ui_restore_autosave()
 
 
 def _ui_add_step(step, portal):
@@ -325,6 +373,9 @@ def _ui_add_step(step, portal):
             return
         steps = ui_rec["steps"]
         last = steps[-1] if steps else None
+        if last and step.get("type") == "clear" and last.get("type") == "clear" \
+                and last.get("locator") == step.get("locator"):
+            return
         # Retyping the same field replaces the earlier fill instead of stacking a second one.
         if last and step.get("type") == "fill" and last.get("type") == "fill" \
                 and last.get("locator") == step.get("locator"):
@@ -357,9 +408,11 @@ def _run_ui_pending():
         try:
             if page is not None and step.get("type") == "hover":
                 resolve_locator(page, step["locator"]).hover(timeout=5000)
+            elif page is not None and step.get("type") == "clear":
+                resolve_locator(page, step["locator"]).clear(timeout=5000)
         except Exception as e:
             with app.app_context():
-                socketio.emit("error", {"msg": "Could not hover: " + str(e).strip().splitlines()[0][:200]})
+                socketio.emit("error", {"msg": f"Could not {step.get('type')}: " + str(e).strip().splitlines()[0][:200]})
 
 
 def _set_page_recording(portal, on, toolbar):
@@ -538,10 +591,13 @@ def playwright_worker():
             page = get_page_for(cmd)
             if page is None:
                 _put_result(cmd, {"ok": False, "error": "No browser open"}); continue
+            keep = bool(cmd.get("keep_steps"))   # append to the existing steps instead of starting over
             with ui_rec_lock:
-                ui_rec.update(recording=True, portal=cmd.get("portal", "A"), steps=[], next_id=1,
-                              toolbar=cmd.get("toolbar", True))
-            _ui_add_step({"type": "goto", "value": page.url, "url": page.url}, cmd.get("portal", "A"))
+                ui_rec.update(recording=True, portal=cmd.get("portal", "A"), toolbar=cmd.get("toolbar", True))
+                if not keep:
+                    ui_rec.update(steps=[], next_id=1, loaded_name=None)
+            if not keep:
+                _ui_add_step({"type": "goto", "value": page.url, "url": page.url}, cmd.get("portal", "A"))
             _set_page_recording(cmd.get("portal", "A"), True, ui_rec["toolbar"])
             _put_result(cmd, {"ok": True, "url": page.url})
 
@@ -870,10 +926,12 @@ ui_runs = {}  # run_id -> subprocess.Popen
 @socketio.on("ui_record_start")
 def ui_record_start(data):
     portal = (data or {}).get("portal", "A")
-    res = pw_call({"action": "ui_record_start", "portal": portal})
+    keep = bool((data or {}).get("keep_steps"))
+    res = pw_call({"action": "ui_record_start", "portal": portal, "keep_steps": keep})
     if not res["ok"]:
         emit("error", {"msg": "Record failed: " + res.get("error", "")}); return
-    emit("log", {"msg": f"Recording UI actions on Portal {portal} - use the app normally."})
+    emit("log", {"msg": f"Recording UI actions on Portal {portal} - use the app normally"
+                        + (" (new steps are added at the end)." if keep else ".")})
     _ui_emit_steps()
 
 
@@ -967,6 +1025,7 @@ def ui_locator_check(data):
 def ui_steps_clear():
     with ui_rec_lock:
         ui_rec["steps"] = []
+        ui_rec["loaded_name"] = None
     _ui_emit_steps()
 
 
@@ -998,6 +1057,99 @@ def ui_replay(data):
                                              "error": res.get("error")})
 
     threading.Thread(target=run, daemon=True).start()
+
+
+def _rec_file(name):
+    slug = slugify(name)
+    path = os.path.realpath(os.path.join(UI_RECORDINGS_DIR, slug + ".json"))
+    if os.path.dirname(path) != os.path.realpath(UI_RECORDINGS_DIR):
+        return None, slug
+    return path, slug
+
+
+@app.route("/api/ui-recordings", methods=["GET"])
+def list_ui_recordings():
+    out = []
+    try:
+        names = [n for n in os.listdir(UI_RECORDINGS_DIR) if n.endswith(".json") and not n.startswith(".")]
+    except FileNotFoundError:
+        names = []
+    for fn in names:
+        try:
+            with open(os.path.join(UI_RECORDINGS_DIR, fn), encoding="utf-8") as f:
+                d = json.load(f)
+            steps = d.get("steps") or []
+            out.append({"file": fn[:-5], "name": d.get("name") or fn[:-5], "saved_at": d.get("saved_at"),
+                        "steps": sum(1 for x in steps if x.get("type") != "case"),
+                        "cases": sum(1 for x in steps if x.get("type") == "case")})
+        except Exception:
+            continue   # skip unreadable files rather than break the list
+    out.sort(key=lambda r: r.get("saved_at") or "", reverse=True)
+    return jsonify({"recordings": out, "loaded_name": ui_rec.get("loaded_name")})
+
+
+@app.route("/api/ui-recordings", methods=["POST"])
+def save_ui_recording():
+    """Saves the editor's current steps under `name` (overwrites a recording of the same name)."""
+    body = request.get_json(silent=True) or {}
+    name = (body.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Give the recording a name"}), 400
+    path, slug = _rec_file(name)
+    if not path:
+        return jsonify({"error": "Invalid name"}), 400
+    with ui_rec_lock:
+        if ui_rec["recording"]:
+            return jsonify({"error": "Stop recording before saving"}), 409
+        steps = [dict(x) for x in ui_rec["steps"]]
+        if not steps:
+            return jsonify({"error": "Nothing recorded yet"}), 400
+        ui_rec["loaded_name"] = name
+    _write_private_json(path, {"name": name, "saved_at": datetime.now().isoformat(timespec="seconds"),
+                               "settings": body.get("settings") or {}, "steps": steps})
+    _ui_emit_steps()
+    return jsonify({"ok": True, "name": name, "file": slug, "steps": len(steps)})
+
+
+@app.route("/api/ui-recordings/<slug>", methods=["GET"])
+def load_ui_recording(slug):
+    """Loads a saved recording into the editor (replacing what's there) so it can be edited."""
+    path, _ = _rec_file(slug)
+    if not path or not os.path.isfile(path):
+        return jsonify({"error": "Recording not found"}), 404
+    with ui_rec_lock:
+        if ui_rec["recording"]:
+            return jsonify({"error": "Stop recording before loading another recording"}), 409
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+    except Exception as e:
+        return jsonify({"error": f"Could not read the file: {e}"}), 500
+    steps = d.get("steps") or []
+    with ui_rec_lock:
+        ui_rec["steps"] = steps
+        ui_rec["next_id"] = max((x.get("id", 0) for x in steps), default=0) + 1
+        ui_rec["loaded_name"] = d.get("name") or slug
+    _ui_emit_steps()
+    return jsonify({"ok": True, "name": ui_rec["loaded_name"], "settings": d.get("settings") or {}, "steps": steps})
+
+
+@app.route("/api/ui-recordings/<slug>", methods=["DELETE"])
+def delete_ui_recording(slug):
+    path, _ = _rec_file(slug)
+    if not path or not os.path.isfile(path):
+        return jsonify({"error": "Recording not found"}), 404
+    try:
+        with open(path, encoding="utf-8") as f:
+            name = json.load(f).get("name")
+    except Exception:
+        name = None
+    os.remove(path)
+    with ui_rec_lock:
+        if ui_rec.get("loaded_name") and ui_rec["loaded_name"] in (name, slug):
+            ui_rec["loaded_name"] = None   # the steps stay in the editor, just no longer tied to a saved file
+    _ui_emit_steps()
+    return jsonify({"ok": True})
 
 
 @socketio.on("ui_generate")

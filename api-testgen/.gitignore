@@ -7,3 +7,4 @@ generated_scripts/*
 !generated_scripts/.gitkeep
 sessions/*
 !sessions/.gitkeep
+ui_recordings/*
