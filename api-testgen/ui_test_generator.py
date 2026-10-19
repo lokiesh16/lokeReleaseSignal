@@ -62,8 +62,29 @@ def _secret_var(loc, taken):
     return var
 
 
+_PAGE_VAR = {"A": "page", "B": "page_b"}
+
+
+def _for_portal(line, portal):
+    """Retargets a rendered line from `page` to the portal's page fixture. Only the call
+    target is rewritten (line start / inside expect(...)), never text inside string values."""
+    var = _PAGE_VAR.get(portal, "page")
+    if var == "page" or not line:
+        return line
+    if line.startswith("page."):
+        return var + line[4:]
+    if line.startswith("expect(page."):
+        return "expect(" + var + line[len("expect(page"):]
+    return line
+
+
 def _render_step(s, secrets):
     """One recorded step -> one line of test code (or None for steps that emit nothing)."""
+    line = _render_step_page(s, secrets)
+    return _for_portal(line, s.get("portal", "A"))
+
+
+def _render_step_page(s, secrets):
     t, loc = s.get("type"), s.get("locator") or {}
     if t == "goto":
         return f"page.goto({_s(s.get('value') or s.get('url'))})"
@@ -143,6 +164,7 @@ def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
     multi = len(cases) > 1
     timeout_ms = max(1, int(float(timeout_s or 15) * 1000))
 
+    uses_b = any(st.get("portal") == "B" for st in steps)
     funcs, used = [], set()
     for n, (cname, csteps) in enumerate(cases, 1):
         lines = []
@@ -154,9 +176,10 @@ def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
         while fn in used:
             fn += "_x"
         used.add(fn)
-        funcs.append((fn, cname, lines or ["pass"]))
+        needs_b = any(st.get("portal") == "B" for st in csteps)
+        funcs.append((fn, cname, lines or ["pass"], needs_b))
     if not funcs:
-        funcs.append((f"test_{slug}", name or slug, ["pass  # no steps were recorded"]))
+        funcs.append((f"test_{slug}", name or slug, ["pass  # no steps were recorded"], False))
 
     out = [
         f'"""UI test: {name or slug}',
@@ -166,6 +189,8 @@ def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
         f"Env:  UI_TIMEOUT_MS (default {timeout_ms}) - how long each step waits for its element;",
         "      UI_HEADED=0 runs headless, UI_SLOWMO=<ms> slows each action down.",
     ]
+    if uses_b:
+        out.append("Two portals: `page` is Portal A and `page_b` is Portal B - separate browser contexts, so each keeps its own login.")
     if multi:
         out.append(f"{len(funcs)} test cases, run in order" +
                    (" in ONE shared browser session (each continues where the previous stopped)." if shared_session
@@ -219,8 +244,23 @@ def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
         "    yield page",
         "    context.close()",
     ]
-    for fn, cname, lines in funcs:
-        out += ["", "", f"def {fn}(page):"]
+    if uses_b:
+        out += [
+            "",
+            "",
+            f'@pytest.fixture(scope="{scope}")',
+            "def page_b(browser):",
+            "    # Portal B: its own context, so it is a separate session/login from `page` (Portal A)",
+            "    context = browser.new_context()",
+            "    page = context.new_page()",
+            "    page.set_default_timeout(TIMEOUT_MS)",
+            "    page.set_default_navigation_timeout(max(TIMEOUT_MS, 30_000))",
+            '    page.on("dialog", lambda d: d.accept())',
+            "    yield page",
+            "    context.close()",
+        ]
+    for fn, cname, lines, needs_b in funcs:
+        out += ["", "", f"def {fn}(page, page_b):" if needs_b else f"def {fn}(page):"]
         if multi:
             out.append(f"    {_s(cname)}")
         out += ["    " + ln for ln in lines]

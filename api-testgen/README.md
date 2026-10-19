@@ -73,6 +73,11 @@ more (append)**), and save again or delete it. Steps are also autosaved, so a
 restart doesn't lose them. Files live in `ui_recordings/` (owner-only, gitignored)
 and contain the recorded values, passwords included.
 
+**Cross-portal flows:** launch Portal A and Portal B on the Capture step, then
+choose *Both* when recording. Steps from either window are recorded in order and
+tagged A/B; replay opens one fresh window per portal (separate logins) and the
+generated test gets `page` (A) and `page_b` (B) fixtures.
+
 Password-like fields are never written into the script: they're read from an
 env var (e.g. `UI_PASSWORD`), with the recorded value kept in an owner-only
 `.<name>.env` next to the test.

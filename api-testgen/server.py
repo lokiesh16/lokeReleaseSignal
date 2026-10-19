@@ -308,7 +308,7 @@ def _put_result(cmd, result):
 # Playwright binding while a recording is active. One recording at a time,
 # bound to one portal; the UI edits/reads this list over Socket.IO.
 
-ui_rec = {"recording": False, "portal": "A", "steps": [], "next_id": 1, "toolbar": True, "anchor": False}
+ui_rec = {"recording": False, "portal": "A", "portals": ["A"], "steps": [], "next_id": 1, "toolbar": True, "anchor": False}
 ui_pending = []  # (portal, step) actions the in-page picker wants Playwright to really perform (hover)
 ui_rec_lock = threading.Lock()
 
@@ -369,16 +369,16 @@ _ui_restore_autosave()
 def _ui_add_step(step, portal):
     """Appends one recorded step (or merges it into the previous one) and pushes the list to the UI."""
     with ui_rec_lock:
-        if not ui_rec["recording"] or portal != ui_rec["portal"]:
+        if not ui_rec["recording"] or portal not in ui_rec["portals"]:
             return
+        step["portal"] = portal   # which window this happened in (replay/codegen use it)
         steps = ui_rec["steps"]
         last = steps[-1] if steps else None
-        if last and step.get("type") == "clear" and last.get("type") == "clear" \
-                and last.get("locator") == step.get("locator"):
+        same_target = last and last.get("locator") == step.get("locator") and last.get("portal", "A") == portal
+        if last and step.get("type") == "clear" and last.get("type") == "clear" and same_target:
             return
         # Retyping the same field replaces the earlier fill instead of stacking a second one.
-        if last and step.get("type") == "fill" and last.get("type") == "fill" \
-                and last.get("locator") == step.get("locator"):
+        if last and step.get("type") == "fill" and last.get("type") == "fill" and same_target:
             last["value"], last["secret"] = step.get("value"), step.get("secret")
         else:
             step["id"] = ui_rec["next_id"]
@@ -392,14 +392,15 @@ def _ui_binding(source, step):
     a recording is live (so the toolbar survives navigations); anything else is a step."""
     portal = getattr(source["page"], "_portal_id", "A")
     if step.get("type") == "__state":
-        return {"rec": ui_rec["recording"] and portal == ui_rec["portal"], "toolbar": ui_rec["toolbar"],
-                "anchor": ui_rec.get("anchor", False)}
+        return {"rec": ui_rec["recording"] and portal in ui_rec["portals"], "toolbar": ui_rec["toolbar"],
+                "anchor": ui_rec.get("anchor", False),
+                "label": f"Portal {portal}" if len(ui_rec["portals"]) > 1 else ""}
     if step.get("type") == "__anchor":   # the toolbar's ⚓ toggle; remembered across page loads
         ui_rec["anchor"] = bool(step.get("value"))
         return None
     perform = step.pop("perform", False)
     _ui_add_step(step, portal)
-    if perform and ui_rec["recording"] and portal == ui_rec["portal"]:
+    if perform and ui_rec["recording"] and portal in ui_rec["portals"]:
         ui_pending.append((portal, step))
 
 
@@ -422,9 +423,10 @@ def _run_ui_pending():
 def _set_page_recording(portal, on, toolbar):
     page = pw["pages"].get(portal)
     if page is not None:
+        label = f"Portal {portal}" if len(ui_rec["portals"]) > 1 else ""
         try:
-            page.evaluate("([on, tb, an]) => window.__tgSetRec && window.__tgSetRec(on, tb, an)",
-                          [on, toolbar, ui_rec.get("anchor", False)])
+            page.evaluate("([on, tb, an, lb]) => window.__tgSetRec && window.__tgSetRec(on, tb, an, lb)",
+                          [on, toolbar, ui_rec.get("anchor", False), label])
         except Exception:
             pass
 
@@ -593,18 +595,37 @@ def playwright_worker():
                 _put_result(cmd, {"ok": False, "error": str(e)})
 
         elif action == "ui_record_start":
-            page = get_page_for(cmd)
-            if page is None:
-                _put_result(cmd, {"ok": False, "error": "No browser open"}); continue
+            wanted = cmd.get("portals") or [cmd.get("portal", "A")]
+            portals = [p for p in wanted if pw["pages"].get(p) is not None]
+            if not portals:
+                _put_result(cmd, {"ok": False, "error": "No browser open" if not pw["pages"] else
+                                  f"Portal {', '.join(wanted)} isn't open - launch it first"}); continue
             keep = bool(cmd.get("keep_steps"))   # append to the existing steps instead of starting over
             with ui_rec_lock:
-                ui_rec.update(recording=True, portal=cmd.get("portal", "A"), toolbar=cmd.get("toolbar", True))
+                ui_rec.update(recording=True, portals=portals, portal=portals[0], toolbar=cmd.get("toolbar", True))
                 if not keep:
                     ui_rec.update(steps=[], next_id=1, loaded_name=None)
-            if not keep:
-                _ui_add_step({"type": "goto", "value": page.url, "url": page.url}, cmd.get("portal", "A"))
-            _set_page_recording(cmd.get("portal", "A"), True, ui_rec["toolbar"])
-            _put_result(cmd, {"ok": True, "url": page.url})
+            for p in portals:
+                if not keep:
+                    pg = pw["pages"][p]
+                    _ui_add_step({"type": "goto", "value": pg.url, "url": pg.url}, p)
+                _set_page_recording(p, True, ui_rec["toolbar"])
+            _put_result(cmd, {"ok": True, "url": pw["pages"][portals[0]].url, "portals": portals})
+
+        elif action == "ui_record_stop":
+            time.sleep(0.4)  # let in-flight events from the page land first
+            page = next(iter(pw["pages"].values()), None)
+            if page is not None:
+                try:
+                    page.wait_for_timeout(300)
+                except Exception:
+                    pass
+            with ui_rec_lock:
+                ui_rec["recording"] = False
+                recorded = list(ui_rec["portals"])
+            for p in recorded:
+                _set_page_recording(p, False, False)
+            _put_result(cmd, {"ok": True})
 
         elif action == "ui_locator_check":
             page = get_page_for(cmd)
@@ -621,37 +642,33 @@ def playwright_worker():
             except Exception as e:
                 _put_result(cmd, {"ok": False, "error": str(e).strip().splitlines()[0][:200]})
 
-        elif action == "ui_record_stop":
-            time.sleep(0.4)  # let in-flight events from the page land first
-            page = get_page_for(cmd)
-            if page is not None:
-                try:
-                    page.wait_for_timeout(300)
-                except Exception:
-                    pass
-            with ui_rec_lock:
-                ui_rec["recording"] = False
-            _set_page_recording(cmd.get("portal", ui_rec["portal"]), False, False)
-            _put_result(cmd, {"ok": True})
-
         elif action == "ui_replay":
-            # Fresh context in the same browser (clean cookies/storage, and no
-            # recorder binding, so the replay can't feed back into the steps).
-            browser = pw["browsers"].get(cmd.get("portal", "A"))
-            if browser is None:
+            # One fresh context (clean cookies/storage = a separate login) per portal the steps
+            # use, in the same browser as that portal. No recorder binding in these contexts,
+            # so the replay can't feed back into the steps.
+            if not pw["browsers"]:
                 _put_result(cmd, {"ok": False, "error": "No browser open"}); continue
             from playwright.sync_api import expect as pw_expect
             steps, slow = cmd.get("steps", []), int(cmd.get("slow_mo") or 0)
             timeout_ms = max(1000, int(float(cmd.get("timeout_s") or 15) * 1000))
             pw_expect.set_options(timeout=timeout_ms)
             failed_at = None
-            ctx = browser.new_context()
+            ctxs, rpages = {}, {}
+
+            def replay_page(portal):
+                if portal not in rpages:
+                    br = pw["browsers"].get(portal) or pw["browsers"].get("A") or next(iter(pw["browsers"].values()))
+                    ctxs[portal] = br.new_context()
+                    pg = ctxs[portal].new_page()
+                    pg.set_default_timeout(timeout_ms)
+                    pg.set_default_navigation_timeout(max(timeout_ms, 30000))
+                    pg.on("dialog", lambda d: d.accept())
+                    rpages[portal] = pg
+                return rpages[portal]
+
             try:
-                rpage = ctx.new_page()
-                rpage.set_default_timeout(timeout_ms)
-                rpage.set_default_navigation_timeout(max(timeout_ms, 30000))
-                rpage.on("dialog", lambda d: d.accept())
                 for pos, s in enumerate(steps):
+                    rpage = replay_page(s.get("portal", "A"))
                     try:
                         if cmd.get("highlight_last") and pos == len(steps) - 1 and s.get("locator"):
                             # "Run to here": show which element this step's locator found, then act on it.
@@ -677,13 +694,14 @@ def playwright_worker():
                         break
                     if slow:
                         rpage.wait_for_timeout(slow)
-                if failed_at is None:
-                    rpage.wait_for_timeout(1500 if cmd.get("highlight_last") else 800)   # let the user see the end state
+                if failed_at is None and rpages:
+                    next(iter(rpages.values())).wait_for_timeout(1500 if cmd.get("highlight_last") else 800)   # let the user see the end state
             finally:
-                try:
-                    ctx.close()
-                except Exception:
-                    pass
+                for c in ctxs.values():
+                    try:
+                        c.close()
+                    except Exception:
+                        pass
             _put_result(cmd, {"ok": True, "failed_at": failed_at})
 
         elif action == "dom_snapshot":
@@ -930,19 +948,21 @@ ui_runs = {}  # run_id -> subprocess.Popen
 
 @socketio.on("ui_record_start")
 def ui_record_start(data):
-    portal = (data or {}).get("portal", "A")
-    keep = bool((data or {}).get("keep_steps"))
-    res = pw_call({"action": "ui_record_start", "portal": portal, "keep_steps": keep})
+    data = data or {}
+    portals = data.get("portals") or [data.get("portal", "A")]
+    keep = bool(data.get("keep_steps"))
+    res = pw_call({"action": "ui_record_start", "portals": portals, "keep_steps": keep})
     if not res["ok"]:
         emit("error", {"msg": "Record failed: " + res.get("error", "")}); return
-    emit("log", {"msg": f"Recording UI actions on Portal {portal} - use the app normally"
+    names = " + ".join(f"Portal {p}" for p in res.get("portals", portals))
+    emit("log", {"msg": f"Recording UI actions on {names} - use the app normally"
                         + (" (new steps are added at the end)." if keep else ".")})
     _ui_emit_steps()
 
 
 @socketio.on("ui_record_stop")
 def ui_record_stop():
-    pw_call({"action": "ui_record_stop", "portal": ui_rec["portal"]}, timeout=15)
+    pw_call({"action": "ui_record_stop"}, timeout=15)
     with ui_rec_lock:
         ui_rec["recording"] = False
     _ui_emit_steps()
@@ -1590,7 +1610,7 @@ def run_explore_loop(run_id, goal, portal, provider, api_key, model, ollama_url,
         cases_results.append({**case, "outcome": outcome, "finding": finding, "history": history, "tokens": case_tokens})
 
     if record_steps:
-        pw_call({"action": "ui_record_stop", "portal": portal}, timeout=15)
+        pw_call({"action": "ui_record_stop"}, timeout=15)
         _ui_emit_steps()
         emit_log(f"⏹ Recorded {len(ui_rec['steps'])} step(s) - review them in 'Record UI test'.", "ok")
 

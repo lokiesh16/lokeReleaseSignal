@@ -653,12 +653,13 @@
           <div class="flex-row" style="margin-bottom:6px">
             <h3 style="margin:0;flex:1">⏺ Recorder <span id="ui-rec-badge" class="badge">idle</span></h3>
           </div>
-          <p>Launch the browser first (Capture step). Clicks, typing, dropdowns, checkboxes and Enter/Escape are captured as you use the app. A small toolbar appears in the page while recording: <b>🎯 Pick</b> lets you highlight any element <i>without clicking it</i>, then choose what to do with it — click, hover, scroll to it, wait for it, or assert its text / value / href / visibility. <b>⚓ Anchor</b> makes the recorder locate controls by their nearest label (e.g. the button under “Date of Birth”) instead of their current text, so values that change — dates, selected options — don't break the test. The toolbar also adds a timed <b>Wait</b> and scroll-to-top/bottom. In the list below, <b>＋</b> on any step inserts a wait after it or <b>splits the steps into separate test cases</b>. Esc leaves pick mode. Password-like fields are saved to an owner-only env file, not into the script.</p>
+          <p>Launch the browser first (Capture step). Clicks, typing, dropdowns, checkboxes and Enter/Escape are captured as you use the app. A small toolbar appears in the page while recording: <b>🎯 Pick</b> lets you highlight any element <i>without clicking it</i>, then choose what to do with it — click, hover, scroll to it, wait for it, or assert its text / value / href / visibility. To test across portals (e.g. Portal A creates data that Portal B, logged in as another user, then checks), launch both portals on the Capture step and choose <b>Both — Portal A + Portal B</b> here: actions in either window are recorded in order, tagged A/B, and replayed in two separate windows. <b>⚓ Anchor</b> makes the recorder locate controls by their nearest label (e.g. the button under “Date of Birth”) instead of their current text, so values that change — dates, selected options — don't break the test. The toolbar also adds a timed <b>Wait</b> and scroll-to-top/bottom. In the list below, <b>＋</b> on any step inserts a wait after it or <b>splits the steps into separate test cases</b>. Esc leaves pick mode. Password-like fields are saved to an owner-only env file, not into the script.</p>
           <div class="field">
             <label>Portal to record</label>
             <select id="ui-portal" style="width:100%;background:rgba(255,255,255,0.045);border:1px solid var(--glass-border);border-radius:9px;padding:9px 14px;color:var(--text);font-family:var(--mono);font-size:12px">
               <option value="A" selected>Portal A</option>
               <option value="B">Portal B</option>
+              <option value="A,B">Both — Portal A + Portal B (cross-portal flow)</option>
             </select>
           </div>
           <div class="flex-row">
@@ -1392,7 +1393,7 @@ function uiRunTo(id) {
 function uiQuickCheck(id) {
   const st = uiLastSteps.find(x => x.id === id);
   if (!st || !st.locator) return;
-  socket.emit('ui_locator_check', { id, locator: st.locator, portal: document.getElementById('ui-portal').value });
+  socket.emit('ui_locator_check', { id, locator: st.locator, portal: st.portal || 'A' });
 }
 let uiEditLoc = null, uiLocDraft = '';   // step id whose selector is being edited, and its draft text
 function uiLocSelector(l) { return !l ? '' : l.kind === 'pw' ? l.selector : l.kind === 'css' ? l.value : ''; }
@@ -1404,7 +1405,7 @@ function uiToggleEditLoc(id) {
 }
 function uiCheckLoc(id) {
   if (!uiLocDraft.trim()) { toast('Type a selector first', 'err'); return; }
-  socket.emit('ui_locator_check', { id, selector: uiLocDraft, portal: document.getElementById('ui-portal').value });
+  socket.emit('ui_locator_check', { id, selector: uiLocDraft, portal: (uiLastSteps.find(x => x.id === id) || {}).portal || 'A' });
 }
 function uiUseAlt(id, index) {
   delete uiCheckResults[id];
@@ -1440,6 +1441,7 @@ function renderUiSteps(steps) {
                  assert_visible: 'Assert visible', assert_attr: 'Assert attr', hover: 'Hover', scroll_into_view: 'Scroll to',
                  wait_for: 'Wait for', wait: 'Wait (ms)', scroll_page: 'Scroll page', note: 'Note' };
   const editable = ['fill', 'select', 'press', 'press_page', 'assert_text', 'assert_value', 'assert_attr', 'wait_for', 'wait', 'scroll_page'];
+  const multiPortal = steps.some(x => x.portal === 'B');   // only label steps when more than one portal is involved
   let n = 0, caseNo = 0;
   box.innerHTML = steps.map((s) => {
     if (s.type === 'case') {
@@ -1450,6 +1452,7 @@ function renderUiSteps(steps) {
         + `<button class="btn btn-ghost btn-sm" title="Remove this split (its steps join the case above)" onclick="socket.emit('ui_step_delete',{id:${s.id}})">✕</button></div>`;
     }
     n += 1;
+    const ptag = multiPortal ? `<span class="badge" style="margin-right:6px;${s.portal === 'B' ? 'color:#38bdf8' : ''}">${s.portal || 'A'}</span>` : '';
     const target = s.type === 'goto' ? escapeHtml(s.value) : !s.locator ? '' : escapeHtml(uiDescribeLocator(s.locator) + (s.attr ? ` [${s.attr}]` : ''));
     let val = '';
     if (s.type === 'fill' && s.secret) val = '<span class="badge">secret → env var</span>';
@@ -1479,7 +1482,7 @@ function renderUiSteps(steps) {
         + `<span>📋 New test case</span><input type="text" placeholder="name (optional)" value="${escapeHtml(uiDraft.name)}" oninput="uiDraft.name=this.value" style="width:180px;${UI_INPUT_STYLE}">`
         + `<button class="btn btn-ghost btn-sm" onclick="uiInsertCase(${s.id})" title="Steps after this one start a new test case">Split after this step</button></div>` : '';
     return `<div><div class="flex-row" style="gap:8px"><span style="width:14px">${mark}</span><span style="color:var(--muted);width:22px">${n}.</span>`
-         + `<b style="width:88px">${verb[s.type] || s.type}</b><span style="flex:1;word-break:break-all">${s.type === 'note' ? '' : target}${chk}</span>${val}`
+         + `<b style="width:88px">${ptag}${verb[s.type] || s.type}</b><span style="flex:1;word-break:break-all">${s.type === 'note' ? '' : target}${chk}</span>${val}`
          + (s.locator ? `<button class="btn btn-ghost btn-sm" title="Check: how many elements does this locator match in the live browser right now? (non-mutating; only meaningful if the browser is on this step's screen)" onclick="uiQuickCheck(${s.id})">🔍</button>` : '')
          + `<button class="btn btn-ghost btn-sm" title="Run to here: replay steps 1–${n} in a fresh window and outline this step's element" onclick="uiRunTo(${s.id})">▶</button>`
          + (s.locator ? `<button class="btn btn-ghost btn-sm" title="Edit this step's selector" onclick="uiToggleEditLoc(${s.id})">✎</button>` : '')
@@ -1579,7 +1582,7 @@ function uiToggleRecord(append) {
   if (!browserOpen) { toast('Launch the browser first (Capture step)', 'err'); return; }
   const hasSteps = uiLastSteps.length > 0;
   if (hasSteps && !append && !confirm(`Start a new recording? This replaces the ${uiLastSteps.length} steps currently in the list.\n\n(Use "Record more (append)" to keep them, or Save them first.)`)) return;
-  socket.emit('ui_record_start', { portal: document.getElementById('ui-portal').value, keep_steps: !!append && hasSteps });
+  socket.emit('ui_record_start', { portals: document.getElementById('ui-portal').value.split(','), keep_steps: !!append && hasSteps });
 }
 function uiClearSteps() { uiReplayResults = {}; uiCheckResults = {}; socket.emit('ui_steps_clear'); }
 function uiReplay() {
