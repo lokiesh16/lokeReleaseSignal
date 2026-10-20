@@ -365,6 +365,33 @@
   .flows-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
   .flows-search { flex: 0 1 260px; height: 36px; padding: 0 10px; }
   .flows-search input { font-size: 12.5px; }
+  /* Saved Flows folders (modules) */
+  .flows-folder-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -6px 0 16px; }
+  .folder-pill {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; padding: 5px 11px;
+    border-radius: 999px; border: 1px solid var(--ink-line); background: var(--ink); color: var(--paper-dim); cursor: pointer;
+  }
+  .folder-pill:hover { color: var(--paper); border-color: var(--ink-line-strong); }
+  .folder-pill b { font-weight: 700; opacity: 0.75; }
+  .folder-pill.active { background: rgba(76,230,170,0.14); color: var(--paper); border-color: var(--circuit); }
+  .folder-pill.empty:not(.active) { opacity: 0.55; }
+  .folder-pill-new { border-style: dashed; color: var(--circuit); }
+  .folder-pill-x { margin-left: 2px; padding: 0 3px; border-radius: 4px; opacity: 0.6; }
+  .folder-pill-x:hover { opacity: 1; background: var(--ink-line); }
+  .folder-new-input { height: 30px; font-size: 12.5px; width: 190px; }
+  .flows-move-bar {
+    display: none; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 14px;
+    border: 1px solid var(--circuit); border-radius: 10px; background: rgba(76,230,170,0.08); font-size: 13px; color: var(--paper);
+  }
+  .flows-move-bar select { height: 32px; font-size: 12.5px; }
+  .folder-link { background: none; border: none; color: var(--circuit); cursor: pointer; font-size: 12.5px; padding: 0; }
+  .flow-card-top-left { display: flex; align-items: center; gap: 8px; }
+  .flow-card-select { width: 15px; height: 15px; margin: 0; cursor: pointer; accent-color: var(--circuit); }
+  .flow-card.checked { border-color: var(--circuit); }
+  .flow-card-module {
+    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--ink-line);
+    color: var(--paper-dim); white-space: nowrap;
+  }
   .flows-filter-pills { display: flex; gap: 4px; background: var(--ink); border: 1px solid var(--ink-line); border-radius: 8px; padding: 3px; }
   .flows-filter-pill {
     padding: 5px 12px; font-size: 12px; font-weight: 600; border-radius: 6px; background: none; border: none;
@@ -1756,6 +1783,10 @@
         <input id="rFlowName" placeholder="e.g. fitness_videos_playback" style="flex:1;">
         <button class="copy" id="saveFlowBtnRun" style="flex-shrink:0;">Save as flow</button>
       </div>
+      <div style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+        <label style="margin:0; font-size:12px; color:var(--paper-dim); flex-shrink:0;">Module</label>
+        <select id="rModuleRun" class="flow-module-select" style="flex:1;"></select>
+      </div>
       <div id="saveFlowStatusRun" style="font-size:12px; margin-top:6px;"></div>
     </div>
 
@@ -1808,6 +1839,8 @@
         </div>
         <button type="button" class="util-icon-btn flows-icon-btn" id="refreshFlowsBtn" title="Refresh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
       </div>
+      <div id="savedFlowsFolderBar" class="flows-folder-bar"></div>
+      <div id="savedFlowsMoveBar" class="flows-move-bar"></div>
       <div id="savedFlowsList" class="flows-grid">Loading…</div>
 
       <div class="card" id="savedFlowDetailCard" style="margin-top:18px;">
@@ -2268,6 +2301,10 @@
           <button class="copy" id="lsSaveCapturedFlowBtn" style="flex-shrink:0;">Save as flow</button>
           <button class="copy" id="lsCreateTestScriptBtn" style="display:none; flex-shrink:0; background:var(--ink-line); color:var(--paper);" title="Converts this same flow.json into a page object + pytest test class, written straight into your project">Create test script</button>
         </div>
+        <div id="lsCapturedModuleField" style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+          <label style="margin:0; font-size:12px; color:var(--paper-dim); flex-shrink:0;">Module</label>
+          <select id="lsCapturedModule" class="flow-module-select" style="flex:1;"></select>
+        </div>
         <div id="lsCapturedFlowStatus" style="font-size:12px; margin-top:6px;"></div>
         <div class="ls-draft-script-block" data-target="setup" style="margin-top:10px; overflow-wrap:anywhere;">
           <div class="ls-draft-script-summary" data-target="setup"></div>
@@ -2582,6 +2619,10 @@
       <div style="display:flex; gap:8px;">
         <input id="rFlowNameReport" placeholder="e.g. fitness_videos_playback" style="flex:1;">
         <button class="copy" id="saveFlowBtnReport" style="flex-shrink:0;">Save as flow</button>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+        <label style="margin:0; font-size:12px; color:var(--paper-dim); flex-shrink:0;">Module</label>
+        <select id="rModuleReport" class="flow-module-select" style="flex:1;"></select>
       </div>
       <div id="saveFlowStatusReport" style="font-size:12px; margin-top:6px;"></div>
     </div>
@@ -4454,10 +4495,19 @@ ${clone.innerHTML}
     const countEl = document.getElementById('flowsTabCountMy');
     if (countEl) countEl.textContent = lastLoadedFlows.length;
     renderSavedFlowsPlatformFilter();
+    // A selection only means something for flows that still exist.
+    const knownSlugs = new Set(lastLoadedFlows.map(f => f.slug));
+    Array.from(selectedMoveSlugs).forEach(slug => { if (!knownSlugs.has(slug)) selectedMoveSlugs.delete(slug); });
+    if (savedFlowsModuleFilter !== 'all' && savedFlowsModuleFilter !== '__none__'
+        && flowModules.length && !flowModules.some(m => m.name === savedFlowsModuleFilter)) {
+      savedFlowsModuleFilter = 'all';   // that folder was deleted
+    }
 
     let flows = savedFlowsPlatformFilter === 'all'
       ? lastLoadedFlows
       : lastLoadedFlows.filter(f => f.platform === savedFlowsPlatformFilter);
+    if (savedFlowsModuleFilter === '__none__') flows = flows.filter(f => !f.module);
+    else if (savedFlowsModuleFilter !== 'all') flows = flows.filter(f => f.module === savedFlowsModuleFilter);
     if (savedFlowsSearchQuery) {
       const q = savedFlowsSearchQuery;
       flows = flows.filter(f => `${f.name} ${f.slug} ${f.goal || ''}`.toLowerCase().includes(q));
@@ -4467,8 +4517,12 @@ ${clone.innerHTML}
       listEl.innerHTML = '<div class="empty-hint">No saved flows yet — run a goal below, then use "Save as flow" once it looks right.</div>';
       return;
     }
+    savedFlowsShownSlugs = flows.map(f => f.slug);
+    renderFolderBar();
+    renderMoveBar();
     if (!flows.length) {
-      listEl.innerHTML = `<div class="empty-hint">No flows match${savedFlowsSearchQuery ? ' that search' : ` — no ${escapeHtml(savedFlowsPlatformFilter)} flows yet`}.</div>`;
+      const folderNote = savedFlowsModuleFilter === 'all' ? '' : ' in this folder';
+      listEl.innerHTML = `<div class="empty-hint">No flows match${savedFlowsSearchQuery ? ' that search' : (savedFlowsPlatformFilter === 'all' ? '' : ` — no ${escapeHtml(savedFlowsPlatformFilter)} flows`)}${folderNote}.${savedFlowsModuleFilter !== 'all' && !savedFlowsSearchQuery ? ' Tick flows below "All folders" and use Move to… to add some.' : ''}</div>`;
       return;
     }
 
@@ -4526,9 +4580,13 @@ ${clone.innerHTML}
     const lastRun = flowLastRunInfo(state);
     const platformClass = f.platform === 'Android' ? 'android' : 'ios';
     return `
-      <div class="flow-card ${opts.selected ? 'selected' : ''}" data-slug="${escapeHtml(f.slug)}">
+      <div class="flow-card ${opts.selected ? 'selected' : ''} ${selectedMoveSlugs.has(f.slug) ? 'checked' : ''}" data-slug="${escapeHtml(f.slug)}">
         <div class="flow-card-top">
-          <span class="flow-card-badge ${platformClass}">${escapeHtml(f.platform)}</span>
+          <span class="flow-card-top-left">
+            <input type="checkbox" class="flow-card-select" data-select-slug="${escapeHtml(f.slug)}" title="Select to move into a folder" ${selectedMoveSlugs.has(f.slug) ? 'checked' : ''}>
+            <span class="flow-card-badge ${platformClass}">${escapeHtml(f.platform)}</span>
+            ${f.module ? `<span class="flow-card-module" title="Module">${escapeHtml(f.module)}</span>` : ''}
+          </span>
           <button type="button" class="flow-card-fav ${isFav ? 'on' : ''}" data-fav-slug="${escapeHtml(f.slug)}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '★' : '☆'}</button>
         </div>
         <div class="flow-card-title">${escapeHtml(humanizeFlowName(f.name))}</div>
@@ -4557,6 +4615,10 @@ ${clone.innerHTML}
     containerEl.querySelectorAll('.flow-card').forEach(card => {
       card.addEventListener('click', () => onSelect(card.dataset.slug));
     });
+    containerEl.querySelectorAll('.flow-card-select').forEach(cb => {
+      cb.addEventListener('click', e => e.stopPropagation());
+      cb.addEventListener('change', () => toggleMoveSelection(cb.dataset.selectSlug, cb.checked, cb.closest('.flow-card')));
+    });
     containerEl.querySelectorAll('.flow-card-fav').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -4576,6 +4638,221 @@ ${clone.innerHTML}
       });
     });
   }
+
+
+  // ================================================================
+  // Saved flow folders (modules): "Home", "Food", ... plus the team's own.
+  // A flow's module is a field in its own JSON (server.py: /api/modules,
+  // /api/flows/move) - this is only the UI over that.
+  // ================================================================
+  let flowModules = [];                 // [{name, default, count}] from /api/modules
+  let savedFlowsModuleFilter = 'all';   // 'all' | '__none__' | a module name
+  let savedFlowsShownSlugs = [];        // every flow the current filters match (not just the visible page)
+  const selectedMoveSlugs = new Set();  // ticked cards, kept across re-renders
+  let folderCreateOpen = false;
+  const MODULE_SELECT_IDS = ['rModuleRun', 'rModuleReport', 'lsCapturedModule'];
+  const FOLDER_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
+
+  async function loadFlowModules() {
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/modules');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'failed to load folders');
+      flowModules = data.modules || [];
+    } catch (e) {
+      // Bridge not reachable yet - same posture as loadSavedFlows; keep what we had.
+    }
+    renderFolderBar();
+    renderMoveBar();
+    populateModuleSelects();
+  }
+
+  function renderFolderBar() {
+    const el = document.getElementById('savedFlowsFolderBar');
+    if (!el) return;
+    const inPlatform = savedFlowsPlatformFilter === 'all'
+      ? lastLoadedFlows : lastLoadedFlows.filter(f => f.platform === savedFlowsPlatformFilter);
+    const counts = {};
+    let none = 0;
+    inPlatform.forEach(f => { if (f.module) counts[f.module] = (counts[f.module] || 0) + 1; else none++; });
+    const pill = (value, label, count, extra) => `
+      <button type="button" class="folder-pill ${savedFlowsModuleFilter === value ? 'active' : ''} ${count ? '' : 'empty'}" data-folder="${escapeHtml(value)}">
+        ${FOLDER_ICON}<span>${escapeHtml(label)}</span> <b>${count}</b>${extra || ''}
+      </button>`;
+    const pills = [pill('all', 'All folders', inPlatform.length)]
+      .concat(flowModules.map(m => pill(m.name, m.name, counts[m.name] || 0,
+        m.default ? '' : `<span class="folder-pill-x" data-delete-folder="${escapeHtml(m.name)}" title="Delete this folder (its flows are kept)">×</span>`)))
+      .concat([pill('__none__', 'No folder', none)]);
+    const n = selectedMoveSlugs.size;
+    const create = folderCreateOpen
+      ? `<input type="text" id="folderNewInput" class="folder-new-input" maxlength="40" placeholder="Folder name">
+         <button type="button" class="copy" data-folder-create style="padding:5px 12px; font-size:12px;">Create${n ? ` + move ${n}` : ''}</button>
+         <button type="button" class="copy" data-folder-cancel style="padding:5px 12px; font-size:12px; background:var(--ink-line); color:var(--paper);">Cancel</button>`
+      : `<button type="button" class="folder-pill folder-pill-new" data-folder-new>+ New folder</button>`;
+    el.innerHTML = pills.join('') + create;
+    if (folderCreateOpen) { const inp = document.getElementById('folderNewInput'); if (inp) inp.focus(); }
+  }
+
+  function renderMoveBar() {
+    const el = document.getElementById('savedFlowsMoveBar');
+    if (!el) return;
+    const n = selectedMoveSlugs.size;
+    if (!n) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    const prev = (document.getElementById('moveFolderSelect') || {}).value || '';
+    el.style.display = 'flex';
+    el.innerHTML = `
+      <b>${n} selected</b>
+      <button type="button" class="folder-link" data-move-select-all>Select all ${savedFlowsShownSlugs.length} shown</button>
+      <select id="moveFolderSelect">
+        <option value="">Move to folder…</option>
+        ${flowModules.map(m => `<option value="${escapeHtml(m.name)}" ${prev === m.name ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+        <option value="__none__" ${prev === '__none__' ? 'selected' : ''}>No folder</option>
+      </select>
+      <button type="button" class="copy" data-move-go style="padding:6px 14px; font-size:12px;">Move</button>
+      <button type="button" class="folder-link" data-move-clear>Clear</button>
+      <span class="hint" style="font-size:11.5px;">Or click “+ New folder” to create one and move these straight in.</span>`;
+  }
+
+  function toggleMoveSelection(slug, checked, cardEl) {
+    if (checked) selectedMoveSlugs.add(slug); else selectedMoveSlugs.delete(slug);
+    if (cardEl) cardEl.classList.toggle('checked', checked);
+    renderMoveBar();
+    if (folderCreateOpen) { const v = (document.getElementById('folderNewInput') || {}).value; renderFolderBar(); const inp = document.getElementById('folderNewInput'); if (inp) inp.value = v || ''; }
+  }
+
+  async function moveSelectedFlows(moduleName) {
+    const slugs = Array.from(selectedMoveSlugs);
+    if (!slugs.length) return;
+    const res = await fetch(BRIDGE_URL + '/api/flows/move', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({slugs, module: moduleName === '__none__' ? '' : moduleName}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'failed to move flows');
+    selectedMoveSlugs.clear();
+    await loadFlowModules();
+    await loadSavedFlows();
+  }
+
+  async function createFlowModule(name) {
+    const res = await fetch(BRIDGE_URL + '/api/modules', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'failed to create folder');
+    return data.name;
+  }
+
+  document.getElementById('savedFlowsFolderBar').addEventListener('click', async (e) => {
+    const del = e.target.closest('[data-delete-folder]');
+    if (del) {
+      e.stopPropagation();
+      const name = del.dataset.deleteFolder;
+      if (!confirm(`Delete the folder "${name}"? Its flows are kept — they just go back to "No folder".`)) return;
+      try {
+        const res = await fetch(BRIDGE_URL + '/api/modules/' + encodeURIComponent(name), {method: 'DELETE'});
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'failed to delete folder');
+        if (savedFlowsModuleFilter === name) savedFlowsModuleFilter = 'all';
+        await loadFlowModules();
+        await loadSavedFlows();
+      } catch (err) { alert('Could not delete folder: ' + err.message); }
+      return;
+    }
+    const pillBtn = e.target.closest('[data-folder]');
+    if (pillBtn) {
+      savedFlowsModuleFilter = pillBtn.dataset.folder;
+      savedFlowsExpanded = false;
+      renderFlowsSidebarPage();
+      return;
+    }
+    if (e.target.closest('[data-folder-new]')) { folderCreateOpen = true; renderFolderBar(); return; }
+    if (e.target.closest('[data-folder-cancel]')) { folderCreateOpen = false; renderFolderBar(); return; }
+    if (e.target.closest('[data-folder-create]')) await submitNewFolder();
+  });
+  document.getElementById('savedFlowsFolderBar').addEventListener('keydown', (e) => {
+    if (e.target.id !== 'folderNewInput') return;
+    if (e.key === 'Enter') { e.preventDefault(); submitNewFolder(); }
+    if (e.key === 'Escape') { folderCreateOpen = false; renderFolderBar(); }
+  });
+  async function submitNewFolder() {
+    const inp = document.getElementById('folderNewInput');
+    const name = inp ? inp.value.trim() : '';
+    if (!name) { if (inp) inp.focus(); return; }
+    try {
+      const created = await createFlowModule(name);
+      folderCreateOpen = false;
+      if (selectedMoveSlugs.size) {
+        await moveSelectedFlows(created);   // reloads folders + flows
+        savedFlowsModuleFilter = created;   // and show where they went
+        renderFlowsSidebarPage();
+      } else {
+        await loadFlowModules();
+      }
+    } catch (err) { alert('Could not create folder: ' + err.message); }
+  }
+
+  document.getElementById('savedFlowsMoveBar').addEventListener('click', async (e) => {
+    if (e.target.closest('[data-move-clear]')) { selectedMoveSlugs.clear(); renderFlowsSidebarPage(); return; }
+    if (e.target.closest('[data-move-select-all]')) {
+      savedFlowsShownSlugs.forEach(slug => selectedMoveSlugs.add(slug));
+      renderFlowsSidebarPage();
+      return;
+    }
+    if (e.target.closest('[data-move-go]')) {
+      const target = document.getElementById('moveFolderSelect').value;
+      if (!target) { alert('Pick a folder to move them to first.'); return; }
+      try { await moveSelectedFlows(target); }
+      catch (err) { alert('Could not move flows: ' + err.message); }
+    }
+  });
+
+  // ---- Module dropdown on the three "Save as flow" forms ----
+  function populateModuleSelects() {
+    MODULE_SELECT_IDS.forEach(id => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">Choose a module…</option>'
+        + flowModules.map(m => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.name)}</option>`).join('')
+        + '<option value="__none__">No module</option><option value="__new__">＋ New module…</option>';
+      if (prev && Array.from(sel.options).some(o => o.value === prev)) sel.value = prev;
+    });
+  }
+  MODULE_SELECT_IDS.forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    sel.addEventListener('change', async () => {
+      if (sel.value !== '__new__') return;
+      const name = (prompt('Name for the new module:') || '').trim();
+      sel.value = '';
+      if (!name) return;
+      try {
+        const created = await createFlowModule(name);
+        await loadFlowModules();
+        sel.value = created;
+      } catch (err) { alert('Could not create module: ' + err.message); }
+    });
+  });
+  // Same slug rule as the server's, to tell "saving a new flow" from "adding
+  // to an existing one" (which keeps its module, so needs no choice).
+  function flowNameExists(name) {
+    const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+    return lastLoadedFlows.some(f => f.slug === slug || (f.name || '').toLowerCase() === name.trim().toLowerCase());
+  }
+  // -> {module} ('' = leave unset) or {error}
+  function readModuleChoice(selectId, name) {
+    const sel = document.getElementById(selectId);
+    const v = sel ? sel.value : '__none__';
+    if (v === '__none__') return {module: ''};
+    if (v) return {module: v};
+    if (flowNameExists(name)) return {module: ''};
+    return {error: 'Pick a module for this flow (or choose "No module")'};
+  }
+  loadFlowModules();
 
   function renderFlowsSidebar(flows) {
     lastLoadedFlows = flows;
@@ -6116,7 +6393,7 @@ ${clone.innerHTML}
     await runTestTarget(runBtn.dataset.path, runBtn.dataset.slug, runBtn);
   });
 
-  async function saveFlow(nameInputId, statusElId, btnId, getReportData, endpoint, btnLabel, appiumBuilderFn) {
+  async function saveFlow(nameInputId, statusElId, btnId, getReportData, endpoint, btnLabel, appiumBuilderFn, moduleSelectId) {
     endpoint = endpoint || '/api/flows';
     btnLabel = btnLabel || 'Save as flow';
     appiumBuilderFn = appiumBuilderFn || buildAppiumPayloadFromRunForm;
@@ -6134,6 +6411,15 @@ ${clone.innerHTML}
       statusEl.innerHTML = '<span style="color:var(--signal);">No report loaded to save yet</span>';
       return;
     }
+    let module = '';
+    if (moduleSelectId && !isPrecondition) {
+      const choice = readModuleChoice(moduleSelectId, name);
+      if (choice.error) {
+        statusEl.innerHTML = `<span style="color:var(--signal);">${escapeHtml(choice.error)}</span>`;
+        return;
+      }
+      module = choice.module;
+    }
 
     btn.disabled = true;
     btn.textContent = 'Saving…';
@@ -6146,6 +6432,7 @@ ${clone.innerHTML}
           name,
           report: reportData,
           appium: appiumBuilderFn(),
+          ...(module ? {module} : {}),
         }),
       });
       const data = await res.json();
@@ -6154,7 +6441,8 @@ ${clone.innerHTML}
         ? `<span style="color:var(--circuit);">✓ Saved "${escapeHtml(name)}" as a precondition (${data.step_count} step(s)) — pick it from "Start from" on future runs</span>`
         : `<span style="color:var(--circuit);">✓ Saved "${escapeHtml(name)}" (${data.step_count} replayable step(s)) — see Saved Flows on the Run tab</span>`;
       nameInput.value = '';
-      if (isPrecondition) loadPreconditions(); else loadSavedFlows();
+      if (moduleSelectId) document.getElementById(moduleSelectId).value = '';
+      if (isPrecondition) loadPreconditions(); else { loadSavedFlows(); loadFlowModules(); }
     } catch (e) {
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
     } finally {
@@ -6164,7 +6452,7 @@ ${clone.innerHTML}
   }
 
   document.getElementById('saveFlowBtnRun').addEventListener('click', () => {
-    saveFlow('rFlowName', 'saveFlowStatusRun', 'saveFlowBtnRun', () => lastRunReportData);
+    saveFlow('rFlowName', 'saveFlowStatusRun', 'saveFlowBtnRun', () => lastRunReportData, undefined, undefined, undefined, 'rModuleRun');
   });
   document.getElementById('savePreconditionBtnRun').addEventListener('click', () => {
     saveFlow('rPreconditionName', 'savePreconditionStatusRun', 'savePreconditionBtnRun', () => lastRunReportData,
@@ -6228,7 +6516,7 @@ ${clone.innerHTML}
   document.getElementById('platform').addEventListener('change', renderPreconditionOptions);
   loadPreconditions();
   document.getElementById('saveFlowBtnReport').addEventListener('click', () => {
-    saveFlow('rFlowNameReport', 'saveFlowStatusReport', 'saveFlowBtnReport', () => lastUploadedReportData);
+    saveFlow('rFlowNameReport', 'saveFlowStatusReport', 'saveFlowBtnReport', () => lastUploadedReportData, undefined, undefined, undefined, 'rModuleReport');
   });
 
   // ---------- manual capture (no LLM, no Appium) ----------
@@ -7770,6 +8058,15 @@ ${clone.innerHTML}
     const isPrecondition = endpoint === '/api/preconditions';
     const endpointKind = isPrecondition ? 'preconditions' : 'flows';
     const editing = lsEditingTarget && lsEditingTarget.kind === endpointKind ? lsEditingTarget : null;
+    let module = '';
+    if (!isPrecondition && !editing) {
+      const choice = readModuleChoice('lsCapturedModule', name);
+      if (choice.error) {
+        statusEl.innerHTML = `<span style="color:var(--signal);">${escapeHtml(choice.error)}</span>`;
+        return;
+      }
+      module = choice.module;
+    }
     btn.disabled = true;
     btn.textContent = editing ? 'Updating…' : 'Saving…';
     statusEl.textContent = '';
@@ -7820,8 +8117,8 @@ ${clone.innerHTML}
       } else {
         const hasSplits = lsCapturedSteps.some(s => s.splitBefore);
         const body = hasSplits
-          ? {name, tests: lsGroupCapturedStepsIntoTests(description), appium: buildAppiumPayloadFromScraperForm(), ...lsDraftScriptFields()}
-          : {name, description, steps: lsCapturedSteps.filter(s => s.action !== 'note').map(lsCleanStep), appium: buildAppiumPayloadFromScraperForm(), ...lsDraftScriptFields()};
+          ? {name, tests: lsGroupCapturedStepsIntoTests(description), appium: buildAppiumPayloadFromScraperForm(), ...lsDraftScriptFields(), ...(module ? {module} : {})}
+          : {name, description, steps: lsCapturedSteps.filter(s => s.action !== 'note').map(lsCleanStep), appium: buildAppiumPayloadFromScraperForm(), ...lsDraftScriptFields(), ...(module ? {module} : {})};
         res = await fetch(BRIDGE_URL + endpoint, {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
@@ -7840,6 +8137,7 @@ ${clone.innerHTML}
         // same name appends it as another test case instead of duplicating
         // what's already saved.
         lsCapturedSteps = [];
+        if (!isPrecondition) document.getElementById('lsCapturedModule').value = '';
         lsResetSplitState();
         lsDraftScripts = {setup: null, api: null};
         renderLsDraftScriptSummary('setup');
@@ -7862,7 +8160,7 @@ ${clone.innerHTML}
       // loadPreconditionsList()/loadSavedFlows() refresh the matching
       // poster row in Saved Flows - both need refreshing on a precondition
       // save since they're two different UI surfaces over the same data.
-      if (isPrecondition) { loadPreconditions(); loadPreconditionsList(); } else { loadSavedFlows(); }
+      if (isPrecondition) { loadPreconditions(); loadPreconditionsList(); } else { loadSavedFlows(); loadFlowModules(); }
     } catch (e) {
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
     } finally {
@@ -7877,6 +8175,9 @@ ${clone.innerHTML}
     const flowBtn = document.getElementById('lsSaveCapturedFlowBtn');
     const preBtn = document.getElementById('lsSaveCapturedPreconditionBtn');
     flowBtn.textContent = (lsEditingTarget && lsEditingTarget.kind === 'flows') ? 'Update this flow' : 'Save as flow';
+    // Updating a flow in place keeps its module - change that from Saved Flows.
+    const moduleField = document.getElementById('lsCapturedModuleField');
+    if (moduleField) moduleField.style.display = (lsEditingTarget && lsEditingTarget.kind === 'flows') ? 'none' : 'flex';
     preBtn.textContent = (lsEditingTarget && lsEditingTarget.kind === 'preconditions') ? 'Update this precondition' : 'Save as precondition';
   }
 
