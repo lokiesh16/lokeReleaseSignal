@@ -671,6 +671,9 @@
           </div>
           <div class="flex-row" style="margin-bottom:10px;gap:16px;flex-wrap:wrap">
             <label style="font-size:12px;color:var(--muted)" title="Every step waits up to this long for its element to appear / become clickable before failing. Used by Replay and written into the generated test (override with UI_TIMEOUT_MS).">Wait up to <input type="number" id="ui-timeout" value="15" min="1" step="1" style="width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text);font-family:var(--mono)"> s per step</label>
+            <label style="font-size:12px;color:var(--muted)" title="Page object: locators go in a separate page file (one class per screen) and the test class only calls them, so a UI change is a one-line fix in one place. Single file: everything inline.">
+              Structure <select id="ui-structure" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text);font-family:var(--mono);font-size:12px"><option value="pom" selected>Page file + test class (2 files)</option><option value="single">Single file</option></select>
+            </label>
             <label style="font-size:12px;color:var(--muted)" title="On: all test cases share one browser session, each continuing where the previous stopped (e.g. login once). Off: each case starts in a fresh browser."><input type="checkbox" id="ui-shared-session" checked> Test cases continue in one browser session</label>
           </div>
           <div class="flex-row" style="margin-bottom:10px">
@@ -682,6 +685,9 @@
             <span id="ui-run-status" class="pw-run-status"></span>
           </div>
           <div id="ui-generated-file" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px"></div>
+          <div id="ui-page-label" class="sub" style="display:none;font-size:11px;color:var(--muted);font-family:var(--mono);margin:6px 0 4px"></div>
+          <pre class="pw-log-box" id="ui-page-code-box"></pre>
+          <div id="ui-test-label" style="display:none;font-size:11px;color:var(--muted);font-family:var(--mono);margin:10px 0 4px"></div>
           <pre class="pw-log-box" id="ui-code-box"></pre>
           <pre class="pw-log-box" id="ui-run-log" style="margin-top:10px"></pre>
         </div>
@@ -2048,6 +2054,7 @@ function uiUpdateStep(id, value) { socket.emit('ui_step_update', { id, value });
 function uiTimeout() { return Math.max(1, parseFloat(document.getElementById('ui-timeout').value) || 15); }
 function uiGenerate() {
   socket.emit('ui_generate', { name: document.getElementById('ui-test-name').value, timeout_s: uiTimeout(),
+                               structure: document.getElementById('ui-structure').value,
                                shared_session: document.getElementById('ui-shared-session').checked });
 }
 function uiRun() {
@@ -2119,8 +2126,14 @@ socket.on('ui_generated', (d) => {
   uiGeneratedFile = d.file;
   const box = document.getElementById('ui-code-box');
   box.textContent = d.code; box.classList.add('show');
+  const pbox = document.getElementById('ui-page-code-box'), plab = document.getElementById('ui-page-label'), tlab = document.getElementById('ui-test-label');
+  if (d.page_code) {
+    pbox.textContent = d.page_code; pbox.classList.add('show');
+    plab.style.display = ''; plab.textContent = '📄 Page file (locators): generated_scripts/' + d.page_file;
+    tlab.style.display = ''; tlab.textContent = '🧪 Test file (test class): generated_scripts/' + d.file;
+  } else { pbox.classList.remove('show'); plab.style.display = 'none'; tlab.style.display = 'none'; }
   document.getElementById('ui-generated-file').textContent =
-    'Saved to generated_scripts/' + d.file + (d.secrets.length ? '  ·  secrets: ' + d.secrets.join(', ') : '');
+    'Saved to generated_scripts/' + (d.page_file ? d.page_file + '  +  ' : '') + d.file + (d.secrets.length ? '  ·  secrets: ' + d.secrets.join(', ') : '');
   uiRunButtons(false);
   toast('UI test generated');
 });

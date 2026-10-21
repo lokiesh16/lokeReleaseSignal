@@ -38,6 +38,7 @@ from flask_socketio import SocketIO, emit
 from api_chain_analyzer import detect_api_chains
 from ui_test_generator import generate_ui_test, slugify, replay_step, resolve_locator, describe_failure
 from ui_run_report import build_report
+from ui_pom_generator import generate_ui_pom
 
 
 def _app_dir():
@@ -1323,11 +1324,20 @@ def ui_generate(data):
     if not steps:
         emit("error", {"msg": "Nothing recorded yet"}); return
 
-    code, secrets = generate_ui_test(name, steps, timeout_s=(data or {}).get("timeout_s") or 15,
-                                     shared_session=(data or {}).get("shared_session", True))
+    timeout_s = (data or {}).get("timeout_s") or 15
+    shared = (data or {}).get("shared_session", True)
     slug = slugify(name)
     os.makedirs(UI_TESTS_DIR, exist_ok=True)
     rel = f"ui_tests/test_{slug}.py"
+    page_rel = page_code = None
+    if (data or {}).get("structure", "pom") == "pom":
+        # Two files: locators in <slug>_page.py (page classes), the test class in test_<slug>.py.
+        code, page_code, secrets, page_module = generate_ui_pom(name, steps, timeout_s=timeout_s, shared_session=shared)
+        page_rel = f"ui_tests/{page_module}.py"
+        with open(os.path.join(OUTPUT_DIR, page_rel), "w", encoding="utf-8") as f:
+            f.write(page_code)
+    else:
+        code, secrets = generate_ui_test(name, steps, timeout_s=timeout_s, shared_session=shared)
     with open(os.path.join(OUTPUT_DIR, rel), "w", encoding="utf-8") as f:
         f.write(code)
     env_path = os.path.join(UI_TESTS_DIR, f".{slug}.env")
@@ -1338,7 +1348,8 @@ def ui_generate(data):
             f.write("".join(f"{k}={v}\n" for k, v in secrets.items()))
     elif os.path.exists(env_path):
         os.remove(env_path)
-    emit("ui_generated", {"file": rel, "code": code, "secrets": list(secrets)})
+    emit("ui_generated", {"file": rel, "code": code, "secrets": list(secrets),
+                          "page_file": page_rel, "page_code": page_code})
 
 
 def _ui_python():

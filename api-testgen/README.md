@@ -60,7 +60,9 @@ in the sidebar.
    Esc leaves pick mode. **⚓ Anchor** locates controls by their nearest label
    (e.g. the button under “Date of Birth”) rather than their current text, for
    values that change; every step also keeps such an alternative you can swap in with ✎. **▶ Replay steps** checks them in a fresh window.
-3. Name the scenario and **Generate test** → a self-contained
+3. Name the scenario and **Generate test** (default *Page file + test class*: locators in
+   `<name>_page.py`, one class per screen, and the test class in `test_<name>.py`; or choose
+   *Single file*) → a self-contained
    pytest + Playwright file at `generated_scripts/ui_tests/test_<name>.py`.
    Locators prefer test-id > role+name > label > placeholder > text > css.
    Generation is deterministic (no LLM).
