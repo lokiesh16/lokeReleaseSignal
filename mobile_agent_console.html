@@ -8638,7 +8638,12 @@ ${clone.innerHTML}
     document.getElementById('lsScreenshotCard').style.display = 'none';
     lsScreenshotWindowSize = null;
     lsScreenshotPoint = null;
-    document.getElementById('lsEditFlowCard').style.display = 'none';
+    // Editing a saved flow doesn't need a live session (startEditingFlow
+    // loads it before you've even connected), so a disconnect must not
+    // hide the edit card - it holds the "Which test case?" picker and the
+    // "Editing test case N of M" banner, and nothing re-shows it on
+    // reconnect. stopEditingFlow is what hides it once editing ends.
+    if (!lsEditingTarget) document.getElementById('lsEditFlowCard').style.display = 'none';
     document.getElementById('lsBugScanResultsCard').style.display = 'none';
     // The session (and its server-side context) is gone - stop showing
     // "Captured so far" values a NEXT session won't actually have.
