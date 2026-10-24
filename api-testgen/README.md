@@ -57,10 +57,17 @@ in the sidebar.
    adds the rest: **🎯 Pick** highlights an element *without clicking it* and
    offers a menu — click, hover, scroll into view, wait for element, assert
    visible / text / value / href — plus a timed **Wait** and scroll top/bottom.
-   Esc leaves pick mode. **⚓ Anchor** locates controls by their nearest label
+   Esc leaves pick mode. **Charts, tooltips and canvases:** hover a chart so its tooltip shows, then **Pick** — if the
+   tooltip is an HTML element (most are) it's listed under *Overlays on screen right now*; select it and
+   the hover that opens it is recorded automatically. On a `<canvas>` use **Hover at this point** and
+   **Assert chart data (Chart.js)**; anything with no element to locate can be checked with an
+   **Assert script** step (⋯ → Insert → 🧮): a JavaScript expression and its expected JSON result.
+   **⚓ Anchor** locates controls by their nearest label
    (e.g. the button under “Date of Birth”) rather than their current text, for
    values that change; every step also keeps such an alternative you can swap in with ✎. **▶ Replay steps** checks them in a fresh window.
-3. Name the scenario and **Generate test** → a self-contained
+3. Name the scenario and **Generate test** (default *Page file + test class*: locators in
+   `<name>_page.py`, one class per screen, and the test class in `test_<name>.py`; or choose
+   *Single file*) → a self-contained
    pytest + Playwright file at `generated_scripts/ui_tests/test_<name>.py`.
    Locators prefer test-id > role+name > label > placeholder > text > css.
    Generation is deterministic (no LLM).
@@ -91,6 +98,18 @@ env var (e.g. `UI_PASSWORD`), with the recorded value kept in an owner-only
 
 Limits: top-level frame only (no iframes), no file uploads / drag-and-drop /
 hover, new tabs and popups aren't followed. Regenerating overwrites the file.
+
+## AI providers
+
+API-chain generation and **AI Explore** can use any of three providers (pick one in the provider
+cards): **Claude** (Anthropic key), **MiniMax via OpenRouter**, or **Ollama** (local, no key).
+
+MiniMax via OpenRouter: paste an OpenRouter key (`sk-or-…`) in the card, or set
+`OPENROUTER_API_KEY` in `.env` so it's used when the field is blank. The model list is loaded
+live from OpenRouter (default `minimax/minimax-m3`; override with `OPENROUTER_MODEL`). MiniMax
+models *think* before answering, so each call is given a minimum 4096-token budget and the
+thinking isn't sent back (it is still billed). Token counts and the **real cost** OpenRouter
+reports are shown in the Explore log, summary and published report.
 
 ## Framework config
 

@@ -38,6 +38,7 @@ from flask_socketio import SocketIO, emit
 from api_chain_analyzer import detect_api_chains
 from ui_test_generator import generate_ui_test, slugify, replay_step, resolve_locator, describe_failure
 from ui_run_report import build_report
+from ui_pom_generator import generate_ui_pom
 
 
 def _app_dir():
@@ -100,6 +101,9 @@ OLLAMA_TIMEOUT      = int(os.environ.get("OLLAMA_TIMEOUT", "600"))  # local CPU 
                                                                      # full framework-context prompt
                                                                      # can take several minutes
 CLAUDE_DEFAULT_MODEL = "claude-sonnet-5"
+OPENROUTER_BASE_URL  = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
+OPENROUTER_DEFAULT_MODEL = os.environ.get("OPENROUTER_MODEL", "minimax/minimax-m3")
+OPENROUTER_TIMEOUT   = int(os.environ.get("OPENROUTER_TIMEOUT", "300"))
 DEFAULT_TARGET_URL  = os.environ.get("TARGET_URL", "https://example.com")
 SERVER_PORT         = int(os.environ.get("PORT", 5002))
 # The one external pytest project the Script Runner (below) knows about -
@@ -414,7 +418,8 @@ def _run_ui_pending():
         page = pw["pages"].get(portal)
         try:
             if page is not None and step.get("type") == "hover":
-                resolve_locator(page, step["locator"]).hover(timeout=5000)
+                pos = step.get("position")
+                resolve_locator(page, step["locator"]).hover(timeout=5000, position={"x": pos["x"], "y": pos["y"]} if pos else None)
             elif page is not None and step.get("type") == "clear":
                 resolve_locator(page, step["locator"]).clear(timeout=5000)
         except Exception as e:
@@ -1036,12 +1041,15 @@ def ui_step_delete(data):
 
 @socketio.on("ui_step_update")
 def ui_step_update(data):
-    """Edit a step's text value (fill text, expected text, option label, key)."""
+    """Edit a step's text: its value by default, or `expr` (the script of an assert-script step)."""
     sid, value = (data or {}).get("id"), (data or {}).get("value")
+    field = (data or {}).get("field") or "value"
+    if field not in ("value", "expr"):
+        return
     with ui_rec_lock:
         for s in ui_rec["steps"]:
-            if s.get("id") == sid and "value" in s:
-                s["value"] = value
+            if s.get("id") == sid and field in s:
+                s[field] = value
     _ui_emit_steps()
 
 
@@ -1051,7 +1059,7 @@ def ui_step_insert(data):
     waits and for splitting the list into test cases ('case' markers)."""
     data = data or {}
     after_id, step = data.get("after_id"), dict(data.get("step") or {})
-    if step.get("type") not in ("wait", "case", "goto"):
+    if step.get("type") not in ("wait", "case", "goto", "assert_js"):
         emit("error", {"msg": "Unsupported step type"}); return
     with ui_rec_lock:
         steps = ui_rec["steps"]
@@ -1074,6 +1082,11 @@ def ui_step_insert(data):
             if not url:
                 emit("error", {"msg": "Enter a URL"}); return
             step.update(value=url, url=url, portal=step.get("portal") if step.get("portal") in ("A", "B") else "A")
+        elif step["type"] == "assert_js":
+            expr = (step.get("expr") or "").strip()
+            if not expr:
+                emit("error", {"msg": "Enter a JavaScript expression to evaluate"}); return
+            step.update(expr=expr, value=str(step.get("value") if step.get("value") is not None else ""))
         else:
             step["value"] = str(step.get("value") or 1000)
         if step["type"] != "goto" and "portal" not in step:
@@ -1323,11 +1336,20 @@ def ui_generate(data):
     if not steps:
         emit("error", {"msg": "Nothing recorded yet"}); return
 
-    code, secrets = generate_ui_test(name, steps, timeout_s=(data or {}).get("timeout_s") or 15,
-                                     shared_session=(data or {}).get("shared_session", True))
+    timeout_s = (data or {}).get("timeout_s") or 15
+    shared = (data or {}).get("shared_session", True)
     slug = slugify(name)
     os.makedirs(UI_TESTS_DIR, exist_ok=True)
     rel = f"ui_tests/test_{slug}.py"
+    page_rel = page_code = None
+    if (data or {}).get("structure", "pom") == "pom":
+        # Two files: locators in <slug>_page.py (page classes), the test class in test_<slug>.py.
+        code, page_code, secrets, page_module = generate_ui_pom(name, steps, timeout_s=timeout_s, shared_session=shared)
+        page_rel = f"ui_tests/{page_module}.py"
+        with open(os.path.join(OUTPUT_DIR, page_rel), "w", encoding="utf-8") as f:
+            f.write(page_code)
+    else:
+        code, secrets = generate_ui_test(name, steps, timeout_s=timeout_s, shared_session=shared)
     with open(os.path.join(OUTPUT_DIR, rel), "w", encoding="utf-8") as f:
         f.write(code)
     env_path = os.path.join(UI_TESTS_DIR, f".{slug}.env")
@@ -1338,7 +1360,8 @@ def ui_generate(data):
             f.write("".join(f"{k}={v}\n" for k, v in secrets.items()))
     elif os.path.exists(env_path):
         os.remove(env_path)
-    emit("ui_generated", {"file": rel, "code": code, "secrets": list(secrets)})
+    emit("ui_generated", {"file": rel, "code": code, "secrets": list(secrets),
+                          "page_file": page_rel, "page_code": page_code})
 
 
 def _ui_python():
@@ -1428,15 +1451,19 @@ def _count_tokens(state, emit_log, result, label=""):
     """Adds one model call's usage to the run's running totals and logs it."""
     i, o = _usage_of(result)
     t = state.setdefault("tokens", {"in": 0, "out": 0, "calls": 0})
+    cost = float(((result or {}).get("usage") or {}).get("cost") or 0) if isinstance(result, dict) else 0.0   # OpenRouter reports it
     t["in"] += i
     t["out"] += o
     t["calls"] += 1
+    t["cost"] = t.get("cost", 0.0) + cost
     if i or o:
-        emit_log(f"{label}  🔢 {i:,} in / {o:,} out  (run total {t['in'] + t['out']:,})", "info")
+        emit_log(f"{label}  🔢 {i:,} in / {o:,} out" + (f"  ≈ ${cost:.4f}" if cost else "")
+                 + f"  (run total {t['in'] + t['out']:,})", "info")
 
 
 def _fmt_tokens(t):
-    return f"{t['in']:,} in / {t['out']:,} out = {t['in'] + t['out']:,} tokens over {t['calls']} model call(s)"
+    return (f"{t['in']:,} in / {t['out']:,} out = {t['in'] + t['out']:,} tokens over {t['calls']} model call(s)"
+            + (f" ≈ ${t['cost']:.4f}" if t.get("cost") else ""))
 
 
 def _format_explore_prompt(goal, step, max_steps, history, url, title, elements, console_errors):
@@ -1782,6 +1809,8 @@ def explore_start(data):
     api_key    = (data.get("api_key") or "").strip()
     if provider == "anthropic" and not api_key:
         emit("error", {"msg": "API key required"}); return
+    if provider == "openrouter" and not _openrouter_key(api_key):
+        emit("error", {"msg": "OpenRouter API key required (or set OPENROUTER_API_KEY in .env)"}); return
     max_steps = max(1, min(int(data.get("max_steps") or 10), 40))
     max_cases = max(1, min(int(data.get("max_cases") or 6), 12))
 
@@ -2662,8 +2691,113 @@ def call_ollama(prompt, model=None, max_tokens=16000, ollama_url=None):
         return {"error": str(e)}, 500
 
 
+def _openrouter_key(api_key=""):
+    """The key typed in the UI, else OPENROUTER_API_KEY from the server's .env."""
+    return (api_key or "").strip() or os.environ.get("OPENROUTER_API_KEY", "").strip()
+
+
+_THINK_RE = re.compile(r"<think>.*?</think>", re.S | re.I)
+_OPENROUTER_HINTS = {
+    401: "OpenRouter rejected the API key (401) - check it at openrouter.ai/keys.",
+    402: "OpenRouter says this account is out of credits (402) - add credits, or pick a ':free' model.",
+    404: "OpenRouter doesn't know that model (404) - pick one from the list.",
+    408: "OpenRouter timed out (408) - try again.",
+    429: "OpenRouter rate limit (429) - wait a moment, or use a paid model (free models are heavily limited).",
+}
+
+
+def call_openrouter(api_key, prompt, max_tokens=16000, model=""):
+    """Calls OpenRouter's OpenAI-style chat API (MiniMax and any other model it hosts). Returns
+    (response_json, status_code) in the same normalised shape call_claude/call_ollama give, so every
+    caller - Explore, API-chain generation, token counting - works unchanged.
+
+    MiniMax models are REASONING models: they think before answering, and that thinking is paid for
+    out of max_tokens. The small calls here (one browser action = 500 tokens) would often run dry
+    mid-thought and return nothing, so the budget gets a floor, the thinking isn't sent back, and any
+    <think> text that leaks into the answer is stripped."""
+    key = _openrouter_key(api_key)
+    if not key:
+        return {"error": "OpenRouter API key required - enter it in the UI or set OPENROUTER_API_KEY in .env"}, 400
+    payload = json.dumps({
+        "model":      model or OPENROUTER_DEFAULT_MODEL,
+        "messages":   [{"role": "user", "content": prompt}],
+        "max_tokens": max(int(max_tokens or 0), 4096),
+        "reasoning":  {"exclude": True},     # don't return the thinking (it is still used, and billed)
+        "usage":      {"include": True},     # ask OpenRouter to report the real cost of each call
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        f"{OPENROUTER_BASE_URL}/chat/completions", data=payload, method="POST",
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}",
+                 "HTTP-Referer": f"http://localhost:{SERVER_PORT}", "X-Title": "api-testgen"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=OPENROUTER_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+        try:
+            detail = (json.loads(raw).get("error") or {}).get("message") or raw
+        except Exception:
+            detail = raw
+        return {"error": f"{_OPENROUTER_HINTS.get(e.code, f'OpenRouter error {e.code}')} {detail[:300]}".strip()}, e.code
+    except (TimeoutError, urllib.error.URLError) as e:
+        if isinstance(e, TimeoutError) or isinstance(getattr(e, "reason", None), TimeoutError):
+            return {"error": f"OpenRouter didn't respond within {OPENROUTER_TIMEOUT}s - raise OPENROUTER_TIMEOUT or try a faster model."}, 504
+        return {"error": f"Could not reach OpenRouter at {OPENROUTER_BASE_URL} ({getattr(e, 'reason', e)})"}, 502
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+    if data.get("error"):   # OpenRouter can return HTTP 200 with an error body (e.g. the provider failed upstream)
+        return {"error": str((data["error"] or {}).get("message") or data["error"])[:400]}, 502
+    choice = (data.get("choices") or [{}])[0]
+    text = _THINK_RE.sub("", (choice.get("message") or {}).get("content") or "").strip()
+    finish = choice.get("finish_reason")
+    if not text:
+        why = ("it ran out of tokens while thinking - raise the limit or pick a faster model"
+               if finish == "length" else "it returned an empty answer")
+        return {"error": f"{data.get('model') or model or OPENROUTER_DEFAULT_MODEL}: {why}."}, 502
+    u = data.get("usage") or {}
+    return {"content": [{"type": "text", "text": text}],
+            "stop_reason": "max_tokens" if finish == "length" else (finish or "end_turn"),
+            "usage": {"input_tokens": u.get("prompt_tokens") or 0, "output_tokens": u.get("completion_tokens") or 0,
+                      "cost": u.get("cost") or 0}}, 200
+
+
+_or_models_cache = {"at": 0, "models": []}
+
+
+@app.route("/api/openrouter/models", methods=["GET"])
+def list_openrouter_models():
+    """Models OpenRouter currently offers whose id contains `q` (default minimax), newest family first.
+    Uses OpenRouter's public model list (no key needed); falls back to the default if unreachable."""
+    q = (request.args.get("q") or "minimax").lower()
+    now = time.time()
+    if now - _or_models_cache["at"] > 600 or not _or_models_cache["models"]:
+        try:
+            with urllib.request.urlopen(f"{OPENROUTER_BASE_URL}/models", timeout=15) as resp:
+                _or_models_cache.update(at=now, models=json.loads(resp.read().decode("utf-8")).get("data", []))
+        except Exception as e:
+            return jsonify({"models": [{"id": OPENROUTER_DEFAULT_MODEL, "name": OPENROUTER_DEFAULT_MODEL}],
+                            "default": OPENROUTER_DEFAULT_MODEL, "has_env_key": bool(_openrouter_key()),
+                            "warning": f"Could not load the model list from OpenRouter ({e}); showing the default."})
+    out = []
+    for m in _or_models_cache["models"]:
+        if q in m.get("id", "").lower():
+            pr = m.get("pricing") or {}
+            try:
+                pin, pout = float(pr.get("prompt") or 0) * 1e6, float(pr.get("completion") or 0) * 1e6
+            except ValueError:
+                pin = pout = 0.0
+            out.append({"id": m["id"], "name": m.get("name") or m["id"], "context": m.get("context_length"),
+                        "in_per_m": round(pin, 3), "out_per_m": round(pout, 3), "free": pin == 0 and pout == 0})
+    out.sort(key=lambda m: m["id"], reverse=True)   # minimax-m3.1 ... m3 ... m2.7 ... : newest first
+    return jsonify({"models": out, "default": OPENROUTER_DEFAULT_MODEL, "has_env_key": bool(_openrouter_key())})
+
+
 def call_llm(provider, prompt, max_tokens=16000, api_key="", model="", ollama_url=""):
     """Dispatches to the configured AI provider. Returns (response_json, status_code)."""
+    if provider == "openrouter":
+        return call_openrouter(api_key, prompt, max_tokens, model)
     if provider == "ollama":
         return call_ollama(prompt, model, max_tokens, ollama_url)
     else:  # default to anthropic
@@ -2826,6 +2960,8 @@ def api_chain_generate():
 
     if provider == "anthropic" and not api_key:
         return jsonify({"error": "API key required"}), 400
+    if provider == "openrouter" and not _openrouter_key(api_key):
+        return jsonify({"error": "OpenRouter API key required (or set OPENROUTER_API_KEY in .env)"}), 400
     if not entries:
         return jsonify({"error": "No API calls selected"}), 400
 

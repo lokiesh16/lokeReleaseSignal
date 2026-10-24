@@ -19,6 +19,26 @@ _SCROLL_JS = {"top": "window.scrollTo(0, 0)",
               "bottom": "window.scrollTo(0, document.documentElement.scrollHeight)"}
 
 
+def assert_js_source(expr, expected_text):
+    """JavaScript for a `wait_for_function` that passes once `expr` evaluates to the expected value.
+    `expected_text` is JSON (a plain string if it isn't valid JSON). Object keys are compared order-
+    independently, and it keeps re-checking until the step timeout - so data that loads a moment late
+    doesn't fail the test. Used by both the generated test and the live replay, so they agree."""
+    try:
+        expected = json.loads(expected_text)
+    except (TypeError, ValueError):
+        expected = "" if expected_text is None else str(expected_text)
+    return ("() => { const n = v => Array.isArray(v) ? v.map(n) : (v && typeof v === 'object') "
+            "? Object.keys(v).sort().reduce((o, k) => (o[k] = n(v[k]), o), {}) : v; "
+            "try { return JSON.stringify(n((" + str(expr) + "))) === JSON.stringify(n(" + json.dumps(expected) + ")); } "
+            "catch (e) { return false; } }")
+
+
+def _position(step):
+    pos = step.get("position") or {}
+    return f'position={{"x": {int(pos.get("x", 0))}, "y": {int(pos.get("y", 0))}}}' if pos else ""
+
+
 def _ms(value):
     try:
         return max(0, int(float(value)))
@@ -52,8 +72,21 @@ def _locator(loc):
     return expr
 
 
+def _py_label(py):
+    """The human text inside a Playwright expression, e.g. get_by_role("textbox", name="Password") -> Password."""
+    lits = re.findall(r'"((?:[^"\\]|\\.)*)"', py or "")
+    lits = [x for x in lits if x not in _ROLES]
+    return lits[0] if lits else ""
+
+
+_ROLES = {"button", "link", "textbox", "checkbox", "radio", "combobox", "heading", "tab", "menuitem", "option",
+          "switch", "searchbox", "slider", "listbox", "dialog", "img", "row", "cell", "listitem", "list"}
+
+
 def _secret_var(loc, taken):
-    base = loc.get("name") or loc.get("value") or "SECRET"
+    base = (loc.get("name") or loc.get("anchor") or _py_label(loc.get("py")) or loc.get("value") or "SECRET")
+    if base.startswith("xpath=") or base.startswith("#") or base.startswith("["):
+        base = "SECRET"
     base = re.sub(r"[^A-Za-z0-9]+", "_", base).strip("_").upper()[:30] or "SECRET"
     var, n = f"UI_{base}", 1
     while var in taken:
@@ -84,48 +117,53 @@ def _render_step(s, secrets):
     return _for_portal(line, s.get("portal", "A"))
 
 
-def _render_step_page(s, secrets):
+def _render_step_page(s, secrets, locfn=None):
+    """`locfn(loc, step) -> expression` lets the page-object generator point a step at a named
+    locator (e.g. `login.sign_in_button`) instead of the inline `page.get_by_...(...)`."""
     t, loc = s.get("type"), s.get("locator") or {}
+    _locator_expr = (lambda l: locfn(l, s)) if (locfn and loc) else _locator
     if t == "goto":
         return f"page.goto({_s(s.get('value') or s.get('url'))})"
     if t == "click":
-        return f"{_locator(loc)}.click()"
+        return f"{_locator_expr(loc)}.click()"
     if t == "fill":
         if s.get("secret"):
             var = _secret_var(loc, secrets)
             secrets[var] = s.get("value", "")
-            return f'{_locator(loc)}.fill(os.environ["{var}"])'
-        return f"{_locator(loc)}.fill({_s(s.get('value'))})"
+            return f'{_locator_expr(loc)}.fill(os.environ["{var}"])'
+        return f"{_locator_expr(loc)}.fill({_s(s.get('value'))})"
     if t == "clear":
-        return f"{_locator(loc)}.clear()"
+        return f"{_locator_expr(loc)}.clear()"
     if t == "select":
-        return f"{_locator(loc)}.select_option(label={_s(s.get('value'))})"
+        return f"{_locator_expr(loc)}.select_option(label={_s(s.get('value'))})"
     if t == "check":
-        return f"{_locator(loc)}.check()"
+        return f"{_locator_expr(loc)}.check()"
     if t == "uncheck":
-        return f"{_locator(loc)}.uncheck()"
+        return f"{_locator_expr(loc)}.uncheck()"
     if t == "press":
-        return f"{_locator(loc)}.press({_s(s.get('value'))})"
+        return f"{_locator_expr(loc)}.press({_s(s.get('value'))})"
     if t == "press_page":
         return f"page.keyboard.press({_s(s.get('value'))})"
     if t == "assert_text":
-        return f"expect({_locator(loc)}).to_contain_text({_s(s.get('value'))})"
+        return f"expect({_locator_expr(loc)}).to_contain_text({_s(s.get('value'))})"
     if t == "assert_value":
-        return f"expect({_locator(loc)}).to_have_value({_s(s.get('value'))})"
+        return f"expect({_locator_expr(loc)}).to_have_value({_s(s.get('value'))})"
     if t == "assert_visible":
-        return f"expect({_locator(loc)}).to_be_visible()"
+        return f"expect({_locator_expr(loc)}).to_be_visible()"
     if t == "hover":
-        return f"{_locator(loc)}.hover()"
+        return f"{_locator_expr(loc)}.hover({_position(s)})"
+    if t == "assert_js":
+        return f"page.wait_for_function({_s(assert_js_source(s.get('expr'), s.get('value')))})"
     if t == "scroll_into_view":
-        return f"{_locator(loc)}.scroll_into_view_if_needed()"
+        return f"{_locator_expr(loc)}.scroll_into_view_if_needed()"
     if t == "wait_for":
-        return f"{_locator(loc)}.wait_for(state={_s(s.get('value') or 'visible')})"
+        return f"{_locator_expr(loc)}.wait_for(state={_s(s.get('value') or 'visible')})"
     if t == "wait":
         return f"page.wait_for_timeout({_ms(s.get('value'))})"
     if t == "scroll_page":
         return f"page.evaluate({_s(_SCROLL_JS.get(s.get('value'), _SCROLL_JS['bottom']))})"
     if t == "assert_attr":
-        return f"expect({_locator(loc)}).to_have_attribute({_s(s.get('attr') or 'href')}, {_s(s.get('value'))})"
+        return f"expect({_locator_expr(loc)}).to_have_attribute({_s(s.get('attr') or 'href')}, {_s(s.get('value'))})"
     if t == "note":
         return f"# NOTE: {(s.get('value') or '').replace(chr(10), ' ')}"
     return None
@@ -333,7 +371,10 @@ def replay_step(page, step, expect):
     elif t == "assert_visible":
         expect(resolve_locator(page, loc)).to_be_visible()
     elif t == "hover":
-        resolve_locator(page, loc).hover()
+        pos = step.get("position")
+        resolve_locator(page, loc).hover(position={"x": pos["x"], "y": pos["y"]} if pos else None)
+    elif t == "assert_js":
+        page.wait_for_function(assert_js_source(step.get("expr"), val))
     elif t == "scroll_into_view":
         resolve_locator(page, loc).scroll_into_view_if_needed()
     elif t == "wait_for":
