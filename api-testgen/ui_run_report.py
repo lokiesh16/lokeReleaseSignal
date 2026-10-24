@@ -18,9 +18,9 @@ _VERBS = {
     "check": "check", "uncheck": "uncheck", "press": "press", "press_page": "press",
     "hover": "hover", "scroll_into_view": "scroll to", "wait_for": "wait for", "wait": "wait",
     "scroll_page": "scroll page", "assert_text": "assert text", "assert_value": "assert value",
-    "assert_visible": "assert visible", "assert_attr": "assert attribute",
+    "assert_visible": "assert visible", "assert_attr": "assert attribute", "assert_js": "assert script",
 }
-_ASSERTS = ("assert_text", "assert_value", "assert_visible", "assert_attr")
+_ASSERTS = ("assert_text", "assert_value", "assert_visible", "assert_attr", "assert_js")
 _SECRET_IN_TEXT = re.compile(r"(?i)\b(pass(?:word|wd)?|pwd|secret|token|api[_-]?key|otp|cvv)\b(\s*[=:]\s*)(\S+)")
 
 
@@ -42,8 +42,12 @@ def step_label(s):
         return f'{verb} to the {s.get("value")}'
     if t == "press_page":
         return f'{verb} {s.get("value")}'
+    if t == "assert_js":
+        return f'{verb} {s.get("expr") or ""}'.strip()
     target = _target(s)
-    return f"{verb} {target}".strip()
+    pos = s.get("position")
+    at = f" at ({pos['x']}, {pos['y']})" if pos else ""
+    return f"{verb} {target}{at}".strip()
 
 
 def step_detail(s):
@@ -61,6 +65,8 @@ def step_detail(s):
         return f'expected {s.get("attr") or "attribute"} = "{s.get("value", "")}"'
     if t == "assert_visible":
         return "expected: visible"
+    if t == "assert_js":
+        return f'expected result: {s.get("value", "")}'
     if t == "wait_for":
         return f'until: {s.get("value") or "visible"}'
     return ""

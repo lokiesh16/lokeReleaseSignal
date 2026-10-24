@@ -408,7 +408,44 @@
     return loc.nth != null ? d + ' #' + (loc.nth + 1) : d;
   }
 
-  function showMenu(el) {
+  // Tooltips, hover cards and similar overlays ignore the mouse (pointer-events:none) and vanish or change
+  // if the pointer moves onto them - so they can't be picked by clicking them, and a plain pick lands on
+  // whatever is underneath. Find the ones visible on screen right now: those under the pointer first, then
+  // the nearest. Only the outermost element of each overlay is returned.
+  function findGhosts(x, y, under) {
+    var all = document.body ? document.body.getElementsByTagName('*') : [], cand = [], vw = window.innerWidth, vh = window.innerHeight;
+    for (var i = 0; i < all.length; i++) {
+      var n = all[i];
+      if (host && (n === host || host.contains(n))) continue;
+      var r = n.getBoundingClientRect();
+      if (r.width < 40 || r.height < 18 || r.width * r.height > vw * vh * 0.5) continue;
+      if (r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) continue;
+      var cs = getComputedStyle(n);
+      if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) < 0.05) continue;
+      if (cs.pointerEvents !== 'none' && n.getAttribute('role') !== 'tooltip') continue;
+      if (!norm(n.textContent) || (under && n.contains(under))) continue;
+      cand.push({ el: n, r: r });
+    }
+    cand = cand.filter(function (c) { return !cand.some(function (o) { return o.el !== c.el && o.el.contains(c.el); }); });
+    cand.forEach(function (c) {
+      var dx = Math.max(c.r.left - x, 0, x - c.r.right), dy = Math.max(c.r.top - y, 0, y - c.r.bottom);
+      c.dist = Math.sqrt(dx * dx + dy * dy); c.inside = c.dist === 0;
+    });
+    cand.sort(function (a, b) { return (b.inside - a.inside) || (a.dist - b.dist); });
+    return cand.slice(0, 4);
+  }
+  var pickCtx = null;          // where the pick happened: {x, y, under, ghost}
+
+  function chartIndex(el) { return Array.prototype.indexOf.call(document.querySelectorAll('canvas'), el); }
+  function chartData(el) {     // Chart.js instance data, when the page exposes the Chart global
+    try {
+      var c = window.Chart && window.Chart.getChart && window.Chart.getChart(el);
+      return c ? { labels: c.data.labels || [], datasets: c.data.datasets.map(function (d) { return d.data; }) } : null;
+    } catch (e) { return null; }
+  }
+
+  function showMenu(el, ctx) {
+    if (ctx) pickCtx = ctx;
     selEl = el; drawBox(el);
     var tag = el.tagName.toLowerCase(), type = (el.getAttribute('type') || '').toLowerCase();
     var isField = tag === 'input' || tag === 'textarea' || tag === 'select';
@@ -420,12 +457,33 @@
     if (isField && !isToggle && tag !== 'select') ops.splice(1, 0, ['Clear field', 'clear']);
     if (isField && !isToggle && type !== 'password') ops.push(['Assert value: "' + trunc(String(el.value || ''), 40) + '"', 'assert_value']);
     if (href) ops.push(['Assert href: ' + trunc(href, 40), 'assert_attr']);
+    var isCanvas = tag === 'canvas', cd = isCanvas ? chartData(el) : null;
+    if (isCanvas && pickCtx) ops.splice(2, 0, ['Hover at this point (opens a tooltip)', 'hover_at']);
+    if (cd) ops.push(['Assert chart data (Chart.js)', 'assert_chart']);
 
     var menu = ui.menu;
     menu.innerHTML = '';
     var hd = document.createElement('div'); hd.className = 'hd';
     hd.textContent = '<' + tag + '> ' + describe(buildLocator(el));
     menu.appendChild(hd);
+    if (pickCtx && pickCtx.overlays && pickCtx.overlays.length) {
+      var lab = document.createElement('div'); lab.className = 'hd'; lab.textContent = 'Overlays on screen right now (e.g. tooltips):';
+      menu.appendChild(lab);
+      pickCtx.overlays.forEach(function (ov) {
+        var ob = document.createElement('button');
+        ob.textContent = '🗨 ' + trunc(norm(ov.textContent), 52);
+        ob.title = 'Select this overlay. The hover that makes it appear is recorded automatically.';
+        ob.onclick = function () { showMenu(ov, { x: pickCtx.x, y: pickCtx.y, under: pickCtx.under, ghost: true, overlays: [] }); };
+        menu.appendChild(ob);
+      });
+    }
+    if (pickCtx && pickCtx.ghost && pickCtx.under && pickCtx.under !== el) {
+      var below = document.createElement('button');
+      below.textContent = '⇩ Pick what is underneath instead (<' + pickCtx.under.tagName.toLowerCase() + '>)';
+      below.title = 'The selected element ignores the mouse (e.g. a tooltip). Pick the thing under it.';
+      below.onclick = function () { showMenu(pickCtx.under, { x: pickCtx.x, y: pickCtx.y, under: pickCtx.under, ghost: false }); };
+      menu.appendChild(below);
+    }
     ops.forEach(function (o) {
       var b = document.createElement('button'); b.textContent = o[0];
       b.onclick = function () { applyOp(o[1], el); };
@@ -434,7 +492,7 @@
     var row = document.createElement('div'); row.className = 'row';
     var up = document.createElement('button'); up.textContent = '▲ Parent';
     up.title = 'Select the enclosing element instead';
-    up.onclick = function () { if (el.parentElement && el.parentElement !== document.documentElement) showMenu(el.parentElement); };
+    up.onclick = function () { if (el.parentElement && el.parentElement !== document.documentElement) showMenu(el.parentElement, pickCtx); };
     var x = document.createElement('button'); x.textContent = '✕ Cancel'; x.onclick = clearSel;
     row.appendChild(up); row.appendChild(x); menu.appendChild(row);
 
@@ -447,11 +505,26 @@
 
   function applyOp(op, el) {
     var loc = buildLocator(el), tag = el.tagName.toLowerCase();
-    var label = { click: 'click', clear: 'clear', hover: 'hover', scroll_into_view: 'scroll', wait_for: 'wait for element',
+    var label = { hover_at: 'hover', assert_chart: 'assert chart data', click: 'click', clear: 'clear', hover: 'hover', scroll_into_view: 'scroll', wait_for: 'wait for element',
                   assert_visible: 'assert visible', assert_text: 'assert text', assert_value: 'assert value', assert_attr: 'assert href' }[op];
     var isToggle = tag === 'input' && /^(checkbox|radio)$/i.test(el.getAttribute('type') || '');
     drawBox(el, '#22c55e');
-    if (op === 'click') {
+    if (pickCtx && pickCtx.ghost && pickCtx.under && op !== 'hover') {
+      // The picked element only exists while the pointer is over something else (a tooltip over a chart):
+      // record that hover first so replay and the generated test make it appear before checking it.
+      var ur = pickCtx.under.getBoundingClientRect();
+      send({ type: 'hover', locator: buildLocator(pickCtx.under), position: { x: Math.round(pickCtx.x - ur.left), y: Math.round(pickCtx.y - ur.top) } });
+    }
+    if (op === 'hover_at') {
+      var rr = el.getBoundingClientRect();
+      send({ type: 'hover', locator: loc, position: { x: Math.round(pickCtx.x - rr.left), y: Math.round(pickCtx.y - rr.top) } });
+      label = 'hover at point';
+    } else if (op === 'assert_chart') {
+      var data = chartData(el);
+      send({ type: 'assert_js', expr: 'Chart.getChart(document.querySelectorAll("canvas")[' + chartIndex(el) + ']).data.datasets.map(d => d.data)',
+             value: JSON.stringify(data.datasets), url: location.href });
+      label = 'assert chart data';
+    } else if (op === 'click') {
       exitPick();                                   // the page is about to change - back to normal use
       var target = el.closest(CLICKABLE) || el;
       // Checkboxes/radios report their own check/uncheck step; anything else is recorded here.
@@ -493,7 +566,10 @@
   window.addEventListener('click', function (e) {
     if (!pickOn || isOurs(e)) return;
     e.preventDefault(); e.stopImmediatePropagation();
-    if (e.target instanceof Element) showMenu(e.target);
+    if (!(e.target instanceof Element)) return;
+    var ghosts = findGhosts(e.clientX, e.clientY, e.target), inside = ghosts.length && ghosts[0].inside ? ghosts[0].el : null;
+    showMenu(inside || e.target, { x: e.clientX, y: e.clientY, under: e.target, ghost: !!inside,
+                                   overlays: ghosts.filter(function (g) { return g.el !== inside; }).map(function (g) { return g.el; }) });
   }, true);
   window.addEventListener('mousemove', function (e) {
     if (!pickOn || selEl || isOurs(e) || !(e.target instanceof Element)) return;

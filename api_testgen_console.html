@@ -335,6 +335,166 @@
   .pw-run-status { font-size: 11px; font-family: var(--mono); color: var(--muted); }
   .pw-run-status.ok  { color: var(--green); }
   .pw-run-status.err { color: var(--red); }
+/* ═══════════ UX revamp ═══════════ */
+  body { font-size: 14px; }
+  .main { min-width: 0; }
+  .panel { height: auto; flex: 1; min-height: 0; }
+  .panel-header.ph-row { display: flex; align-items: center; gap: 16px; padding: 14px 28px; }
+  .panel-header.ph-row h2 { margin: 0; font-size: 19px; }
+  .panel-header.ph-row p { margin: 2px 0 0; font-size: 12.5px; }
+  .panel-body { padding: 0 28px 48px; }
+  #panel-ui .panel-body > :first-child { margin-top: 16px; }
+  .hint { font-size: 12px; color: var(--muted); line-height: 1.55; margin-top: 10px; }
+  .hint b { color: var(--text); font-weight: 600; }
+
+  /* browser bar (always visible) */
+  .browserbar { flex-shrink: 0; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding: 10px 28px 12px;
+    border-bottom: 1px solid var(--glass-border); background: rgba(255,255,255,0.03); position: relative; z-index: 12; }
+  .bb-field { display: flex; flex-direction: column; gap: 3px; flex: 1 1 240px; min-width: 180px; }
+  .bb-field.bb-b { flex: 1 1 200px; }
+  .bb-field label { font: 10px var(--mono); letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  .bb-field label small { text-transform: none; letter-spacing: 0; opacity: .7; }
+  .bb-field input, .ux-input { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 8px;
+    padding: 7px 11px; color: var(--text); font-family: var(--mono); font-size: 12.5px; min-width: 0; }
+  .bb-field input:focus, .ux-input:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,0.08); }
+  .bb-nav { position: relative; }
+  .bb-nav > summary { list-style: none; cursor: pointer; }
+  .bb-nav > summary::-webkit-details-marker { display: none; }
+  .bb-pop { position: absolute; right: 0; top: 38px; z-index: 40; width: min(440px, 88vw); background: var(--bg2); border: 1px solid var(--glass-border-strong);
+    border-radius: 12px; padding: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.55); display: flex; flex-direction: column; gap: 8px; }
+  .bb-pop .flex-row input { flex: 1; }
+
+  /* sidebar icons */
+  .step-num { font-size: 13px; }
+  .sidebar-title-text { letter-spacing: 1.5px; }
+
+  /* progress stepper */
+  .stepper { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+  .sp-item { display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 7px; border: 1px solid var(--glass-border);
+    border-radius: 99px; font-size: 12.5px; font-weight: 600; color: var(--muted); background: var(--glass); transition: all .2s; }
+  .sp-item .n { width: 21px; height: 21px; border-radius: 50%; display: grid; place-items: center; font: 600 11px var(--mono); background: rgba(255,255,255,0.09); }
+  .sp-item.active { color: var(--text); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,106,255,.15); }
+  .sp-item.active .n { background: var(--accent); color: #fff; }
+  .sp-item.done { color: var(--green); border-color: #2dd4a055; }
+  .sp-item.done .n { background: var(--green); color: #04231a; }
+  .sp-item.rec { color: var(--red); border-color: #ff5f6d77; }
+  .sp-item.rec .n { background: var(--red); color: #fff; animation: pulse 1.3s infinite; }
+  .sp-arrow { color: var(--muted); opacity: .45; }
+
+  /* two-column workspace */
+  .ui-grid { display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: 18px; align-items: start; }
+  .ui-side { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 14px; max-height: calc(100vh - 230px); overflow-y: auto; padding: 2px 4px 8px 2px; }
+  .ui-side::-webkit-scrollbar { width: 6px; } .ui-side::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 6px; }
+  @media (max-width: 1180px) {
+    .ui-grid { grid-template-columns: 1fr; }
+    /* one column: Record first, then the steps, then the other tools */
+    .ui-side { display: contents; }
+    .ui-side > .card { order: 3; } .ui-side > #rec-card { order: 1; } .ui-main { order: 2; }
+  }
+  .card.compact { padding: 15px 16px; margin-bottom: 0; border-radius: 14px; }
+  .card.compact h3 { font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .ui-main > .card { margin-bottom: 16px; }
+
+  /* record card */
+  .rec-big { width: 100%; justify-content: center; padding: 12px 16px; font-size: 14px; }
+  .rec-big.stop { background: linear-gradient(155deg, #ff8a95, #ff5f6d); box-shadow: 0 4px 18px rgba(255,95,109,.4); }
+  #rec-card.recording { border-color: #ff5f6d88; box-shadow: 0 0 0 1px #ff5f6d55, 0 0 30px rgba(255,95,109,.2); }
+  .field.tight { margin-bottom: 10px; }
+  .chk { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); cursor: pointer; }
+  .chk input { accent-color: var(--accent); }
+  details.fold > summary { cursor: pointer; list-style: none; font-size: 12.5px; font-weight: 600; color: var(--accent2); padding: 4px 0; user-select: none; }
+  details.fold > summary::-webkit-details-marker { display: none; }
+  details.fold > summary::before { content: '▸'; display: inline-block; width: 14px; transition: transform .15s; }
+  details.fold[open] > summary::before { transform: rotate(90deg); }
+  details.fold .fold-body { padding: 8px 0 2px; display: flex; flex-direction: column; gap: 9px; }
+  details.help { margin-bottom: 14px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 12px; padding: 8px 14px; }
+  details.help ul { margin: 6px 0 8px 18px; font-size: 12.5px; line-height: 1.7; color: var(--muted); }
+  details.help li b { color: var(--text); }
+  .psum { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin: 2px 0 10px; }
+  .psum b { color: var(--text); }
+  .psum .warn { color: var(--amber); }
+
+  /* steps */
+  .steps-card { padding: 0; }
+  .steps-bar { position: sticky; top: 0; z-index: 6; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 11px 16px;
+    background: #14141f; box-shadow: 0 1px 0 var(--glass-border), 0 8px 18px -10px rgba(0,0,0,.6);
+    border-radius: 16px 16px 0 0; }
+  .steps-bar h3 { margin: 0; display: flex; align-items: center; gap: 8px; }
+  .steps-search { width: 150px; }
+  .steps-status { padding: 0 16px; font-size: 12px; min-height: 0; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .steps-status:not(:empty) { padding-top: 8px; }
+  .steps-list { padding: 8px 10px 14px; }
+  .srow { display: grid; grid-template-columns: 16px 30px 122px minmax(0, 1fr) minmax(110px, 250px) auto; align-items: center; gap: 8px;
+    padding: 5px 8px; border-radius: 9px; border: 1px solid transparent; font-size: 13px; min-height: 40px; }
+  .srow:hover { background: var(--glass-strong); }
+  .srow.bad { background: rgba(255,95,109,.1); border-color: #ff5f6d55; }
+  .sr-mark { font-weight: 700; text-align: center; }
+  .sr-num { color: var(--muted); font: 12px var(--mono); text-align: right; }
+  .sr-verb { font-weight: 700; font-size: 12.5px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .v-assert { color: var(--green); } .v-wait { color: var(--amber); } .v-nav { color: var(--accent2); }
+  .sr-target.span2, .sr-val.span2 { grid-column: 4 / span 2; }
+  .sr-target { font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .92; }
+  .sr-val { min-width: 0; display: flex; }
+  .sr-val .ux-input { width: 100%; padding: 4px 9px; font-size: 12px; }
+  .sr-actions { display: flex; gap: 2px; align-items: center; }
+  .ibtn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; display: grid; place-items: center; transition: all .12s; }
+  .ibtn:hover { background: var(--glass-hover); border-color: var(--glass-border); color: var(--text); }
+  .ibtn.run:hover { color: var(--green); }
+  .pill { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: rgba(255,255,255,.08); color: var(--muted); font-family: var(--mono); }
+  .pill.b { color: #38bdf8; background: rgba(56,189,248,.12); } .pill.a { color: var(--accent2); background: rgba(124,106,255,.14); }
+  .pill.ok { color: var(--green); background: rgba(45,212,160,.12); } .pill.no { color: var(--red); background: rgba(255,95,109,.12); } .pill.warn { color: var(--amber); background: rgba(255,183,77,.12); }
+  .sr-detail { margin: 2px 8px 8px 56px; padding: 10px 12px; background: rgba(255,255,255,.04); border: 1px dashed var(--border2); border-radius: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; }
+  .sr-note { margin: 0 8px 8px 56px; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+  .sr-note.err { color: var(--red); } .sr-note.hint { color: var(--amber); }
+  .sr-note img { display: block; max-width: 340px; border: 1px solid var(--border); border-radius: 8px; margin-top: 6px; }
+  .case-head { display: flex; align-items: center; gap: 10px; margin: 12px 2px 4px; padding: 8px 12px; border-radius: 10px;
+    background: rgba(124,106,255,.12); border: 1px solid #4c3f8a; }
+  .case-head .caret { cursor: pointer; width: 18px; transition: transform .15s; color: var(--accent2); user-select: none; }
+  .case-head.collapsed .caret { transform: rotate(-90deg); }
+  .case-head .ux-input { flex: 1; padding: 4px 9px; font-family: var(--sans); font-weight: 700; font-size: 13px; }
+  .case-meta { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+  .empty { text-align: center; padding: 34px 24px 30px; color: var(--muted); }
+  .empty .big { font-size: 34px; } .empty h4 { color: var(--text); font-size: 16px; margin: 6px 0 4px; }
+  .empty ol { text-align: left; display: inline-block; margin: 12px auto 10px; line-height: 2; font-size: 13px; }
+  .empty ol b { color: var(--text); }
+
+  /* row menu + modal */
+  .modal-card .gen-options { grid-template-columns: repeat(3, 1fr); }
+  .rowmenu { position: fixed; z-index: 90; min-width: 250px; background: var(--bg2); border: 1px solid var(--glass-border-strong); border-radius: 12px; padding: 6px; box-shadow: 0 18px 50px rgba(0,0,0,.6); }
+  .rowmenu button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: transparent; border: none; color: var(--text); padding: 9px 12px; border-radius: 8px; font: 13px var(--sans); cursor: pointer; }
+  .rowmenu button:hover { background: var(--glass-hover); }
+  .rowmenu button.danger { color: var(--red); } .rowmenu hr { border: none; border-top: 1px solid var(--glass-border); margin: 4px 2px; }
+  .modal { position: fixed; inset: 0; background: rgba(4,4,10,.66); backdrop-filter: blur(4px); z-index: 80; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .modal.show { display: flex; }
+  .modal-card { width: min(640px, 96vw); max-height: 90vh; overflow-y: auto; background: var(--bg2); border: 1px solid var(--glass-border-strong); border-radius: 16px; padding: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  .modal-card h3 { font-size: 16px; margin-bottom: 4px; }
+
+  /* output tabs */
+  .out-card { padding: 0; overflow: hidden; }
+  .out-tabs { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--glass-border); }
+  .out-tab { padding: 8px 14px; border-radius: 9px 9px 0 0; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--muted); border: 1px solid transparent; border-bottom: none; user-select: none; }
+  .out-tab:hover { color: var(--text); } .out-tab.active { color: var(--text); background: var(--glass-strong); border-color: var(--glass-border); }
+  .out-pane { display: none; padding: 12px 14px 14px; } .out-pane.active { display: block; }
+  .out-pane .pw-log-box { max-height: 440px; }
+  .out-pane .lab { font: 11px var(--mono); color: var(--muted); margin-bottom: 6px; }
+
+  /* saved recordings list */
+  .saved-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 10px;
+    border: 1px solid var(--glass-border); border-radius: 10px; background: rgba(255,255,255,.03); }
+  .saved-item:hover { background: var(--glass-strong); }
+  .saved-item.current { border-color: var(--accent); background: rgba(124,106,255,.1); }
+  .si-name { font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .si-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .si-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .si-actions .btn { white-space: nowrap; }
+  .card.compact h3 { flex-wrap: wrap; }
+  #ui-editing-badge { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* env-URL dropdowns in the browser bar (hosted page uses <select>) */
+  .bb-field select { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 8px; padding: 7px 11px;
+    color: var(--text); font-family: var(--mono); font-size: 12.5px; min-width: 0; width: 100%; }
+  .bb-field select:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,0.08); }
+  .bb-field select option, .bb-field select optgroup { background: #14141f; color: var(--text); }
 </style>
 </head>
 <body>
@@ -342,7 +502,7 @@
 
   <header class="topbar">
     <div class="logo">api<span>✦</span>testgen</div>
-    <div class="tagline">network capture · chain detection · pytest generation</div>
+    <div class="tagline">record · replay · generate tests</div>
     <div class="spacer"></div>
     <button class="btn btn-ghost btn-sm" id="downloadAppBtn" title="Download the local bridge server - a standalone build, no Python install needed. Unzip, then right-click the extracted app and choose Open once (Gatekeeper blocks unsigned apps on a plain double-click).">Download app</button>
     <div class="dot" id="conn-dot"></div>
@@ -352,17 +512,17 @@
   <aside class="sidebar">
     <div class="sidebar-section">
       <div class="sidebar-section-head">
-        <div class="sidebar-title"><span class="sidebar-title-text">Workflow</span></div>
+        <div class="sidebar-title"><span class="sidebar-title-text">Workspace</span></div>
         <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Collapse sidebar">‹</button>
       </div>
-      <div class="step active" id="step-1" onclick="showPanel('capture')">
-        <div class="step-num">1</div><div class="step-label">Capture traffic</div>
+      <div class="step active" id="step-3" onclick="showPanel('ui')" title="UI Tests">
+        <div class="step-num">🧪</div><div class="step-label">UI Tests</div>
       </div>
-      <div class="step" id="step-2" onclick="showPanel('preview')">
-        <div class="step-num">2</div><div class="step-label">Preview &amp; download</div>
+      <div class="step" id="step-1" onclick="showPanel('capture')" title="API Capture">
+        <div class="step-num">🌐</div><div class="step-label">API Capture</div>
       </div>
-      <div class="step" id="step-3" onclick="showPanel('ui')">
-        <div class="step-num">3</div><div class="step-label">Record UI test</div>
+      <div class="step" id="step-2" onclick="showPanel('preview')" title="Generated files">
+        <div class="step-num">📄</div><div class="step-label">Generated files</div>
       </div>
     </div>
     <div class="sidebar-footer">
@@ -372,66 +532,64 @@
 
   <main class="main">
 
+    <!-- Browser bar: always visible, so the browser can be launched from any screen -->
+    <div class="browserbar" id="browserbar">
+      <div class="bb-field">
+        <label for="target-url">Portal A — app URL</label>
+        <select id="target-url">
+              <option value="">Select target URL...</option>
+              <optgroup label="Staging env">
+                <option value="https://hub-develop.habitnu.com/">https://hub-develop.habitnu.com/</option>
+                <option value="https://app-musc-develop.habitnu.com/">https://app-musc-develop.habitnu.com/</option>
+                <option value="https://app-develop.habitnu.com/">https://app-develop.habitnu.com/</option>
+                <option value="https://coaches-develop.habitnu.com/">https://coaches-develop.habitnu.com/</option>
+              </optgroup>
+              <optgroup label="Uat env">
+                <option value="https://hub-uat.habitnu.com/">https://hub-uat.habitnu.com/</option>
+                <option value="https://app-musc-uat.habitnu.com/">https://app-musc-uat.habitnu.com/</option>
+                <option value="https://app-uat.habitnu.com/">https://app-uat.habitnu.com/</option>
+                <option value="https://coaches-uat.habitnu.com/">https://coaches-uat.habitnu.com/</option>
+              </optgroup>
+            </select>
+      </div>
+      <div class="bb-field bb-b">
+        <label for="target-url-b">Portal B <small>(optional second window)</small></label>
+        <select id="target-url-b">
+              <option value="">Select target URL...</option>
+              <optgroup label="Staging env">
+                <option value="https://hub-develop.habitnu.com/">https://hub-develop.habitnu.com/</option>
+                <option value="https://app-musc-develop.habitnu.com/">https://app-musc-develop.habitnu.com/</option>
+                <option value="https://app-develop.habitnu.com/">https://app-develop.habitnu.com/</option>
+                <option value="https://coaches-develop.habitnu.com/">https://coaches-develop.habitnu.com/</option>
+              </optgroup>
+              <optgroup label="Uat env">
+                <option value="https://hub-uat.habitnu.com/">https://hub-uat.habitnu.com/</option>
+                <option value="https://app-musc-uat.habitnu.com/">https://app-musc-uat.habitnu.com/</option>
+                <option value="https://app-uat.habitnu.com/">https://app-uat.habitnu.com/</option>
+                <option value="https://coaches-uat.habitnu.com/">https://coaches-uat.habitnu.com/</option>
+              </optgroup>
+            </select>
+      </div>
+      <button class="btn btn-primary btn-sm" id="btn-launch" onclick="launchBrowser()">▶ Launch</button>
+      <button class="btn btn-danger btn-sm" onclick="stopBrowser()" title="Close the browser window(s)">■ Stop</button>
+      <details class="bb-nav" id="bb-nav">
+        <summary class="btn btn-ghost btn-sm">↪ Navigate…</summary>
+        <div class="bb-pop">
+          <div class="hint" style="margin:0 0 4px">Send an already-open window to another page.</div>
+          <div class="flex-row"><input type="text" class="ux-input" id="nav-url-a" placeholder="Portal A to…"><button class="btn btn-ghost btn-sm" onclick="navigateBrowser('A')">→ Go</button></div>
+          <div class="flex-row"><input type="text" class="ux-input" id="nav-url-b" placeholder="Portal B to…"><button class="btn btn-ghost btn-sm" onclick="navigateBrowser('B')">→ Go</button></div>
+        </div>
+      </details>
+    </div>
+
+
     <!-- Panel: Capture -->
-    <div class="panel active" id="panel-capture">
+    <div class="panel" id="panel-capture">
       <div class="panel-header">
-        <h2>Capture &amp; select API traffic</h2>
-        <p>Launch a browser, use the target app, then pick which calls make up the scenario you want to test.</p>
+        <h2>API Capture</h2>
+        <p>Launch a browser from the bar above and use the app, then pick which API calls make up the scenario to test.</p>
       </div>
       <div class="panel-body">
-
-        <div class="card">
-          <h3>Browser</h3>
-          <p>Opens a real Chromium window via Playwright. Every fetch/XHR the page makes is captured — auth headers and bodies included.</p>
-          <div class="field">
-            <label>Target URL (Portal A)</label>
-            <select id="target-url">
-              <option value="">Select target URL...</option>
-              <optgroup label="Staging env">
-                <option value="https://hub-develop.habitnu.com/">https://hub-develop.habitnu.com/</option>
-                <option value="https://app-musc-develop.habitnu.com/">https://app-musc-develop.habitnu.com/</option>
-                <option value="https://app-develop.habitnu.com/">https://app-develop.habitnu.com/</option>
-                <option value="https://coaches-develop.habitnu.com/">https://coaches-develop.habitnu.com/</option>
-              </optgroup>
-              <optgroup label="Uat env">
-                <option value="https://hub-uat.habitnu.com/">https://hub-uat.habitnu.com/</option>
-                <option value="https://app-musc-uat.habitnu.com/">https://app-musc-uat.habitnu.com/</option>
-                <option value="https://app-uat.habitnu.com/">https://app-uat.habitnu.com/</option>
-                <option value="https://coaches-uat.habitnu.com/">https://coaches-uat.habitnu.com/</option>
-              </optgroup>
-            </select>
-          </div>
-          <div class="field">
-            <label>Portal B URL <span style="opacity:0.6">— optional, opens a second window so you can capture APIs across both portals (e.g. Portal A creating data that Portal B then fetches)</span></label>
-            <select id="target-url-b">
-              <option value="">Select target URL...</option>
-              <optgroup label="Staging env">
-                <option value="https://hub-develop.habitnu.com/">https://hub-develop.habitnu.com/</option>
-                <option value="https://app-musc-develop.habitnu.com/">https://app-musc-develop.habitnu.com/</option>
-                <option value="https://app-develop.habitnu.com/">https://app-develop.habitnu.com/</option>
-                <option value="https://coaches-develop.habitnu.com/">https://coaches-develop.habitnu.com/</option>
-              </optgroup>
-              <optgroup label="Uat env">
-                <option value="https://hub-uat.habitnu.com/">https://hub-uat.habitnu.com/</option>
-                <option value="https://app-musc-uat.habitnu.com/">https://app-musc-uat.habitnu.com/</option>
-                <option value="https://app-uat.habitnu.com/">https://app-uat.habitnu.com/</option>
-                <option value="https://coaches-uat.habitnu.com/">https://coaches-uat.habitnu.com/</option>
-              </optgroup>
-            </select>
-          </div>
-          <div class="flex-row">
-            <button class="btn btn-primary btn-sm" id="btn-launch" onclick="launchBrowser()">▶ Launch browser(s)</button>
-            <button class="btn btn-danger btn-sm" onclick="stopBrowser()">■ Stop all</button>
-          </div>
-          <div class="flex-row" style="margin-top:12px">
-            <input type="text" id="nav-url-a" placeholder="Navigate Portal A to..." style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-family:var(--mono);font-size:12px">
-            <button class="btn btn-ghost btn-sm" onclick="navigateBrowser('A')">→ Go</button>
-          </div>
-          <div class="flex-row" style="margin-top:8px">
-            <input type="text" id="nav-url-b" placeholder="Navigate Portal B to..." style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text);font-family:var(--mono);font-size:12px">
-            <button class="btn btn-ghost btn-sm" onclick="navigateBrowser('B')">→ Go</button>
-          </div>
-        </div>
 
         <div class="card">
           <div class="flex-row" style="margin-bottom:6px">
@@ -471,24 +629,8 @@
             <div class="spacer"></div>
           </div>
 
-          <div class="gen-options">
-            <div id="provider-anthropic" class="gen-option selected" onclick="setProvider('anthropic')">
-              <h4>Claude (Anthropic)</h4>
-              <p>Requires an API key. Best quality.</p>
-            </div>
-            <div id="provider-ollama" class="gen-option" onclick="setProvider('ollama')">
-              <h4>Ollama (free, local)</h4>
-              <p>Runs on your machine. No API key needed.</p>
-            </div>
-          </div>
-          <div class="field" id="field-api-key">
-            <label>Anthropic API key</label>
-            <input type="password" id="api-key" placeholder="sk-ant-...">
-          </div>
-          <div class="field" id="field-ollama-model" style="display:none">
-            <label>Ollama model <button type="button" class="btn btn-ghost btn-sm" onclick="refreshOllamaModels()" style="margin-left:6px">↻ Refresh</button></label>
-            <select id="ollama-model"></select>
-          </div>
+          <div class="psum"><span>AI provider:</span> <b class="provider-summary-text">Claude</b>
+            <button class="btn btn-ghost btn-sm" onclick="openProviderDialog()">Change</button></div>
 
           <div class="gen-progress" id="gen-progress">
             <div class="gen-status-text" id="gen-status">Generating...</div>
@@ -608,90 +750,149 @@
     </div>
 
     <!-- Panel: UI recorder -->
-    <div class="panel" id="panel-ui">
-      <div class="panel-header">
-        <h2>Record a UI test</h2>
-        <p>Click through the app in the browser you launched on the Capture step. Each action is recorded here, turned into a Playwright test, and can be replayed in a fresh browser.</p>
+    <div class="panel active" id="panel-ui">
+      <div class="panel-header ph-row">
+        <div style="flex:1;min-width:0">
+          <h2>UI Tests</h2>
+          <p>Record by hand or let AI explore, replay to verify, then generate Playwright tests.</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('ui-help').toggleAttribute('open')">? How it works</button>
       </div>
       <div class="panel-body">
 
-        <div class="card">
-          <div class="flex-row" style="margin-bottom:6px">
-            <h3 style="margin:0;flex:1">⏺ Recorder <span id="ui-rec-badge" class="badge">idle</span></h3>
-          </div>
-          <p>Launch the browser first (Capture step). Clicks, typing, dropdowns, checkboxes and Enter/Escape are captured as you use the app. A small toolbar appears in the page while recording: <b>🎯 Pick</b> lets you highlight any element <i>without clicking it</i>, then choose what to do with it — click, hover, scroll to it, wait for it, or assert its text / value / href / visibility. To test across portals (e.g. Portal A creates data that Portal B, logged in as another user, then checks), launch both portals on the Capture step and choose <b>Both — Portal A + Portal B</b> here: actions in either window are recorded in order, tagged A/B, and replayed in two separate windows. <b>⚓ Anchor</b> makes the recorder locate controls by their nearest label (e.g. the button under “Date of Birth”) instead of their current text, so values that change — dates, selected options — don't break the test. The toolbar also adds a timed <b>Wait</b> and scroll-to-top/bottom. In the list below, <b>＋</b> on any step inserts a wait after it or <b>splits the steps into separate test cases</b>. Esc leaves pick mode. Password-like fields are saved to an owner-only env file, not into the script.</p>
-          <div class="field">
-            <label>Portal to record</label>
-            <select id="ui-portal" style="width:100%;background:rgba(255,255,255,0.045);border:1px solid var(--glass-border);border-radius:9px;padding:9px 14px;color:var(--text);font-family:var(--mono);font-size:12px">
-              <option value="A" selected>Portal A</option>
-              <option value="B">Portal B</option>
-              <option value="A,B">Both — Portal A + Portal B (cross-portal flow)</option>
-            </select>
-          </div>
-          <div class="flex-row">
-            <button class="btn btn-primary btn-sm" id="btn-ui-rec" onclick="uiToggleRecord()">⏺ Start recording</button>
-            <button class="btn btn-ghost btn-sm" id="btn-ui-rec-append" onclick="uiToggleRecord(true)" style="display:none" title="Keep the steps below and add new ones at the end (use the browser's current page as the starting point)">⏺ Record more (append)</button>
-            <button class="btn btn-ghost btn-sm" id="btn-ui-replay" onclick="uiReplay()">▶ Replay steps</button>
-            <button class="btn btn-ghost btn-sm" onclick="uiClearSteps()">Clear steps</button>
-            <span id="ui-replay-status" class="pw-run-status"></span>
-          </div>
-          <div class="flex-row" style="margin-top:8px;gap:14px;flex-wrap:wrap">
-            <label style="font-size:12px;color:var(--muted)" title="Takes a screenshot after every step during Replay and builds a shareable HTML report (goal, expected result, verdict, issues, steps with screenshots, final screen). Makes the replay a little slower.">
-              <input type="checkbox" id="ui-report"> 📄 Create an HTML report when replaying
-            </label>
-            <span id="ui-report-row" style="display:none;font-size:12px"></span>
-          </div>
-          <p style="margin-top:8px;font-size:11px">Replay runs the steps in a fresh window (clean cookies) so you can check each one before generating. Stops at the first failure.</p>
+        <details class="fold help" id="ui-help">
+          <summary>How it works &amp; tips</summary>
+          <ul>
+            <li><b>Record:</b> launch your app (bar above), press <b>⏺ Start recording</b>, then use the app normally. Clicks, typing, dropdowns and Enter become steps.</li>
+            <li><b>In the browser,</b> a toolbar appears: <b>🎯 Pick</b> selects an element <i>without clicking it</i> so you can assert its text/value/link, hover, wait for it, scroll to it or clear it. <b>⚓ Anchor</b> finds controls by their label so changing values (dates, chosen options) don't break the test.</li>
+            <li><b>Two portals?</b> Launch both, record in <b>Both A + B</b>: steps are tagged A/B and replay in two separate windows (separate logins).</li>
+            <li><b>Edit steps:</b> the <b>⋯</b> menu on a step checks or edits its locator and inserts a wait / go-to / test-case split. <b>▶</b> replays everything up to that step.</li>
+            <li><b>Verify:</b> <b>Replay all</b> runs the whole flow in fresh windows (tick <b>Report</b> for an HTML report with screenshots).</li>
+            <li><b>Generate:</b> name the test and click Generate for a page file + test class. Passwords are kept in owner-only local files, never in the generated code.</li>
+          </ul>
+        </details>
+
+        <div class="stepper" id="ui-stepper">
+          <div class="sp-item"><span class="n">1</span>Open browser</div><span class="sp-arrow">›</span>
+          <div class="sp-item"><span class="n">2</span>Record steps</div><span class="sp-arrow">›</span>
+          <div class="sp-item"><span class="n">3</span>Replay &amp; check</div><span class="sp-arrow">›</span>
+          <div class="sp-item"><span class="n">4</span>Generate test</div>
         </div>
 
-        <div class="card">
-          <div class="flex-row" style="margin-bottom:6px">
-            <h3 style="margin:0;flex:1">💾 Saved recordings <span id="ui-editing-badge" class="badge" style="display:none"></span></h3>
-          </div>
-          <p>Save the steps below under a name, reload one later to edit it (change values, fix selectors, add waits, split cases, delete steps, or append more), then save again. Steps are also autosaved, so a restart won't lose them. Saved files contain recorded values (including passwords) and are kept owner-only in <code>ui_recordings/</code>.</p>
-          <div class="name-row" style="margin-bottom:10px">
-            <input type="text" id="ui-save-name" placeholder="Recording name, e.g. set target weight">
-            <button class="btn btn-primary btn-sm" onclick="uiSaveRecording()" title="Saves under this name; overwrites a recording with the same name">💾 Save</button>
-          </div>
-          <div id="ui-saved-list" style="display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:12px"><span style="color:var(--muted)">No saved recordings yet.</span></div>
-        </div>
+        <div class="ui-grid">
 
-        <div class="card">
-          <h3>Recorded steps <span id="ui-step-count" class="badge">0</span></h3>
-          <div id="ui-steps" style="font-family:var(--mono);font-size:12px;display:flex;flex-direction:column;gap:6px;margin-top:8px">
-            <span style="color:var(--muted)">Nothing recorded yet.</span>
-          </div>
-        </div>
+          <!-- ═════ main column: steps + outputs ═════ -->
+          <section class="ui-main">
+            <div class="card steps-card">
+              <div class="steps-bar">
+                <h3>Steps <span id="ui-step-count" class="badge">0</span></h3>
+                <input type="search" id="ui-filter" class="ux-input steps-search" placeholder="Filter steps…" oninput="uiSetFilter(this.value)">
+                <div class="spacer"></div>
+                <button class="btn btn-ghost btn-sm" id="btn-ui-collapse" onclick="uiCollapseAll()" title="Collapse / expand all test cases">⇕ Cases</button>
+                <label class="chk" title="Takes a screenshot after every step during Replay and builds a shareable HTML report (goal, expected result, verdict, issues, steps with screenshots, final screen). Makes the replay a little slower."><input type="checkbox" id="ui-report"> 📄 Report</label>
+                <button class="btn btn-ghost btn-sm" id="btn-ui-replay" onclick="uiReplay()" title="Run every step in fresh browser windows and mark each ✓ / ✗">▶ Replay all</button>
+                <button class="btn btn-ghost btn-sm" onclick="uiClearSteps()" title="Remove all steps from the editor">Clear</button>
+              </div>
+              <div class="steps-status"><span id="ui-replay-status" class="pw-run-status"></span><span id="ui-report-row" style="display:none;font-size:12px"></span></div>
+              <div id="ui-steps" class="steps-list"></div>
+            </div>
 
-        <div class="card">
-          <h3>Generate &amp; run</h3>
-          <div class="name-row" style="margin-bottom:10px">
-            <input type="text" id="ui-test-name" placeholder="Scenario name, e.g. login and create order">
-            <button class="btn btn-primary btn-sm" onclick="uiGenerate()">⚙ Generate test</button>
-          </div>
-          <div class="flex-row" style="margin-bottom:10px;gap:16px;flex-wrap:wrap">
-            <label style="font-size:12px;color:var(--muted)" title="Every step waits up to this long for its element to appear / become clickable before failing. Used by Replay and written into the generated test (override with UI_TIMEOUT_MS).">Wait up to <input type="number" id="ui-timeout" value="15" min="1" step="1" style="width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text);font-family:var(--mono)"> s per step</label>
-            <label style="font-size:12px;color:var(--muted)" title="Page object: locators go in a separate page file (one class per screen) and the test class only calls them, so a UI change is a one-line fix in one place. Single file: everything inline.">
-              Structure <select id="ui-structure" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text);font-family:var(--mono);font-size:12px"><option value="pom" selected>Page file + test class (2 files)</option><option value="single">Single file</option></select>
-            </label>
-            <label style="font-size:12px;color:var(--muted)" title="On: all test cases share one browser session, each continuing where the previous stopped (e.g. login once). Off: each case starts in a fresh browser."><input type="checkbox" id="ui-shared-session" checked> Test cases continue in one browser session</label>
-          </div>
-          <div class="flex-row" style="margin-bottom:10px">
-            <button class="btn btn-primary btn-sm" id="btn-ui-run" onclick="uiRun()" disabled>▶ Run test</button>
-            <button class="btn btn-danger btn-sm" id="btn-ui-run-stop" onclick="uiRunStop()" style="display:none">■ Stop</button>
-            <label style="font-size:12px;color:var(--muted)"><input type="checkbox" id="ui-headless"> headless</label>
-            <label style="font-size:12px;color:var(--muted)">slow-mo <input type="number" id="ui-slowmo" value="300" min="0" step="100" style="width:70px;background:rgba(255,255,255,0.045);border:1px solid var(--glass-border);border-radius:6px;padding:3px 6px;color:var(--text);font-family:var(--mono)"> ms</label>
-            <div class="spacer"></div>
-            <span id="ui-run-status" class="pw-run-status"></span>
-          </div>
-          <div id="ui-generated-file" style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-bottom:8px"></div>
-          <div id="ui-page-label" class="sub" style="display:none;font-size:11px;color:var(--muted);font-family:var(--mono);margin:6px 0 4px"></div>
-          <pre class="pw-log-box" id="ui-page-code-box"></pre>
-          <div id="ui-test-label" style="display:none;font-size:11px;color:var(--muted);font-family:var(--mono);margin:10px 0 4px"></div>
-          <pre class="pw-log-box" id="ui-code-box"></pre>
-          <pre class="pw-log-box" id="ui-run-log" style="margin-top:10px"></pre>
-        </div>
+            <div class="card out-card" id="ui-out-card" style="display:none">
+              <div class="out-tabs">
+                <div class="out-tab active" data-tab="run" onclick="uiOutTab('run')">▶ Run output</div>
+                <div class="out-tab" data-tab="test" onclick="uiOutTab('test')">🧪 Test file</div>
+                <div class="out-tab" data-tab="page" onclick="uiOutTab('page')" style="display:none">📄 Page file</div>
+              </div>
+              <div class="out-pane active" id="pane-run"><pre class="pw-log-box" id="ui-run-log"></pre></div>
+              <div class="out-pane" id="pane-test"><div class="lab" id="ui-test-label"></div><pre class="pw-log-box" id="ui-code-box"></pre></div>
+              <div class="out-pane" id="pane-page"><div class="lab" id="ui-page-label"></div><pre class="pw-log-box" id="ui-page-code-box"></pre></div>
+            </div>
+          </section>
 
+          <!-- ═════ side column: always within reach ═════ -->
+          <aside class="ui-side">
+
+            <div class="card compact" id="rec-card">
+              <h3>⏺ Record <span id="ui-rec-badge" class="badge">idle</span></h3>
+              <div class="field tight"><label for="ui-portal">Record in</label>
+                <select id="ui-portal">
+                  <option value="A" selected>Portal A</option>
+                  <option value="B">Portal B</option>
+                  <option value="A,B">Both — A + B (cross-portal flow)</option>
+                </select>
+              </div>
+              <button class="btn btn-primary rec-big" id="btn-ui-rec" onclick="uiToggleRecord()">⏺ Start recording</button>
+              <button class="btn btn-ghost btn-sm" id="btn-ui-rec-append" onclick="uiToggleRecord(true)" style="display:none;width:100%;justify-content:center;margin-top:8px" title="Keep the steps and add new ones at the end, from the browser's current page">⏺ Record more (append)</button>
+              <p class="hint">Then use the app in the browser window. In its toolbar: <b>🎯 Pick</b> adds checks, <b>⚓ Anchor</b> uses label-based locators.</p>
+            </div>
+
+            <div class="card compact">
+              <h3>💾 Saved recordings <span id="ui-editing-badge" class="badge" style="display:none"></span></h3>
+              <div class="name-row" style="margin-bottom:10px">
+                <input type="text" id="ui-save-name" class="ux-input" style="flex:1" placeholder="Name this recording">
+                <button class="btn btn-primary btn-sm" onclick="uiSaveRecording()" title="Saves under this name; overwrites a recording with the same name">Save</button>
+              </div>
+              <div id="ui-saved-list" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;max-height:210px;overflow-y:auto"><span style="color:var(--muted)">No saved recordings yet.</span></div>
+              <p class="hint">Steps are also autosaved. Saved files contain recorded values (including passwords) and stay owner-only in <code>ui_recordings/</code>.</p>
+            </div>
+
+            <div class="card compact" id="ai-card">
+              <h3>🤖 Let AI do it <span id="explore-status-badge" class="badge">idle</span></h3>
+              <div class="field tight"><textarea id="explore-goal" placeholder="Describe what to test, e.g. Log in with qa@example.com / password and check the dashboard loads" style="min-height:62px"></textarea></div>
+              <div class="psum"><span>AI:</span> <b class="provider-summary-text">Claude</b> <button class="btn btn-ghost btn-sm" onclick="openProviderDialog()">Change</button></div>
+              <details class="fold">
+                <summary>Options</summary>
+                <div class="fold-body">
+                  <label class="chk">Portal <select id="explore-portal" class="ux-input" style="padding:3px 8px"><option value="A" selected>A</option><option value="B">B</option></select></label>
+                  <label class="chk" title="Capture what the AI does as editable UI test steps (replaces steps already in the recorder)"><input type="checkbox" id="explore-record-steps" checked> Record as UI test steps</label>
+                  <label class="chk" title="Off (default): the AI does exactly what your goal says - one case. On: it first plans extra edge/negative/boundary cases around your goal and runs them all."><input type="checkbox" id="explore-broaden" onchange="document.getElementById('explore-max-cases').disabled = !this.checked"> Also explore edge / negative cases</label>
+                  <label class="chk">Max cases <input type="number" id="explore-max-cases" class="ux-input" value="6" disabled min="1" max="12" style="width:64px;padding:3px 8px"></label>
+                  <label class="chk">Max steps per case <input type="number" id="explore-max-steps" class="ux-input" value="10" min="1" max="40" style="width:64px;padding:3px 8px"></label>
+                  <label class="chk" title="Takes a screenshot after every action for the published report. Makes the browser flicker and slows the run; the AI itself doesn't use them."><input type="checkbox" id="explore-screenshots"> Screenshots for report</label>
+                </div>
+              </details>
+              <div class="flex-row" style="margin-top:10px">
+                <button class="btn btn-primary" id="btn-explore-start" onclick="startExplore()" style="flex:1;justify-content:center">🤖 Start exploring</button>
+                <button class="btn btn-danger" id="btn-explore-stop" onclick="stopExplore()" style="display:none">■ Stop</button>
+              </div>
+              <pre class="pw-log-box" id="explore-log-box" style="margin-top:10px;max-height:170px"></pre>
+              <div id="explore-report" style="display:none;margin-top:10px;background:rgba(124,106,255,0.08);border:1px solid #4c3f8a;border-radius:10px;padding:12px 14px">
+                <div style="font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:#c4b5fd;margin-bottom:6px">Exploration report</div>
+                <pre id="explore-report-text" style="white-space:pre-wrap;font-size:12px;margin:0"></pre>
+                <div class="flex-row" id="explore-publish-row" style="margin-top:10px;display:none;flex-wrap:wrap">
+                  <button class="btn btn-ghost btn-sm" id="btn-publish-explore" onclick="publishExploreReport()">☁ Publish report</button>
+                  <span id="explore-publish-status" style="font-size:12px;font-family:var(--mono)"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card compact">
+              <h3>🧪 Generate &amp; run</h3>
+              <div class="name-row" style="margin-bottom:10px">
+                <input type="text" id="ui-test-name" class="ux-input" style="flex:1" placeholder="Test name, e.g. login and create order">
+                <button class="btn btn-primary btn-sm" onclick="uiGenerate()" title="Writes the page file + test class into generated_scripts/ui_tests/">Generate</button>
+              </div>
+              <div class="flex-row" style="flex-wrap:wrap;gap:8px">
+                <button class="btn btn-ghost btn-sm" id="btn-ui-run" onclick="uiRun()" disabled title="Runs the generated test with pytest">▶ Run test</button>
+                <button class="btn btn-danger btn-sm" id="btn-ui-run-stop" onclick="uiRunStop()" style="display:none">■ Stop</button>
+                <span id="ui-run-status" class="pw-run-status"></span>
+              </div>
+              <div id="ui-generated-file" class="hint" style="word-break:break-all;margin-top:8px"></div>
+              <details class="fold" style="margin-top:6px">
+                <summary>Settings</summary>
+                <div class="fold-body">
+                  <label class="chk" title="Page object: locators go in a separate page file (one class per screen) and the test class only calls them, so a UI change is a one-line fix in one place. Single file: everything inline.">Structure
+                    <select id="ui-structure" class="ux-input" style="padding:3px 8px"><option value="pom" selected>Page file + test class</option><option value="single">Single file</option></select></label>
+                  <label class="chk" title="Every step waits up to this long for its element to appear / become clickable before failing. Used by Replay and written into the generated test (override with UI_TIMEOUT_MS).">Wait up to <input type="number" id="ui-timeout" class="ux-input" value="15" min="1" step="1" style="width:64px;padding:3px 8px"> s per step</label>
+                  <label class="chk" title="On: all test cases share one browser session, each continuing where the previous stopped (e.g. login once). Off: each case starts in a fresh browser."><input type="checkbox" id="ui-shared-session" checked> Test cases continue in one browser session</label>
+                  <label class="chk"><input type="checkbox" id="ui-headless"> Run headless (no window)</label>
+                  <label class="chk">Slow-mo <input type="number" id="ui-slowmo" class="ux-input" value="300" min="0" step="100" style="width:72px;padding:3px 8px"> ms between actions (Replay &amp; Run)</label>
+                </div>
+              </details>
+            </div>
+
+          </aside>
+        </div>
       </div>
     </div>
 
@@ -749,6 +950,46 @@
     </div>
   </div>
 
+  <!-- AI provider dialog (shared by AI Explore and API-chain generation) -->
+  <div class="modal" id="provider-modal" onclick="if(event.target===this)closeProviderDialog()">
+    <div class="modal-card">
+      <h3>AI provider</h3>
+      <p class="hint" style="margin:0 0 14px">Used by AI Explore and by API-chain generation. Pick one and add its key (keys are never saved).</p>
+          <div class="gen-options">
+            <div id="provider-anthropic" class="gen-option selected" onclick="setProvider('anthropic')">
+              <h4>Claude (Anthropic)</h4>
+              <p>Requires an API key. Best quality.</p>
+            </div>
+            <div id="provider-openrouter" class="gen-option" onclick="setProvider('openrouter')">
+              <h4>MiniMax (OpenRouter)</h4>
+              <p>Low-cost cloud model. Needs an OpenRouter API key.</p>
+            </div>
+            <div id="provider-ollama" class="gen-option" onclick="setProvider('ollama')">
+              <h4>Ollama (free, local)</h4>
+              <p>Runs on your machine. No API key needed.</p>
+            </div>
+          </div>
+          <div class="field" id="field-openrouter" style="display:none">
+            <label>OpenRouter API key <span id="or-key-note" style="opacity:0.7;font-weight:normal"></span></label>
+            <input type="password" id="or-api-key" oninput="updateProviderSummary()" placeholder="sk-or-...  (blank = use OPENROUTER_API_KEY from .env)" autocomplete="off">
+            <label style="margin-top:10px">MiniMax model <button type="button" class="btn btn-ghost btn-sm" onclick="refreshOpenRouterModels()" style="margin-left:6px">↻ Refresh</button></label>
+            <select id="openrouter-model" onchange="updateProviderSummary()"></select>
+            <span id="or-model-note" style="font-size:11px;color:var(--muted)"></span>
+          </div>
+          <div class="field" id="field-api-key">
+            <label>Anthropic API key</label>
+            <input type="password" id="api-key" placeholder="sk-ant-..." oninput="updateProviderSummary()">
+          </div>
+          <div class="field" id="field-ollama-model" style="display:none">
+            <label>Ollama model <button type="button" class="btn btn-ghost btn-sm" onclick="refreshOllamaModels()" style="margin-left:6px">↻ Refresh</button></label>
+            <select id="ollama-model" onchange="updateProviderSummary()"></select>
+          </div>
+
+
+      <div class="flex-row" style="margin-top:6px"><div class="spacer"></div><button class="btn btn-primary btn-sm" onclick="closeProviderDialog()">Done</button></div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 </div>
 
@@ -781,6 +1022,9 @@ function setConnected(on) {
   browserOpen = on;
   document.getElementById('conn-dot').classList.toggle('on', on);
   document.getElementById('conn-label').textContent = on ? 'browser open' : 'disconnected';
+  const lb = document.getElementById('btn-launch');
+  if (lb) lb.textContent = on ? '↻ Relaunch' : '▶ Launch';
+  uiUpdateStepper();
 }
 socket.on('status',         (d) => setConnected(d.connected));
 socket.on('browser_started',(d) => { setConnected(true); log(`Browser${d.portal==='B'?' (Portal B)':''} at ${d.url}`, 'ok'); setTimeout(refreshNetworkLog, 800); });
@@ -1333,6 +1577,563 @@ function getSelectedChainEntries() {
   return Array.from(selectedChainEntries.values()).sort((a, b) => (a.ts || 0) - (b.ts || 0));
 }
 
+// ── AI Explore ─────────────────────────────────────────────────────────────────
+
+let currentExploreRunId = null;
+let lastExploreRunId = null;
+
+// ── UI recorder ──────────────────────────────────────────────────────────────
+let uiReplayResults = {}, uiLastSteps = [];
+let uiRecording = false, uiGeneratedFile = null, uiRunId = null;
+
+function uiDescribeLocator(l) {
+  if (!l) return '';
+  if (l.anchor) return '⚓ label "' + l.anchor + '" → control next to it';
+  if (l.kind === 'pw') return l.py;
+  const nth = l.nth != null ? ` #${l.nth + 1}` : '';
+  if (l.kind === 'role') return `${l.role} "${l.name}"${nth}`;
+  if (l.kind === 'css') return `css ${l.value}${nth}`;
+  return `${l.kind} "${l.value}"${nth}`;
+}
+
+let uiInsertOpen = null, uiDraft = { ms: 1000, name: '', url: '', portal: 'A' };
+let uiCheckResults = {};   // step id -> {count} from the quick Check (live browser, current page)
+function uiRunTo(id) {
+  if (!browserOpen) { toast('Launch the browser first (▶ Launch in the bar above)', 'err'); return; }
+  uiLastReplayFull = false;
+  uiReplayResults = {}; uiCheckResults = {};
+  renderUiSteps(uiLastSteps);
+  socket.emit('ui_replay', { upto_id: id, portal: document.getElementById('ui-portal').value,
+                             slow_mo: parseInt(document.getElementById('ui-slowmo').value, 10) || 0, timeout_s: uiTimeout() });
+}
+function uiQuickCheck(id) {
+  const st = uiLastSteps.find(x => x.id === id);
+  if (!st || !st.locator) return;
+  socket.emit('ui_locator_check', { id, locator: st.locator, portal: st.portal || 'A' });
+}
+let uiEditLoc = null, uiLocDraft = '';   // step id whose selector is being edited, and its draft text
+function uiLocSelector(l) { return !l ? '' : l.kind === 'pw' ? l.selector : l.kind === 'css' ? l.value : ''; }
+function uiToggleEditLoc(id) {
+  uiEditLoc = uiEditLoc === id ? null : id;
+  const st = uiLastSteps.find(x => x.id === id);
+  uiLocDraft = st ? uiLocSelector(st.locator) : '';
+  renderUiSteps(uiLastSteps);
+}
+function uiCheckLoc(id) {
+  if (!uiLocDraft.trim()) { toast('Type a selector first', 'err'); return; }
+  socket.emit('ui_locator_check', { id, selector: uiLocDraft, portal: (uiLastSteps.find(x => x.id === id) || {}).portal || 'A' });
+}
+function uiUseAlt(id, index) {
+  delete uiCheckResults[id];
+  socket.emit('ui_step_use_alt', { id, index });
+  uiEditLoc = null;
+}
+function uiSaveLoc(id) {
+  delete uiCheckResults[id];
+  socket.emit('ui_step_set_locator', { id, selector: uiLocDraft });
+  uiEditLoc = null;
+}
+const UI_INPUT_STYLE = 'background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 8px;color:var(--text);font-family:var(--mono);font-size:12px';
+
+function uiToggleInsert(id) { uiInsertOpen = uiInsertOpen === id ? null : id; renderUiSteps(uiLastSteps); }
+function uiInsertWait(afterId) {
+  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'wait', value: String(uiDraft.ms) } });
+  uiInsertOpen = null;
+}
+function uiInsertGoto(afterId) {
+  const url = (uiDraft.url || '').trim();
+  if (!url) { toast('Enter a URL to go to', 'err'); return; }
+  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'goto', value: url, portal: uiDraft.portal || 'A' } });
+  uiDraft.url = ''; uiInsertOpen = null;
+}
+function uiInsertScript(afterId) {
+  const expr = (uiDraft.expr || '').trim();
+  if (!expr) { toast('Enter a JavaScript expression to evaluate', 'err'); return; }
+  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'assert_js', expr, value: uiDraft.expect || '' } });
+  uiDraft.expr = ''; uiDraft.expect = ''; uiInsertOpen = null;
+}
+function uiInsertCase(afterId) {
+  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'case', value: uiDraft.name } });
+  uiDraft.name = ''; uiInsertOpen = null;
+}
+
+// ── UX: filter, collapsible cases, row menu, stepper, output tabs ──
+let uiFilter = '', uiCollapsed = {}, uiReplayOkSnapshot = null, uiLastReplayFull = true;
+function uiSetFilter(v) { uiFilter = (v || '').trim().toLowerCase(); renderUiSteps(uiLastSteps); }
+function uiToggleCase(id) { uiCollapsed[id] = !uiCollapsed[id]; renderUiSteps(uiLastSteps); }
+function uiCollapseAll() {
+  const heads = uiLastSteps.filter(s => s.type === 'case');
+  const collapse = heads.some(h => !uiCollapsed[h.id]);          // any open -> collapse all, else expand all
+  heads.forEach(h => { uiCollapsed[h.id] = collapse; });
+  renderUiSteps(uiLastSteps);
+}
+
+function uiUpdateStepper() {
+  const items = document.querySelectorAll('#ui-stepper .sp-item');
+  if (!items.length) return;
+  const has = uiLastSteps.some(s => s.type !== 'case');
+  const reviewed = uiReplayOkSnapshot !== null && uiReplayOkSnapshot === uiCanon(uiLastSteps);
+  const st = [
+    browserOpen ? 'done' : 'active',
+    uiRecording ? 'rec' : has ? 'done' : (browserOpen ? 'active' : ''),
+    reviewed ? 'done' : (has && !uiRecording ? 'active' : ''),
+    uiGeneratedFile ? 'done' : (reviewed ? 'active' : ''),
+  ];
+  items.forEach((el, i) => {
+    el.className = 'sp-item ' + (st[i] || '');
+    el.querySelector('.n').textContent = st[i] === 'done' ? '✓' : (st[i] === 'rec' ? '●' : i + 1);
+  });
+}
+
+function uiCloseMenu() { const m = document.getElementById('row-menu'); if (m) m.remove(); }
+document.addEventListener('click', uiCloseMenu);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { uiCloseMenu(); closeProviderDialog(); } });
+function uiRowMenu(id, ev) {
+  ev.stopPropagation();
+  const st = uiLastSteps.find(x => x.id === id);
+  if (!st) return;
+  const had = document.getElementById('row-menu');
+  uiCloseMenu();
+  if (had && had.dataset.id == id) return;                        // second click on the same button closes it
+  const items = [];
+  if (st.locator) {
+    items.push(['🔍', 'Check locator on the live page', `uiQuickCheck(${id})`]);
+    items.push(['✎', 'Edit or swap the locator…', `uiToggleEditLoc(${id})`]);
+  }
+  items.push(['＋', 'Insert a wait / go-to / test-case split after…', `uiToggleInsert(${id})`]);
+  const m = document.createElement('div');
+  m.className = 'rowmenu'; m.id = 'row-menu'; m.dataset.id = id;
+  m.innerHTML = items.map(([i, t, fn]) => `<button onclick="${fn}"><span>${i}</span>${t}</button>`).join('')
+    + `<hr><button class="danger" onclick="socket.emit('ui_step_delete',{id:${id}})"><span>🗑</span>Delete this step</button>`;
+  document.body.appendChild(m);
+  const r = ev.currentTarget.getBoundingClientRect();
+  m.style.top = Math.max(8, Math.min(r.bottom + 4, innerHeight - m.offsetHeight - 8)) + 'px';
+  m.style.left = Math.max(8, r.right - m.offsetWidth) + 'px';
+}
+
+const UI_VERB = { goto: 'Go to', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
+  press: 'Press', press_page: 'Press', assert_text: 'Assert text', assert_value: 'Assert value', assert_visible: 'Assert visible',
+  assert_attr: 'Assert attr', assert_js: 'Assert script', hover: 'Hover', scroll_into_view: 'Scroll to', wait_for: 'Wait for', wait: 'Wait (ms)',
+  scroll_page: 'Scroll page', note: 'Note' };
+const UI_EDITABLE = ['goto', 'fill', 'select', 'press', 'press_page', 'assert_text', 'assert_value', 'assert_attr', 'assert_js', 'wait_for', 'wait', 'scroll_page'];
+function uiVerbClass(t) { return /^assert/.test(t) ? 'v-assert' : (t === 'wait' || t === 'wait_for' || /^scroll/.test(t)) ? 'v-wait' : t === 'goto' ? 'v-nav' : ''; }
+
+const UI_EMPTY = `<div class="empty"><div class="big">🧪</div><h4>No steps yet</h4>
+  <p>Record your first flow in three moves:</p>
+  <ol><li>Enter your app's URL in the bar above and click <b>▶ Launch</b></li>
+      <li>Press <b>⏺ Start recording</b> on the right</li>
+      <li>Use the app normally — every click and entry appears here</li></ol>
+  <p>…or describe a goal and let <b>🤖 AI</b> do it for you.</p></div>`;
+
+function uiStepDetail(s, n, r) {
+  const parts = [];
+  const open = uiInsertOpen === s.id, editing = uiEditLoc === s.id;
+  if (editing && s.locator) {
+    parts.push(`<div class="sr-detail"><span><b>✎ Selector</b></span>`
+      + `<input type="text" class="ux-input" style="flex:1;min-width:240px" placeholder="e.g. [data-testid=&quot;save&quot;]   or   .card >> text=lbs   or   xpath=//button[2]" value="${escapeHtml(uiLocDraft)}" oninput="uiLocDraft=this.value">`
+      + `<button class="btn btn-ghost btn-sm" onclick="uiCheckLoc(${s.id})" title="Counts what it matches in the live browser and outlines it">Check</button>`
+      + `<button class="btn btn-primary btn-sm" onclick="uiSaveLoc(${s.id})">Use this</button>`
+      + ((s.locator.alts || []).length ? `<div style="flex-basis:100%;display:flex;flex-direction:column;gap:5px;margin-top:4px"><span class="hint" style="margin:0">Other locators recorded for this element (⚓ ones don't depend on its current text or value):</span>`
+        + s.locator.alts.map((a, i) => `<button class="btn btn-ghost btn-sm" style="text-align:left;justify-content:flex-start;white-space:normal" onclick="uiUseAlt(${s.id}, ${i})" title="${escapeHtml(a.value || a.selector || '')}">Use: ${escapeHtml(uiDescribeLocator(a))}</button>`).join('') + `</div>` : '')
+      + `</div>`);
+  }
+  if (open) {
+    parts.push(`<div class="sr-detail"><span><b>⏱ Wait</b></span><input type="number" class="ux-input" min="0" step="250" value="${uiDraft.ms}" oninput="uiDraft.ms=this.value" style="width:84px"><span>ms</span>`
+      + `<button class="btn btn-ghost btn-sm" onclick="uiInsertWait(${s.id})">Add wait here</button>`
+      + `<span style="color:var(--muted)">│</span><span><b>🌐 Go to</b></span><input type="text" class="ux-input" placeholder="https://…" value="${escapeHtml(uiDraft.url)}" oninput="uiDraft.url=this.value" style="width:210px">`
+      + `<select class="ux-input" onchange="uiDraft.portal=this.value"><option value="A"${uiDraft.portal !== 'B' ? ' selected' : ''}>Portal A</option><option value="B"${uiDraft.portal === 'B' ? ' selected' : ''}>Portal B</option></select>`
+      + `<button class="btn btn-ghost btn-sm" onclick="uiInsertGoto(${s.id})" title="Inserts a Go-to step after this one">Add</button>`
+      + `<span style="color:var(--muted)">│</span><span><b>🧮 Assert script</b></span><input type="text" class="ux-input" placeholder="JS, e.g. document.title" value="${escapeHtml(uiDraft.expr || '')}" oninput="uiDraft.expr=this.value" style="width:210px">`
+      + `<input type="text" class="ux-input" placeholder='expected (JSON), e.g. "Home"' value="${escapeHtml(uiDraft.expect || '')}" oninput="uiDraft.expect=this.value" style="width:150px">`
+      + `<button class="btn btn-ghost btn-sm" onclick="uiInsertScript(${s.id})" title="Adds a check on the result of a JavaScript expression - for things with no element to locate, like a chart's data">Add</button>`
+      + `<span style="color:var(--muted)">│</span><span><b>📋 New test case</b></span><input type="text" class="ux-input" placeholder="name (optional)" value="${escapeHtml(uiDraft.name)}" oninput="uiDraft.name=this.value" style="width:170px">`
+      + `<button class="btn btn-ghost btn-sm" onclick="uiInsertCase(${s.id})" title="Steps after this one start a new test case">Split after this step</button></div>`);
+  }
+  if (r && !r.ok) {
+    parts.push(`<div class="sr-note err">${escapeHtml(r.error)}${r.screenshot ? `<img src="data:image/jpeg;base64,${r.screenshot}" alt="page at the failure">` : ''}</div>`);
+    if (/matched 0/.test(r.error || '')) parts.push('<div class="sr-note hint">The locator finds nothing on the page at this point. Use <b>⋯ → Edit or swap the locator</b> to try a better selector (a data-testid, an id or a CSS path), then <b>Check</b> it.</div>');
+  }
+  return parts.join('');
+}
+
+function renderUiSteps(steps) {
+  uiLastSteps = steps;
+  const box = document.getElementById('ui-steps');
+  const actions = steps.filter(s => s.type !== 'case');
+  const cases = steps.filter(s => s.type === 'case').length;
+  document.getElementById('ui-step-count').textContent = actions.length + (cases ? ` · ${cases} case${cases > 1 ? 's' : ''}` : '');
+  uiUpdateStepper();
+  if (!steps.length) { box.innerHTML = UI_EMPTY; return; }
+  const multiPortal = steps.some(x => x.portal === 'B');            // only tag steps with A/B when two portals are involved
+  let n = 0, cur = { head: null, rows: [] };
+  const groups = [cur];
+  steps.forEach(s => { if (s.type === 'case') { cur = { head: s, rows: [] }; groups.push(cur); } else { n += 1; cur.rows.push({ s, n }); } });
+
+  const rowHtml = ({ s, n }) => {
+    const r = uiReplayResults[s.id];
+    const mark = !r ? '' : r.ok ? '<span class="sr-mark" style="color:var(--green)">✓</span>' : '<span class="sr-mark" style="color:var(--red)">✗</span>';
+    const pill = multiPortal ? `<span class="pill ${s.portal === 'B' ? 'b' : 'a'}" title="Portal ${s.portal || 'A'}">${s.portal || 'A'}</span>` : '';
+    const target = s.type === 'assert_js' ? (s.expr || '') : s.type === 'goto' || !s.locator ? '' : uiDescribeLocator(s.locator) + (s.attr ? ` [${s.attr}]` : '') + (s.position ? ` @ (${s.position.x}, ${s.position.y})` : '');
+    const c = uiCheckResults[s.id];
+    const chk = c ? (c.count === 1 ? ' <span class="pill ok">✓ 1 match</span>' : c.count === 0 ? ' <span class="pill no">✗ 0 matches</span>' : ` <span class="pill warn">⚠ ${c.count} matches</span>`) : '';
+    let val = '';
+    if (s.type === 'fill' && s.secret) val = '<span class="pill">🔒 secret → env var</span>';
+    else if (UI_EDITABLE.includes(s.type)) val = `<input type="text" class="ux-input" value="${escapeHtml(s.value)}" onchange="uiUpdateStep(${s.id}, this.value)">`;
+    else if (s.type === 'note') val = `<span style="color:var(--muted)">${escapeHtml(s.value)}</span>`;
+    return `<div class="srow ${r && !r.ok ? 'bad' : ''}" data-id="${s.id}">`
+      + `<span>${mark}</span><span class="sr-num">${n}</span>`
+      + `<span class="sr-verb ${uiVerbClass(s.type)}">${pill}${UI_VERB[s.type] || s.type}</span>`
+      + (s.type === 'assert_js' ? `<span class="sr-val"><input type="text" class="ux-input" title="JavaScript evaluated in the page" value="${escapeHtml(s.expr)}" onchange="uiUpdateStep(${s.id}, this.value, 'expr')"></span>`
+        : (target || !val ? `<span class="sr-target${val ? '' : ' span2'}" title="${escapeHtml(target)}">${escapeHtml(target)}${chk}</span>` : ''))
+      + (val ? `<span class="sr-val${target ? '' : ' span2'}">${val}</span>` : '')
+      + `<span class="sr-actions"><button class="ibtn run" title="Run to here: replay steps 1–${n} in fresh windows and outline this step's element" onclick="uiRunTo(${s.id})">▶</button>`
+      + `<button class="ibtn" title="More: check or edit the locator, insert a wait, delete…" onclick="uiRowMenu(${s.id}, event)">⋯</button></span></div>`
+      + uiStepDetail(s, n, r);
+  };
+  const textOf = ({ s }) => [UI_VERB[s.type] || s.type, s.locator ? uiDescribeLocator(s.locator) : '', s.value || '', s.attr || ''].join(' ').toLowerCase();
+
+  let shown = 0;
+  const html = groups.map(g => {
+    const rows = uiFilter ? g.rows.filter(r => textOf(r).includes(uiFilter)) : g.rows;
+    shown += rows.length;
+    if (!g.head) return rows.map(rowHtml).join('');
+    if (uiFilter && !rows.length) return '';
+    const collapsed = !!uiCollapsed[g.head.id] && !uiFilter;
+    const res = g.rows.map(x => uiReplayResults[x.s.id]).filter(Boolean);
+    const bad = res.filter(x => !x.ok).length;
+    const meta = `${g.rows.length} step${g.rows.length === 1 ? '' : 's'}` + (res.length ? (bad ? ` · <span style="color:var(--red)">${bad} failed</span>` : ` · <span style="color:var(--green)">✓ passed</span>`) : '');
+    return `<div class="case-head ${collapsed ? 'collapsed' : ''}"><span class="caret" onclick="uiToggleCase(${g.head.id})" title="Collapse / expand">▾</span>`
+      + `<b style="white-space:nowrap">📋 Test case</b>`
+      + `<input type="text" class="ux-input" value="${escapeHtml(g.head.value)}" onchange="uiUpdateStep(${g.head.id}, this.value)" title="Rename this test case">`
+      + `<span class="case-meta">${meta}</span>`
+      + `<button class="ibtn" title="Remove this split (its steps join the case above)" onclick="socket.emit('ui_step_delete',{id:${g.head.id}})">✕</button></div>`
+      + (collapsed ? '' : rows.map(rowHtml).join(''));
+  }).join('');
+  box.innerHTML = html + (uiFilter && !shown ? `<div class="empty" style="padding:22px">No steps match “${escapeHtml(uiFilter)}”.</div>` : '');
+}
+
+function uiOutTab(name) {
+  document.querySelectorAll('#ui-out-card .out-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  ['run', 'test', 'page'].forEach(p => document.getElementById('pane-' + p).classList.toggle('active', p === name));
+}
+function uiShowOutput(tab) {
+  const card = document.getElementById('ui-out-card');
+  card.style.display = '';
+  uiOutTab(tab);
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── saved recordings ──
+let uiLoadedName = null, uiSnapshot = null;
+// Canonical JSON (sorted keys) so the same steps compare equal however the server ordered the fields.
+function uiCanon(v) {
+  return JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x))
+    ? Object.keys(x).sort().reduce((o, key) => (o[key] = x[key], o), {}) : x);
+}
+function uiDirty() { return uiLoadedName != null && uiSnapshot !== uiCanon(uiLastSteps); }
+function uiUpdateEditingBadge() {
+  const b = document.getElementById('ui-editing-badge');
+  if (!b) return;
+  b.style.display = uiLoadedName ? '' : 'none';
+  b.textContent = uiLoadedName ? `editing: ${uiLoadedName}${uiDirty() ? '  ● unsaved changes' : ''}` : '';
+  b.style.color = uiDirty() ? 'var(--yellow,#f59e0b)' : '';
+}
+
+async function uiRefreshSaved() {
+  const box = document.getElementById('ui-saved-list');
+  try {
+    const r = await (await fetch(BRIDGE_URL + '/api/ui-recordings')).json();
+    const list = r.recordings || [];
+    if (!list.length) { box.innerHTML = '<span style="color:var(--muted)">No saved recordings yet.</span>'; return; }
+    box.innerHTML = list.map(x => {
+      const when = x.saved_at ? new Date(x.saved_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+      const cur = uiLoadedName === x.name;
+      const esc = escapeHtml(x.name);
+      return `<div class="saved-item${cur ? ' current' : ''}">`
+        + `<div class="si-main"><div class="si-name" title="${esc}">${cur ? '▶ ' : ''}${esc}</div>`
+        + `<div class="si-meta">${x.steps} step${x.steps === 1 ? '' : 's'}${x.cases ? ` · ${x.cases} case${x.cases > 1 ? 's' : ''}` : ''}${when ? ` · ${escapeHtml(when)}` : ''}</div></div>`
+        + `<div class="si-actions"><button class="btn btn-ghost btn-sm" onclick="uiLoadRecording('${escapeHtml(x.file)}')" title="Load into the editor to edit it">✎ Edit</button>`
+        + `<button class="ibtn" onclick="uiDeleteRecording('${escapeHtml(x.file)}', '${esc.replace(/'/g, "\\'")}')" title="Delete this saved recording">🗑</button></div></div>`;
+    }).join('');
+  } catch (e) { box.innerHTML = '<span style="color:var(--red)">Could not reach the bridge.</span>'; }
+}
+
+async function uiSaveRecording() {
+  const name = (document.getElementById('ui-save-name').value || '').trim();
+  if (!name) { toast('Give the recording a name', 'err'); return; }
+  if (!uiLastSteps.length) { toast('Nothing to save yet', 'err'); return; }
+  const exists = Array.from(document.querySelectorAll('#ui-saved-list .si-name')).some(b => b.textContent.replace('▶ ', '') === name);
+  if (exists && uiLoadedName !== name && !confirm(`A recording named "${name}" already exists. Overwrite it?`)) return;
+  const settings = { timeout_s: uiTimeout(), shared_session: document.getElementById('ui-shared-session').checked,
+                     test_name: document.getElementById('ui-test-name').value };
+  const res = await fetch(BRIDGE_URL + '/api/ui-recordings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                               body: JSON.stringify({ name, settings }) });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Save failed', 'err'); return; }
+  uiLoadedName = d.name; uiSnapshot = uiCanon(uiLastSteps);
+  uiUpdateEditingBadge(); uiRefreshSaved();
+  toast(`Saved "${d.name}" (${d.steps} steps)`);
+}
+
+async function uiLoadRecording(file) {
+  if (uiRecording) { toast('Stop recording first', 'err'); return; }
+  if (uiDirty() && !confirm('You have unsaved changes to the recording being edited. Load another and discard them?')) return;
+  if (!uiDirty() && uiLoadedName == null && uiLastSteps.length && !confirm(`Replace the ${uiLastSteps.length} unsaved steps in the list with this saved recording?`)) return;
+  const res = await fetch(BRIDGE_URL + '/api/ui-recordings/' + encodeURIComponent(file));
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Load failed', 'err'); return; }
+  uiReplayResults = {}; uiCheckResults = {};
+  uiLoadedName = d.name; uiSnapshot = uiCanon(d.steps || []);
+  document.getElementById('ui-save-name').value = d.name;
+  const st = d.settings || {};
+  if (st.test_name) document.getElementById('ui-test-name').value = st.test_name; else document.getElementById('ui-test-name').value = d.name;
+  if (st.timeout_s) document.getElementById('ui-timeout').value = st.timeout_s;
+  if (st.shared_session != null) document.getElementById('ui-shared-session').checked = !!st.shared_session;
+  uiUpdateEditingBadge(); uiRefreshSaved();
+  toast(`Loaded "${d.name}" - edit the steps, then Save`);
+}
+
+async function uiDeleteRecording(file, name) {
+  if (!confirm(`Delete the saved recording "${name}"? This can't be undone.\n\n(Steps currently in the editor are not affected.)`)) return;
+  const res = await fetch(BRIDGE_URL + '/api/ui-recordings/' + encodeURIComponent(file), { method: 'DELETE' });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Delete failed', 'err'); return; }
+  if (uiLoadedName === name) { uiLoadedName = null; uiSnapshot = null; }
+  uiUpdateEditingBadge(); uiRefreshSaved();
+  toast(`Deleted "${name}"`);
+}
+
+function uiSetRecording(on) {
+  uiRecording = on;
+  const badge = document.getElementById('ui-rec-badge');
+  badge.textContent = on ? '● recording' : 'idle';
+  badge.style.color = on ? 'var(--red)' : '';
+  const btn = document.getElementById('btn-ui-rec');
+  btn.textContent = on ? '■ Stop recording' : '⏺ Start recording';
+  btn.classList.toggle('stop', on);
+  document.getElementById('rec-card').classList.toggle('recording', on);
+  document.getElementById('ui-portal').disabled = on;
+  uiUpdateStepper();
+}
+
+function uiToggleRecord(append) {
+  if (uiRecording) { socket.emit('ui_record_stop'); return; }
+  if (!browserOpen) { toast('Launch the browser first (▶ Launch in the bar above)', 'err'); return; }
+  const hasSteps = uiLastSteps.length > 0;
+  if (hasSteps && !append && !confirm(`Start a new recording? This replaces the ${uiLastSteps.length} steps currently in the list.\n\n(Use "Record more (append)" to keep them, or Save them first.)`)) return;
+  socket.emit('ui_record_start', { portals: document.getElementById('ui-portal').value.split(','), keep_steps: !!append && hasSteps });
+}
+function uiClearSteps() { uiReplayResults = {}; uiCheckResults = {}; socket.emit('ui_steps_clear'); }
+function uiReplay() {
+  if (!browserOpen) { toast('Launch the browser first (▶ Launch in the bar above)', 'err'); return; }
+  uiLastReplayFull = true;
+  uiReplayResults = {}; uiCheckResults = {};
+  renderUiSteps(uiLastSteps);
+  document.getElementById('ui-report-row').style.display = 'none';
+  socket.emit('ui_replay', { report: document.getElementById('ui-report').checked, name: document.getElementById('ui-test-name').value || uiLoadedName || '',
+                             portal: document.getElementById('ui-portal').value,
+                             slow_mo: parseInt(document.getElementById('ui-slowmo').value, 10) || 0,
+                             timeout_s: uiTimeout() });
+}
+function uiUpdateStep(id, value, field) { socket.emit('ui_step_update', { id, value, field }); }
+
+function uiTimeout() { return Math.max(1, parseFloat(document.getElementById('ui-timeout').value) || 15); }
+function uiGenerate() {
+  socket.emit('ui_generate', { name: document.getElementById('ui-test-name').value, timeout_s: uiTimeout(),
+                               structure: document.getElementById('ui-structure').value,
+                               shared_session: document.getElementById('ui-shared-session').checked });
+}
+function uiRun() {
+  if (!uiGeneratedFile) { toast('Generate the test first', 'err'); return; }
+  const box = document.getElementById('ui-run-log');
+  box.textContent = ''; box.classList.add('show');
+  uiShowOutput('run');
+  socket.emit('ui_run', { file: uiGeneratedFile, headless: document.getElementById('ui-headless').checked,
+                          slow_mo: parseInt(document.getElementById('ui-slowmo').value, 10) || 0 });
+}
+function uiRunStop() { socket.emit('ui_run_stop', { run_id: uiRunId }); }
+
+function uiRunButtons(running) {
+  document.getElementById('btn-ui-run').disabled = running || !uiGeneratedFile;
+  document.getElementById('btn-ui-run-stop').style.display = running ? '' : 'none';
+}
+
+socket.on('ui_locator_checked', (d) => {
+  if (d.ok && d.id != null) { uiCheckResults[d.id] = { count: d.count }; renderUiSteps(uiLastSteps); }
+  if (!d.ok) { toast('Selector error: ' + d.error, 'err'); return; }
+  toast(d.count === 1 ? 'Matches 1 element (outlined in the browser)' : d.count === 0 ? 'Matches 0 elements on the current page' : `Matches ${d.count} elements - too broad, the test will use the first`, d.count === 1 ? 'ok' : 'err');
+});
+socket.on('ui_replay_started', () => {
+  document.getElementById('btn-ui-replay').disabled = true;
+  const st = document.getElementById('ui-replay-status'); st.className = 'pw-run-status'; st.textContent = 'replaying…';
+});
+socket.on('ui_replay_step', (d) => {
+  uiReplayResults[d.id] = d; renderUiSteps(uiLastSteps);
+  if (!d.ok) { const row = document.querySelector(`#ui-steps .srow[data-id="${d.id}"]`); if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' }); }   // jump to the failure
+});
+function uiShowReport(rep) {
+  const row = document.getElementById('ui-report-row');
+  if (!rep) { row.style.display = 'none'; return; }
+  if (rep.error) { row.style.display = ''; row.innerHTML = `<span style="color:var(--red)">Report failed: ${escapeHtml(rep.error)}</span>`; return; }
+  row.style.display = '';
+  row.innerHTML = `📄 Report ready (${rep.passed ? 'PASS' : 'FAIL'}) — <a href="${BRIDGE_URL}${rep.url}" target="_blank" style="color:var(--accent)">Open</a>`
+    + ` <button class="btn btn-ghost btn-sm" id="ui-report-publish" onclick="uiPublishReport('${rep.folder}')" title="Uploads this report to Cloudflare R2 and gives a public link">☁ Publish</button> <span id="ui-report-link"></span>`;
+}
+async function uiPublishReport(folder) {
+  if (!confirm('Publish this report to a public link on Cloudflare R2?\n\nIt contains screenshots of the app and the step values (passwords are masked). Anyone with the link can view it.')) return;
+  const btn = document.getElementById('ui-report-publish'), out = document.getElementById('ui-report-link');
+  btn.disabled = true; btn.textContent = 'Publishing…';
+  try {
+    const r = await fetch(`${BRIDGE_URL}/api/ui-reports/${encodeURIComponent(folder)}/publish`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'publish failed');
+    out.innerHTML = `<a href="${escapeHtml(d.url)}" target="_blank" style="color:var(--accent)">${escapeHtml(d.url)}</a>`;
+    try { await navigator.clipboard.writeText(d.url); toast('Report published - link copied'); } catch (e) { toast('Report published'); }
+  } catch (e) { toast(e.message, 'err'); }
+  btn.disabled = false; btn.textContent = '☁ Publish';
+}
+
+socket.on('ui_replay_done', (d) => {
+  uiShowReport(d.report);
+  document.getElementById('btn-ui-replay').disabled = false;
+  const st = document.getElementById('ui-replay-status');
+  const failed = !d.ok || d.failed_at != null;
+  st.className = 'pw-run-status ' + (failed ? 'err' : 'ok');
+  st.textContent = d.error ? ('✗ ' + d.error) : failed ? '✗ a step failed - fix or delete it, then replay again' : '✓ all steps passed';
+  uiReplayOkSnapshot = (!failed && d.ok && uiLastReplayFull) ? uiCanon(uiLastSteps) : null;
+  uiUpdateStepper();
+});
+socket.on('ui_steps', (d) => {
+  uiSetRecording(d.recording);
+  renderUiSteps(d.steps || []);
+  const first = uiLoadedName === null && uiSnapshot === null;   // page just (re)loaded: adopt the server's state
+  const prevLoaded = uiLoadedName;
+  uiLoadedName = d.loaded_name || null;
+  if (prevLoaded !== uiLoadedName) uiRefreshSaved();            // keep the "currently editing" highlight in step
+  if (uiLoadedName && first) uiSnapshot = uiCanon(d.steps || []);
+  if (!uiLoadedName) uiSnapshot = null;
+  document.getElementById('btn-ui-rec-append').style.display = (!d.recording && (d.steps || []).length) ? '' : 'none';
+  uiUpdateEditingBadge();
+});
+uiRefreshSaved();
+socket.on('ui_generated', (d) => {
+  uiGeneratedFile = d.file;
+  const box = document.getElementById('ui-code-box');
+  box.textContent = d.code; box.classList.add('show');
+  document.querySelector('#ui-out-card .out-tab[data-tab="page"]').style.display = d.page_code ? '' : 'none';
+  const pbox = document.getElementById('ui-page-code-box'), plab = document.getElementById('ui-page-label'), tlab = document.getElementById('ui-test-label');
+  if (d.page_code) {
+    pbox.textContent = d.page_code; pbox.classList.add('show');
+    plab.style.display = ''; plab.textContent = '📄 Page file (locators): generated_scripts/' + d.page_file;
+    tlab.style.display = ''; tlab.textContent = '🧪 Test file (test class): generated_scripts/' + d.file;
+  } else { pbox.classList.remove('show'); plab.style.display = 'none'; tlab.style.display = 'none'; }
+  document.getElementById('ui-generated-file').textContent =
+    'Saved to generated_scripts/' + (d.page_file ? d.page_file + '  +  ' : '') + d.file + (d.secrets.length ? '  ·  secrets: ' + d.secrets.join(', ') : '');
+  uiRunButtons(false);
+  uiShowOutput('test');
+  uiUpdateStepper();
+  toast('UI test generated');
+});
+socket.on('ui_run_started', (d) => {
+  uiRunId = d.run_id; uiRunButtons(true);
+  document.getElementById('ui-out-card').style.display = '';
+  const st = document.getElementById('ui-run-status'); st.className = 'pw-run-status'; st.textContent = 'running…';
+});
+socket.on('ui_run_log', (d) => {
+  const box = document.getElementById('ui-run-log');
+  box.classList.add('show'); box.textContent += d.line; box.scrollTop = box.scrollHeight;
+});
+socket.on('ui_run_done', (d) => {
+  uiRunButtons(false);
+  const st = document.getElementById('ui-run-status');
+  st.className = 'pw-run-status ' + (d.returncode === 0 ? 'ok' : 'err');
+  st.textContent = d.returncode === 0 ? '✓ passed' : '✗ failed (exit ' + d.returncode + ')';
+});
+socket.on('ui_run_error', (d) => { uiRunButtons(false); toast(d.msg, 'err'); });
+socket.emit('ui_get_steps');
+
+function exploreLog(msg, kind = 'info') {
+  const box = document.getElementById('explore-log-box');
+  const prefix = { ok: '✓ ', err: '✗ ', warn: '⚠ ', thought: '… ' }[kind] || '';
+  box.textContent += prefix + msg + '\n';
+  box.scrollTop = box.scrollHeight;
+}
+
+function startExplore() {
+  const goal = document.getElementById('explore-goal').value.trim();
+  if (!goal) { toast('Describe a goal first', 'err'); return; }
+  if (!browserOpen) { toast('Launch the browser first (▶ Launch in the bar above)', 'err'); return; }
+  const providerFields = getProviderFields();
+  if (!providerFields) return;
+  const portal = document.getElementById('explore-portal').value;
+  const maxSteps = parseInt(document.getElementById('explore-max-steps').value, 10) || 10;
+  const maxCases = parseInt(document.getElementById('explore-max-cases').value, 10) || 6;
+
+  document.getElementById('explore-log-box').textContent = '';
+  document.getElementById('explore-report').style.display = 'none';
+  document.getElementById('explore-publish-row').style.display = 'none';
+  document.getElementById('explore-publish-status').textContent = '';
+  document.getElementById('btn-explore-start').style.display = 'none';
+  document.getElementById('btn-explore-stop').style.display = 'inline-flex';
+  document.getElementById('explore-status-badge').textContent = 'planning...';
+
+  socket.emit('explore_start', { ...providerFields, goal, portal, max_steps: maxSteps, max_cases: maxCases,
+                                 record_steps: document.getElementById('explore-record-steps').checked,
+                                 screenshots: document.getElementById('explore-screenshots').checked,
+                                 broaden: document.getElementById('explore-broaden').checked });
+}
+
+function stopExplore() {
+  if (!currentExploreRunId) return;
+  socket.emit('explore_stop', { run_id: currentExploreRunId });
+}
+
+socket.on('explore_started', (d) => {
+  currentExploreRunId = d.run_id;
+  exploreLog(`Exploration started (${d.run_id})`);
+});
+
+socket.on('explore_log', (d) => exploreLog(d.msg, d.kind));
+
+socket.on('explore_done', (d) => {
+  currentExploreRunId = null;
+  lastExploreRunId = d.run_id;
+  document.getElementById('btn-explore-start').style.display = 'inline-flex';
+  document.getElementById('btn-explore-stop').style.display = 'none';
+  document.getElementById('explore-status-badge').textContent = d.summary || d.outcome;
+  document.getElementById('explore-report').style.display = 'block';
+  document.getElementById('explore-report-text').textContent = d.feedback || '';
+  document.getElementById('explore-publish-row').style.display = 'flex';
+  document.getElementById('explore-publish-status').textContent = '';
+
+  if (d.recorded_steps != null) { uiReplayResults = {}; showPanel('ui'); toast(`Recorded ${d.recorded_steps} steps - replay them to verify before generating`); return; }
+  if (d.outcome === 'error') {
+    toast('Exploration error — see log', 'err');
+  } else {
+    toast(`Exploration finished — ${d.summary}`, d.outcome === 'done' ? 'ok' : 'err');
+  }
+});
+
+async function publishExploreReport() {
+  if (!lastExploreRunId) { toast('Run an exploration first', 'err'); return; }
+  const btn = document.getElementById('btn-publish-explore');
+  const statusEl = document.getElementById('explore-publish-status');
+  btn.disabled = true; btn.textContent = 'Publishing…';
+  statusEl.textContent = '';
+  try {
+    const r = await fetch(`${BRIDGE_URL}/api/explore/publish/${encodeURIComponent(lastExploreRunId)}`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'publish failed');
+    statusEl.innerHTML = `<a href="${d.url}" target="_blank" rel="noopener" style="color:var(--accent2)">${escapeHtml(d.url)}</a>`;
+    toast('Report published', 'ok');
+  } catch (e) {
+    statusEl.textContent = e.message;
+    toast(e.message, 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '☁ Publish report to Cloudflare';
+  }
+}
+
 // ── Chain detection + generation ──────────────────────────────────────────────
 
 async function analyzeApiChain() {
@@ -1448,11 +2249,36 @@ function parseScripts(text) {
 
 function setProvider(p) {
   aiProvider = p;
+  try { localStorage.setItem('apitestgen.provider', p); } catch (e) {}
   document.getElementById('provider-anthropic').classList.toggle('selected', p === 'anthropic');
+  document.getElementById('provider-openrouter').classList.toggle('selected', p === 'openrouter');
+  document.getElementById('field-openrouter').style.display = p === 'openrouter' ? 'flex' : 'none';
+  if (p === 'openrouter' && !document.getElementById('openrouter-model').dataset.loaded) refreshOpenRouterModels();
   document.getElementById('provider-ollama').classList.toggle('selected', p === 'ollama');
   document.getElementById('field-api-key').style.display = p === 'anthropic' ? 'flex' : 'none';
   document.getElementById('field-ollama-model').style.display = p === 'ollama' ? 'flex' : 'none';
   if (p === 'ollama' && !document.getElementById('ollama-model').dataset.loaded) refreshOllamaModels();
+  updateProviderSummary();
+}
+
+let orHasEnvKey = false;
+async function refreshOpenRouterModels() {
+  const select = document.getElementById('openrouter-model'), note = document.getElementById('or-model-note');
+  select.innerHTML = '<option value="">Loading...</option>';
+  try {
+    const d = await (await fetch(BRIDGE_URL + '/api/openrouter/models')).json();
+    orHasEnvKey = !!d.has_env_key;
+    document.getElementById('or-key-note').textContent = orHasEnvKey ? '— using the key from the server\'s .env if left blank' : '';
+    select.innerHTML = (d.models || []).map(m => {
+      const price = m.free ? 'free' : `$${m.in_per_m}/$${m.out_per_m} per M tokens`;
+      return `<option value="${escapeHtml(m.id)}"${m.id === d.default ? ' selected' : ''}>${escapeHtml(m.id)} — ${escapeHtml(price)}</option>`;
+    }).join('') || `<option value="${escapeHtml(d.default)}">${escapeHtml(d.default)}</option>`;
+    note.textContent = d.warning || 'Prices are in/out per million tokens. MiniMax models think before answering, so calls use more tokens than the visible answer.';
+    select.dataset.loaded = '1';
+  } catch (e) {
+    select.innerHTML = '<option value="minimax/minimax-m3">minimax/minimax-m3</option>';
+    note.textContent = 'Could not load the model list - using the default.';
+  }
 }
 
 async function refreshOllamaModels() {
@@ -1471,16 +2297,77 @@ async function refreshOllamaModels() {
   }
 }
 
+function openProviderDialog() { document.getElementById('provider-modal').classList.add('show'); }
+function closeProviderDialog() { document.getElementById('provider-modal').classList.remove('show'); updateProviderSummary(); }
+function updateProviderSummary() {
+  const val = (id) => (document.getElementById(id) || {}).value || '';
+  let txt, needKey = false;
+  if (aiProvider === 'openrouter') {
+    const m = val('openrouter-model');
+    txt = 'MiniMax' + (m ? ` · ${m.replace('minimax/', '')}` : '');
+    needKey = !val('or-api-key').trim() && !orHasEnvKey;
+  } else if (aiProvider === 'ollama') {
+    const m = val('ollama-model');
+    txt = 'Ollama' + (m ? ` · ${m}` : '');
+  } else { txt = 'Claude'; needKey = !val('api-key').trim(); }
+  document.querySelectorAll('.provider-summary-text').forEach(e => {
+    e.innerHTML = escapeHtml(txt) + (needKey ? ' <span class="warn">· key needed</span>' : '');
+  });
+}
+['refreshOpenRouterModels', 'refreshOllamaModels'].forEach(fn => {
+  const orig = window[fn];
+  window[fn] = async function (...a) { const r = await orig.apply(this, a); updateProviderSummary(); return r; };
+});
+
 function getProviderFields() {
+  if (aiProvider === 'openrouter') {
+    const key = document.getElementById('or-api-key').value.trim();
+    if (!key && !orHasEnvKey) { toast('Enter your OpenRouter API key (or set OPENROUTER_API_KEY in the server\'s .env)', 'err'); openProviderDialog(); return null; }
+    return { provider: 'openrouter', api_key: key, model: document.getElementById('openrouter-model').value || '' };
+  }
   if (aiProvider === 'ollama') {
     const model = document.getElementById('ollama-model').value;
-    if (!model) { toast('Pick an Ollama model first', 'err'); return null; }
+    if (!model) { toast('Pick an Ollama model first', 'err'); openProviderDialog(); return null; }
     return { provider: 'ollama', api_key: '', model };
   }
   const apiKey = document.getElementById('api-key').value.trim();
-  if (!apiKey) { toast('Enter an API key first', 'err'); return null; }
+  if (!apiKey) { toast('Enter an API key first', 'err'); openProviderDialog(); return null; }
   return { provider: 'anthropic', api_key: apiKey, model: '' };
 }
+
+// ── remember the small choices between sessions (never keys) ──
+const UX_VALUES = ['target-url', 'target-url-b', 'ui-portal', 'ui-timeout', 'ui-structure', 'ui-slowmo', 'explore-portal', 'explore-max-cases', 'explore-max-steps'];
+const UX_CHECKS = ['ui-shared-session', 'ui-headless', 'ui-report', 'explore-record-steps', 'explore-screenshots', 'explore-broaden'];
+function uxSave() {
+  try {
+    const o = {};
+    UX_VALUES.forEach(id => { o[id] = document.getElementById(id).value; });
+    UX_CHECKS.forEach(id => { o[id] = document.getElementById(id).checked; });
+    localStorage.setItem('apitestgen.ux', JSON.stringify(o));
+  } catch (e) {}
+}
+(function uxRestore() {
+  try {
+    const o = JSON.parse(localStorage.getItem('apitestgen.ux') || '{}');
+    UX_VALUES.forEach(id => {
+      const el = document.getElementById(id);
+      if (o[id] == null || o[id] === '') return;
+      if (el.tagName === 'SELECT' && !Array.from(el.options).some(op => op.value === o[id])) return;   // not an option any more
+      el.value = o[id];
+    });
+    UX_CHECKS.forEach(id => { if (o[id] != null) document.getElementById(id).checked = !!o[id]; });
+    document.getElementById('explore-max-cases').disabled = !document.getElementById('explore-broaden').checked;
+    const prov = localStorage.getItem('apitestgen.provider');
+    if (prov && ['anthropic', 'openrouter', 'ollama'].includes(prov)) setProvider(prov);
+    const panel = localStorage.getItem('apitestgen.panel');
+    if (panel && ['ui', 'capture', 'preview'].includes(panel) && panel !== 'ui') showPanel(panel);
+  } catch (e) {}
+  ['change', 'input'].forEach(ev => document.addEventListener(ev, (e) => {
+    if (e.target && (UX_VALUES.includes(e.target.id) || UX_CHECKS.includes(e.target.id))) uxSave();
+  }));
+  updateProviderSummary();
+  uiUpdateStepper();
+})();
 
 // ── Preview / download ────────────────────────────────────────────────────────
 
@@ -1811,355 +2698,13 @@ function toggleSidebar() {
   }
 })();
 
-// ── UI recorder ──────────────────────────────────────────────────────────────
-let uiReplayResults = {}, uiLastSteps = [];
-let uiRecording = false, uiGeneratedFile = null, uiRunId = null;
-
-function uiDescribeLocator(l) {
-  if (!l) return '';
-  if (l.anchor) return '⚓ label "' + l.anchor + '" → control next to it';
-  if (l.kind === 'pw') return l.py;
-  const nth = l.nth != null ? ` #${l.nth + 1}` : '';
-  if (l.kind === 'role') return `${l.role} "${l.name}"${nth}`;
-  if (l.kind === 'css') return `css ${l.value}${nth}`;
-  return `${l.kind} "${l.value}"${nth}`;
-}
-
-let uiInsertOpen = null, uiDraft = { ms: 1000, name: '', url: '', portal: 'A' };
-let uiCheckResults = {};   // step id -> {count} from the quick Check (live browser, current page)
-function uiRunTo(id) {
-  if (!browserOpen) { toast('Launch the browser first (Capture step)', 'err'); return; }
-  uiReplayResults = {}; uiCheckResults = {};
-  renderUiSteps(uiLastSteps);
-  socket.emit('ui_replay', { upto_id: id, portal: document.getElementById('ui-portal').value,
-                             slow_mo: parseInt(document.getElementById('ui-slowmo').value, 10) || 0, timeout_s: uiTimeout() });
-}
-function uiQuickCheck(id) {
-  const st = uiLastSteps.find(x => x.id === id);
-  if (!st || !st.locator) return;
-  socket.emit('ui_locator_check', { id, locator: st.locator, portal: st.portal || 'A' });
-}
-let uiEditLoc = null, uiLocDraft = '';   // step id whose selector is being edited, and its draft text
-function uiLocSelector(l) { return !l ? '' : l.kind === 'pw' ? l.selector : l.kind === 'css' ? l.value : ''; }
-function uiToggleEditLoc(id) {
-  uiEditLoc = uiEditLoc === id ? null : id;
-  const st = uiLastSteps.find(x => x.id === id);
-  uiLocDraft = st ? uiLocSelector(st.locator) : '';
-  renderUiSteps(uiLastSteps);
-}
-function uiCheckLoc(id) {
-  if (!uiLocDraft.trim()) { toast('Type a selector first', 'err'); return; }
-  socket.emit('ui_locator_check', { id, selector: uiLocDraft, portal: (uiLastSteps.find(x => x.id === id) || {}).portal || 'A' });
-}
-function uiUseAlt(id, index) {
-  delete uiCheckResults[id];
-  socket.emit('ui_step_use_alt', { id, index });
-  uiEditLoc = null;
-}
-function uiSaveLoc(id) {
-  delete uiCheckResults[id];
-  socket.emit('ui_step_set_locator', { id, selector: uiLocDraft });
-  uiEditLoc = null;
-}
-const UI_INPUT_STYLE = 'background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:3px 8px;color:var(--text);font-family:var(--mono);font-size:12px';
-
-function uiToggleInsert(id) { uiInsertOpen = uiInsertOpen === id ? null : id; renderUiSteps(uiLastSteps); }
-function uiInsertWait(afterId) {
-  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'wait', value: String(uiDraft.ms) } });
-  uiInsertOpen = null;
-}
-function uiInsertGoto(afterId) {
-  const url = (uiDraft.url || '').trim();
-  if (!url) { toast('Enter a URL to go to', 'err'); return; }
-  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'goto', value: url, portal: uiDraft.portal || 'A' } });
-  uiDraft.url = ''; uiInsertOpen = null;
-}
-function uiInsertCase(afterId) {
-  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'case', value: uiDraft.name } });
-  uiDraft.name = ''; uiInsertOpen = null;
-}
-
-function renderUiSteps(steps) {
-  uiLastSteps = steps;
-  const box = document.getElementById('ui-steps');
-  const actions = steps.filter(s => s.type !== 'case');
-  const cases = steps.filter(s => s.type === 'case').length;
-  document.getElementById('ui-step-count').textContent = actions.length + (cases ? ` · ${cases} test case${cases > 1 ? 's' : ''}` : '');
-  if (!steps.length) { box.innerHTML = '<span style="color:var(--muted)">Nothing recorded yet.</span>'; return; }
-  const verb = { goto: 'Go to', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
-                 press: 'Press', press_page: 'Press', assert_text: 'Assert text', assert_value: 'Assert value',
-                 assert_visible: 'Assert visible', assert_attr: 'Assert attr', hover: 'Hover', scroll_into_view: 'Scroll to',
-                 wait_for: 'Wait for', wait: 'Wait (ms)', scroll_page: 'Scroll page', note: 'Note' };
-  const editable = ['goto', 'fill', 'select', 'press', 'press_page', 'assert_text', 'assert_value', 'assert_attr', 'wait_for', 'wait', 'scroll_page'];
-  const multiPortal = steps.some(x => x.portal === 'B');   // only label steps when more than one portal is involved
-  let n = 0, caseNo = 0;
-  box.innerHTML = steps.map((s) => {
-    if (s.type === 'case') {
-      caseNo += 1;
-      return `<div class="flex-row" style="gap:8px;margin-top:${caseNo > 1 ? 12 : 0}px;padding:6px 10px;background:rgba(124,106,255,0.12);border:1px solid #4c3f8a;border-radius:8px">`
-        + `<b style="white-space:nowrap">📋 Test case ${caseNo}</b>`
-        + `<input type="text" value="${escapeHtml(s.value)}" onchange="uiUpdateStep(${s.id}, this.value)" style="flex:1;${UI_INPUT_STYLE}">`
-        + `<button class="btn btn-ghost btn-sm" title="Remove this split (its steps join the case above)" onclick="socket.emit('ui_step_delete',{id:${s.id}})">✕</button></div>`;
-    }
-    n += 1;
-    const ptag = multiPortal ? `<span class="badge" style="margin-right:6px;${s.portal === 'B' ? 'color:#38bdf8' : ''}">${s.portal || 'A'}</span>` : '';
-    const target = s.type === 'goto' ? '' : !s.locator ? '' : escapeHtml(uiDescribeLocator(s.locator) + (s.attr ? ` [${s.attr}]` : ''));
-    let val = '';
-    if (s.type === 'fill' && s.secret) val = '<span class="badge">secret → env var</span>';
-    else if (editable.includes(s.type)) val = `<input type="text" value="${escapeHtml(s.value)}" onchange="uiUpdateStep(${s.id}, this.value)" style="flex:1;min-width:80px;${UI_INPUT_STYLE}">`;
-    else if (s.type === 'note') val = `<span style="color:var(--muted)">${escapeHtml(s.value)}</span>`;
-    const r = uiReplayResults[s.id];
-    const mark = !r ? '' : r.ok ? '<span style="color:var(--green)">✓</span>' : '<span style="color:var(--red)">✗</span>';
-    const errLine = r && !r.ok ? `<div style="color:var(--red);font-size:11px;padding-left:30px;white-space:pre-wrap">${escapeHtml(r.error)}${r.screenshot ? `<br><img src="data:image/jpeg;base64,${r.screenshot}" style="max-width:360px;border:1px solid var(--border);border-radius:6px;margin-top:4px">` : ''}</div>` : '';
-    const c = uiCheckResults[s.id];
-    const chk = c ? (c.count === 1 ? ' <span class="badge" style="color:var(--green)">✓ 1 match</span>'
-                  : c.count === 0 ? ' <span class="badge" style="color:var(--red)">✗ 0 matches</span>'
-                  : ` <span class="badge" style="color:var(--yellow,#f59e0b)">⚠ ${c.count} matches</span>`) : '';
-    const open = uiInsertOpen === s.id;
-    const editing = uiEditLoc === s.id;
-    const hint = r && !r.ok && /matched 0/.test(r.error || '') ? '<div style="color:var(--yellow,#f59e0b);font-size:11px;padding-left:30px;margin-top:2px">The locator finds nothing on the page at this point. Click ✎ to type a better selector (try a data-testid, an id, or a CSS path), and use Check to see what it matches.</div>' : '';
-    const locRow = editing && s.locator ? `<div class="flex-row" style="gap:8px;margin:6px 0 4px 30px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:8px;flex-wrap:wrap">`
-        + `<span>✎ Selector</span><input type="text" placeholder="e.g. [data-testid=&quot;save&quot;]   or   .card >> text=lbs   or   xpath=//button[2]" value="${escapeHtml(uiLocDraft)}" oninput="uiLocDraft=this.value" style="flex:1;min-width:240px;${UI_INPUT_STYLE}">`
-        + `<button class="btn btn-ghost btn-sm" onclick="uiCheckLoc(${s.id})" title="Counts what it matches in the live recording browser and outlines it">Check</button>`
-        + `<button class="btn btn-primary btn-sm" onclick="uiSaveLoc(${s.id})">Use this</button>`
-        + ((s.locator.alts || []).length ? `<div style="flex-basis:100%;display:flex;flex-direction:column;gap:4px;margin-top:4px"><span style="color:var(--muted);font-size:11px">Other locators recorded for this element (⚓ ones don't depend on its current text/value):</span>`
-            + s.locator.alts.map((a, i) => `<button class="btn btn-ghost btn-sm" style="text-align:left;justify-content:flex-start;white-space:normal" onclick="uiUseAlt(${s.id}, ${i})" title="${escapeHtml(a.value || a.selector || '')}">Use: ${escapeHtml(uiDescribeLocator(a))}</button>`).join('') + `</div>` : '')
-        + `</div>` : '';
-    const insertRow = open ? `<div class="flex-row" style="gap:8px;margin:6px 0 4px 30px;padding:8px 10px;background:rgba(255,255,255,0.04);border:1px dashed var(--border);border-radius:8px;flex-wrap:wrap">`
-        + `<span>⏱ Wait</span><input type="number" min="0" step="250" value="${uiDraft.ms}" oninput="uiDraft.ms=this.value" style="width:80px;${UI_INPUT_STYLE}"><span>ms</span>`
-        + `<button class="btn btn-ghost btn-sm" onclick="uiInsertWait(${s.id})">Add wait here</button>`
-        + `<span style="color:var(--muted);margin:0 6px">|</span>`
-        + `<span>🌐 Go to</span><input type="text" placeholder="https://… (opens/navigates that portal)" value="${escapeHtml(uiDraft.url)}" oninput="uiDraft.url=this.value" style="width:230px;${UI_INPUT_STYLE}">`
-        + `<select onchange="uiDraft.portal=this.value" style="${UI_INPUT_STYLE}"><option value="A"${uiDraft.portal !== 'B' ? ' selected' : ''}>Portal A</option><option value="B"${uiDraft.portal === 'B' ? ' selected' : ''}>Portal B</option></select>`
-        + `<button class="btn btn-ghost btn-sm" onclick="uiInsertGoto(${s.id})" title="Inserts a Go-to step after this one">Add</button>`
-        + `<span style="color:var(--muted);margin:0 6px">|</span>`
-        + `<span>📋 New test case</span><input type="text" placeholder="name (optional)" value="${escapeHtml(uiDraft.name)}" oninput="uiDraft.name=this.value" style="width:180px;${UI_INPUT_STYLE}">`
-        + `<button class="btn btn-ghost btn-sm" onclick="uiInsertCase(${s.id})" title="Steps after this one start a new test case">Split after this step</button></div>` : '';
-    return `<div><div class="flex-row" style="gap:8px"><span style="width:14px">${mark}</span><span style="color:var(--muted);width:22px">${n}.</span>`
-         + `<b style="width:88px">${ptag}${verb[s.type] || s.type}</b><span style="flex:1;word-break:break-all">${s.type === 'note' ? '' : target}${chk}</span>${val}`
-         + (s.locator ? `<button class="btn btn-ghost btn-sm" title="Check: how many elements does this locator match in the live browser right now? (non-mutating; only meaningful if the browser is on this step's screen)" onclick="uiQuickCheck(${s.id})">🔍</button>` : '')
-         + `<button class="btn btn-ghost btn-sm" title="Run to here: replay steps 1–${n} in a fresh window and outline this step's element" onclick="uiRunTo(${s.id})">▶</button>`
-         + (s.locator ? `<button class="btn btn-ghost btn-sm" title="Edit this step's selector" onclick="uiToggleEditLoc(${s.id})">✎</button>` : '')
-         + `<button class="btn btn-ghost btn-sm" title="Insert a wait, or split into a new test case, after this step" onclick="uiToggleInsert(${s.id})">${open ? '−' : '＋'}</button>`
-         + `<button class="btn btn-ghost btn-sm" title="Remove step" onclick="socket.emit('ui_step_delete',{id:${s.id}})">✕</button></div>${locRow}${insertRow}${errLine}${hint}</div>`;
-  }).join('');
-}
-
-// ── saved recordings ──
-let uiLoadedName = null, uiSnapshot = null;
-// Canonical JSON (sorted keys) so the same steps compare equal however the server ordered the fields.
-function uiCanon(v) {
-  return JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x))
-    ? Object.keys(x).sort().reduce((o, key) => (o[key] = x[key], o), {}) : x);
-}
-function uiDirty() { return uiLoadedName != null && uiSnapshot !== uiCanon(uiLastSteps); }
-function uiUpdateEditingBadge() {
-  const b = document.getElementById('ui-editing-badge');
-  if (!b) return;
-  b.style.display = uiLoadedName ? '' : 'none';
-  b.textContent = uiLoadedName ? `editing: ${uiLoadedName}${uiDirty() ? '  ● unsaved changes' : ''}` : '';
-  b.style.color = uiDirty() ? 'var(--yellow,#f59e0b)' : '';
-}
-
-async function uiRefreshSaved() {
-  const box = document.getElementById('ui-saved-list');
-  try {
-    const r = await (await fetch(BRIDGE_URL + '/api/ui-recordings')).json();
-    const list = r.recordings || [];
-    if (!list.length) { box.innerHTML = '<span style="color:var(--muted)">No saved recordings yet.</span>'; return; }
-    box.innerHTML = list.map(x => {
-      const when = x.saved_at ? new Date(x.saved_at).toLocaleString() : '';
-      const cur = uiLoadedName === x.name;
-      return `<div class="flex-row" style="gap:8px"><b style="flex:1;word-break:break-all">${cur ? '▶ ' : ''}${escapeHtml(x.name)}</b>`
-        + `<span style="color:var(--muted)">${x.steps} steps${x.cases ? ` · ${x.cases} cases` : ''} · ${escapeHtml(when)}</span>`
-        + `<button class="btn btn-ghost btn-sm" onclick="uiLoadRecording('${escapeHtml(x.file)}')" title="Load into the editor to edit it">✎ Load / edit</button>`
-        + `<button class="btn btn-ghost btn-sm" onclick="uiDeleteRecording('${escapeHtml(x.file)}', '${escapeHtml(x.name).replace(/'/g, "\\'")}')" title="Delete this saved recording">🗑</button></div>`;
-    }).join('');
-  } catch (e) { box.innerHTML = '<span style="color:var(--red)">Could not reach the bridge.</span>'; }
-}
-
-async function uiSaveRecording() {
-  const name = (document.getElementById('ui-save-name').value || '').trim();
-  if (!name) { toast('Give the recording a name', 'err'); return; }
-  if (!uiLastSteps.length) { toast('Nothing to save yet', 'err'); return; }
-  const exists = Array.from(document.querySelectorAll('#ui-saved-list b')).some(b => b.textContent.replace('▶ ', '') === name);
-  if (exists && uiLoadedName !== name && !confirm(`A recording named "${name}" already exists. Overwrite it?`)) return;
-  const settings = { timeout_s: uiTimeout(), shared_session: document.getElementById('ui-shared-session').checked,
-                     test_name: document.getElementById('ui-test-name').value };
-  const res = await fetch(BRIDGE_URL + '/api/ui-recordings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                                               body: JSON.stringify({ name, settings }) });
-  const d = await res.json();
-  if (!res.ok) { toast(d.error || 'Save failed', 'err'); return; }
-  uiLoadedName = d.name; uiSnapshot = uiCanon(uiLastSteps);
-  uiUpdateEditingBadge(); uiRefreshSaved();
-  toast(`Saved "${d.name}" (${d.steps} steps)`);
-}
-
-async function uiLoadRecording(file) {
-  if (uiRecording) { toast('Stop recording first', 'err'); return; }
-  if (uiDirty() && !confirm('You have unsaved changes to the recording being edited. Load another and discard them?')) return;
-  if (!uiDirty() && uiLoadedName == null && uiLastSteps.length && !confirm(`Replace the ${uiLastSteps.length} unsaved steps in the list with this saved recording?`)) return;
-  const res = await fetch(BRIDGE_URL + '/api/ui-recordings/' + encodeURIComponent(file));
-  const d = await res.json();
-  if (!res.ok) { toast(d.error || 'Load failed', 'err'); return; }
-  uiReplayResults = {}; uiCheckResults = {};
-  uiLoadedName = d.name; uiSnapshot = uiCanon(d.steps || []);
-  document.getElementById('ui-save-name').value = d.name;
-  const st = d.settings || {};
-  if (st.test_name) document.getElementById('ui-test-name').value = st.test_name; else document.getElementById('ui-test-name').value = d.name;
-  if (st.timeout_s) document.getElementById('ui-timeout').value = st.timeout_s;
-  if (st.shared_session != null) document.getElementById('ui-shared-session').checked = !!st.shared_session;
-  uiUpdateEditingBadge(); uiRefreshSaved();
-  toast(`Loaded "${d.name}" - edit the steps, then Save`);
-}
-
-async function uiDeleteRecording(file, name) {
-  if (!confirm(`Delete the saved recording "${name}"? This can't be undone.\n\n(Steps currently in the editor are not affected.)`)) return;
-  const res = await fetch(BRIDGE_URL + '/api/ui-recordings/' + encodeURIComponent(file), { method: 'DELETE' });
-  const d = await res.json();
-  if (!res.ok) { toast(d.error || 'Delete failed', 'err'); return; }
-  if (uiLoadedName === name) { uiLoadedName = null; uiSnapshot = null; }
-  uiUpdateEditingBadge(); uiRefreshSaved();
-  toast(`Deleted "${name}"`);
-}
-
-function uiSetRecording(on) {
-  uiRecording = on;
-  const badge = document.getElementById('ui-rec-badge');
-  badge.textContent = on ? '● recording' : 'idle';
-  badge.style.color = on ? 'var(--red)' : '';
-  document.getElementById('btn-ui-rec').textContent = on ? '■ Stop recording' : '⏺ Start recording';
-}
-
-function uiToggleRecord(append) {
-  if (uiRecording) { socket.emit('ui_record_stop'); return; }
-  if (!browserOpen) { toast('Launch the browser first (Capture step)', 'err'); return; }
-  const hasSteps = uiLastSteps.length > 0;
-  if (hasSteps && !append && !confirm(`Start a new recording? This replaces the ${uiLastSteps.length} steps currently in the list.\n\n(Use "Record more (append)" to keep them, or Save them first.)`)) return;
-  socket.emit('ui_record_start', { portals: document.getElementById('ui-portal').value.split(','), keep_steps: !!append && hasSteps });
-}
-function uiClearSteps() { uiReplayResults = {}; uiCheckResults = {}; socket.emit('ui_steps_clear'); }
-function uiReplay() {
-  if (!browserOpen) { toast('Launch the browser first (Capture step)', 'err'); return; }
-  uiReplayResults = {}; uiCheckResults = {};
-  renderUiSteps(uiLastSteps);
-  document.getElementById('ui-report-row').style.display = 'none';
-  socket.emit('ui_replay', { report: document.getElementById('ui-report').checked, name: document.getElementById('ui-test-name').value || uiLoadedName || '',
-                             portal: document.getElementById('ui-portal').value,
-                             slow_mo: parseInt(document.getElementById('ui-slowmo').value, 10) || 0,
-                             timeout_s: uiTimeout() });
-}
-function uiUpdateStep(id, value) { socket.emit('ui_step_update', { id, value }); }
-
-function uiTimeout() { return Math.max(1, parseFloat(document.getElementById('ui-timeout').value) || 15); }
-function uiGenerate() {
-  socket.emit('ui_generate', { name: document.getElementById('ui-test-name').value, timeout_s: uiTimeout(),
-                               structure: document.getElementById('ui-structure').value,
-                               shared_session: document.getElementById('ui-shared-session').checked });
-}
-function uiRun() {
-  if (!uiGeneratedFile) { toast('Generate the test first', 'err'); return; }
-  const box = document.getElementById('ui-run-log');
-  box.textContent = ''; box.classList.add('show');
-  socket.emit('ui_run', { file: uiGeneratedFile, headless: document.getElementById('ui-headless').checked,
-                          slow_mo: parseInt(document.getElementById('ui-slowmo').value, 10) || 0 });
-}
-function uiRunStop() { socket.emit('ui_run_stop', { run_id: uiRunId }); }
-
-function uiRunButtons(running) {
-  document.getElementById('btn-ui-run').disabled = running || !uiGeneratedFile;
-  document.getElementById('btn-ui-run-stop').style.display = running ? '' : 'none';
-}
-
-socket.on('ui_locator_checked', (d) => {
-  if (d.ok && d.id != null) { uiCheckResults[d.id] = { count: d.count }; renderUiSteps(uiLastSteps); }
-  if (!d.ok) { toast('Selector error: ' + d.error, 'err'); return; }
-  toast(d.count === 1 ? 'Matches 1 element (outlined in the browser)' : d.count === 0 ? 'Matches 0 elements on the current page' : `Matches ${d.count} elements - too broad, the test will use the first`, d.count === 1 ? 'ok' : 'err');
-});
-socket.on('ui_replay_started', () => {
-  document.getElementById('btn-ui-replay').disabled = true;
-  const st = document.getElementById('ui-replay-status'); st.className = 'pw-run-status'; st.textContent = 'replaying…';
-});
-socket.on('ui_replay_step', (d) => { uiReplayResults[d.id] = d; renderUiSteps(uiLastSteps); });
-function uiShowReport(rep) {
-  const row = document.getElementById('ui-report-row');
-  if (!rep) { row.style.display = 'none'; return; }
-  if (rep.error) { row.style.display = ''; row.innerHTML = `<span style="color:var(--red)">Report failed: ${escapeHtml(rep.error)}</span>`; return; }
-  row.style.display = '';
-  row.innerHTML = `📄 Report ready (${rep.passed ? 'PASS' : 'FAIL'}) — <a href="${BRIDGE_URL}${rep.url}" target="_blank" style="color:var(--accent)">Open</a>`
-    + ` <button class="btn btn-ghost btn-sm" id="ui-report-publish" onclick="uiPublishReport('${rep.folder}')" title="Uploads this report to Cloudflare R2 and gives a public link">☁ Publish</button> <span id="ui-report-link"></span>`;
-}
-async function uiPublishReport(folder) {
-  if (!confirm('Publish this report to a public link on Cloudflare R2?\n\nIt contains screenshots of the app and the step values (passwords are masked). Anyone with the link can view it.')) return;
-  const btn = document.getElementById('ui-report-publish'), out = document.getElementById('ui-report-link');
-  btn.disabled = true; btn.textContent = 'Publishing…';
-  try {
-    const r = await fetch(`${BRIDGE_URL}/api/ui-reports/${encodeURIComponent(folder)}/publish`, { method: 'POST' });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'publish failed');
-    out.innerHTML = `<a href="${escapeHtml(d.url)}" target="_blank" style="color:var(--accent)">${escapeHtml(d.url)}</a>`;
-    try { await navigator.clipboard.writeText(d.url); toast('Report published - link copied'); } catch (e) { toast('Report published'); }
-  } catch (e) { toast(e.message, 'err'); }
-  btn.disabled = false; btn.textContent = '☁ Publish';
-}
-
-socket.on('ui_replay_done', (d) => {
-  uiShowReport(d.report);
-  document.getElementById('btn-ui-replay').disabled = false;
-  const st = document.getElementById('ui-replay-status');
-  const failed = !d.ok || d.failed_at != null;
-  st.className = 'pw-run-status ' + (failed ? 'err' : 'ok');
-  st.textContent = d.error ? ('✗ ' + d.error) : failed ? '✗ a step failed - fix or delete it, then replay again' : '✓ all steps passed';
-});
-socket.on('ui_steps', (d) => {
-  uiSetRecording(d.recording);
-  renderUiSteps(d.steps || []);
-  const first = uiLoadedName === null && uiSnapshot === null;   // page just (re)loaded: adopt the server's state
-  uiLoadedName = d.loaded_name || null;
-  if (uiLoadedName && first) uiSnapshot = uiCanon(d.steps || []);
-  if (!uiLoadedName) uiSnapshot = null;
-  document.getElementById('btn-ui-rec-append').style.display = (!d.recording && (d.steps || []).length) ? '' : 'none';
-  uiUpdateEditingBadge();
-});
-uiRefreshSaved();
-socket.on('ui_generated', (d) => {
-  uiGeneratedFile = d.file;
-  const box = document.getElementById('ui-code-box');
-  box.textContent = d.code; box.classList.add('show');
-  const pbox = document.getElementById('ui-page-code-box'), plab = document.getElementById('ui-page-label'), tlab = document.getElementById('ui-test-label');
-  if (d.page_code) {
-    pbox.textContent = d.page_code; pbox.classList.add('show');
-    plab.style.display = ''; plab.textContent = '📄 Page file (locators): generated_scripts/' + d.page_file;
-    tlab.style.display = ''; tlab.textContent = '🧪 Test file (test class): generated_scripts/' + d.file;
-  } else { pbox.classList.remove('show'); plab.style.display = 'none'; tlab.style.display = 'none'; }
-  document.getElementById('ui-generated-file').textContent =
-    'Saved to generated_scripts/' + (d.page_file ? d.page_file + '  +  ' : '') + d.file + (d.secrets.length ? '  ·  secrets: ' + d.secrets.join(', ') : '');
-  uiRunButtons(false);
-  toast('UI test generated');
-});
-socket.on('ui_run_started', (d) => {
-  uiRunId = d.run_id; uiRunButtons(true);
-  const st = document.getElementById('ui-run-status'); st.className = 'pw-run-status'; st.textContent = 'running…';
-});
-socket.on('ui_run_log', (d) => {
-  const box = document.getElementById('ui-run-log');
-  box.classList.add('show'); box.textContent += d.line; box.scrollTop = box.scrollHeight;
-});
-socket.on('ui_run_done', (d) => {
-  uiRunButtons(false);
-  const st = document.getElementById('ui-run-status');
-  st.className = 'pw-run-status ' + (d.returncode === 0 ? 'ok' : 'err');
-  st.textContent = d.returncode === 0 ? '✓ passed' : '✗ failed (exit ' + d.returncode + ')';
-});
-socket.on('ui_run_error', (d) => { uiRunButtons(false); toast(d.msg, 'err'); });
-socket.emit('ui_get_steps');
-
 function showPanel(n) {
   if (n === 'config') { openConfig(); return; }
   ['capture','preview','ui'].forEach(p => document.getElementById('panel-'+p).classList.toggle('active', p===n));
   document.getElementById('step-1').classList.toggle('active', n==='capture');
   document.getElementById('step-2').classList.toggle('active', n==='preview');
   document.getElementById('step-3').classList.toggle('active', n==='ui');
+  try { localStorage.setItem('apitestgen.panel', n); } catch (e) {}
 }
 
 function escapeHtml(str) {
@@ -2209,7 +2754,11 @@ async function saveConfig() {
 
 fetch(BRIDGE_URL + '/api/status').then(r=>r.json()).then(d=>{
   if (d.connected) setConnected(true);
-  document.getElementById('target-url').value = d.target_url || 'https://example.com';
+  const tu = document.getElementById('target-url');
+  if (!tu.value) {                                              // only a default: never overwrite a URL the user already chose/remembered
+    const want = d.target_url || 'https://example.com';
+    if (tu.tagName !== 'SELECT' || Array.from(tu.options).some(o => o.value === want)) tu.value = want;
+  }
   log(`Backend ready · Playwright: ${d.playwright_available ? 'available' : 'not installed'}`);
 }).catch(()=>log('Backend not reachable — is server.py running?', 'err'));
 refreshSessionsList();

@@ -19,6 +19,26 @@ _SCROLL_JS = {"top": "window.scrollTo(0, 0)",
               "bottom": "window.scrollTo(0, document.documentElement.scrollHeight)"}
 
 
+def assert_js_source(expr, expected_text):
+    """JavaScript for a `wait_for_function` that passes once `expr` evaluates to the expected value.
+    `expected_text` is JSON (a plain string if it isn't valid JSON). Object keys are compared order-
+    independently, and it keeps re-checking until the step timeout - so data that loads a moment late
+    doesn't fail the test. Used by both the generated test and the live replay, so they agree."""
+    try:
+        expected = json.loads(expected_text)
+    except (TypeError, ValueError):
+        expected = "" if expected_text is None else str(expected_text)
+    return ("() => { const n = v => Array.isArray(v) ? v.map(n) : (v && typeof v === 'object') "
+            "? Object.keys(v).sort().reduce((o, k) => (o[k] = n(v[k]), o), {}) : v; "
+            "try { return JSON.stringify(n((" + str(expr) + "))) === JSON.stringify(n(" + json.dumps(expected) + ")); } "
+            "catch (e) { return false; } }")
+
+
+def _position(step):
+    pos = step.get("position") or {}
+    return f'position={{"x": {int(pos.get("x", 0))}, "y": {int(pos.get("y", 0))}}}' if pos else ""
+
+
 def _ms(value):
     try:
         return max(0, int(float(value)))
@@ -131,7 +151,9 @@ def _render_step_page(s, secrets, locfn=None):
     if t == "assert_visible":
         return f"expect({_locator_expr(loc)}).to_be_visible()"
     if t == "hover":
-        return f"{_locator_expr(loc)}.hover()"
+        return f"{_locator_expr(loc)}.hover({_position(s)})"
+    if t == "assert_js":
+        return f"page.wait_for_function({_s(assert_js_source(s.get('expr'), s.get('value')))})"
     if t == "scroll_into_view":
         return f"{_locator_expr(loc)}.scroll_into_view_if_needed()"
     if t == "wait_for":
@@ -349,7 +371,10 @@ def replay_step(page, step, expect):
     elif t == "assert_visible":
         expect(resolve_locator(page, loc)).to_be_visible()
     elif t == "hover":
-        resolve_locator(page, loc).hover()
+        pos = step.get("position")
+        resolve_locator(page, loc).hover(position={"x": pos["x"], "y": pos["y"]} if pos else None)
+    elif t == "assert_js":
+        page.wait_for_function(assert_js_source(step.get("expr"), val))
     elif t == "scroll_into_view":
         resolve_locator(page, loc).scroll_into_view_if_needed()
     elif t == "wait_for":
