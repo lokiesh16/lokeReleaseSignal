@@ -601,6 +601,17 @@ def playwright_worker():
             except Exception as e:
                 _put_result(cmd, {"ok": False, "error": str(e)})
 
+        elif action == "history":
+            page = get_page_for(cmd)
+            if page is None:
+                _put_result(cmd, {"ok": False, "error": "No browser open"}); continue
+            try:
+                page.go_back(wait_until="domcontentloaded", timeout=30000)
+                _ui_add_step({"type": "back", "url": page.url}, cmd.get("portal", "A"))
+                _put_result(cmd, {"ok": True, "url": page.url, "title": page.title()})
+            except Exception as e:
+                _put_result(cmd, {"ok": False, "error": str(e)})
+
         elif action == "ui_record_start":
             wanted = cmd.get("portals") or [cmd.get("portal", "A")]
             portals = [p for p in wanted if pw["pages"].get(p) is not None]
@@ -966,6 +977,18 @@ def navigate(data):
         emit("error", {"msg": "Navigate failed: " + res.get("error", "")})
 
 
+@socketio.on("go_back")
+def go_back(data):
+    """Browser-bar Back button: history-back in a portal (recorded as a 'back' step while recording)."""
+    portal = (data or {}).get("portal", "A")
+    res = pw_call({"action": "history", "portal": portal})
+    if res["ok"]:
+        emit("log", {"msg": "<- " + res.get("url", "")})
+        emit("navigated", {"url": res.get("url"), "title": res.get("title"), "portal": portal})
+    else:
+        emit("error", {"msg": "Back failed: " + res.get("error", "")})
+
+
 @socketio.on("stop_browser")
 def stop_browser():
     """No portal given -> closes every open portal window."""
@@ -1178,7 +1201,8 @@ def ui_replay(data):
         report_info = None
         if want_report and res.get("ok") and res.get("report") is not None:
             try:
-                html_text = build_report(run_name, steps, res["report"], res.get("finals"), started, res.get("total_ms", 0))
+                html_text = build_report(run_name, steps, res["report"], res.get("finals"), started, res.get("total_ms", 0),
+                                         goal=(data.get("goal") or "").strip(), expected=(data.get("expected") or "").strip())
                 folder = f"{slugify(run_name)}_{started.strftime('%Y%m%d-%H%M%S')}"
                 os.makedirs(os.path.join(UI_REPORTS_DIR, folder), exist_ok=True)
                 with open(os.path.join(UI_REPORTS_DIR, folder, "index.html"), "w", encoding="utf-8") as f:
@@ -1319,6 +1343,25 @@ def publish_ui_report(folder):
     try:
         with open(path, encoding="utf-8") as f:
             url = cf_r2.publish_html_report(f"reports/{folder}", "index.html", f.read())
+    except RuntimeError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"publish failed: {e}"}), 500
+    return jsonify({"url": url})
+
+
+@app.route("/api/ui-reports/<folder>/publish-s3", methods=["POST"])
+def publish_ui_report_s3(folder):
+    """Uploads one report to the team S3 bucket (shown on the Test cases web page under 'web test run results')
+    and returns the link that opens it there. Only ever runs when the user clicks Publish."""
+    path = _report_path(folder)
+    if not path:
+        return jsonify({"error": "Report not found"}), 404
+    import s3_reports
+    if not s3_reports.is_configured():
+        return jsonify({"error": "S3 is not configured - see S3_REPORTS_* in .env"}), 400
+    try:
+        url = s3_reports.publish_ui_report(folder, path)
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
