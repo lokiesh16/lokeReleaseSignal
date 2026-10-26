@@ -124,6 +124,8 @@ def _render_step_page(s, secrets, locfn=None):
     _locator_expr = (lambda l: locfn(l, s)) if (locfn and loc) else _locator
     if t == "goto":
         return f"page.goto({_s(s.get('value') or s.get('url'))})"
+    if t == "back":
+        return "page.go_back()"
     if t == "click":
         return f"{_locator_expr(loc)}.click()"
     if t == "fill":
@@ -348,6 +350,8 @@ def replay_step(page, step, expect):
     val = step.get("value")
     if t == "goto":
         page.goto(val or step.get("url"))
+    elif t == "back":
+        page.go_back(wait_until="domcontentloaded")
     elif t == "click":
         resolve_locator(page, loc).click()
     elif t == "fill":

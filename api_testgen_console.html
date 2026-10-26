@@ -357,6 +357,10 @@
   .bb-field input, .ux-input { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 8px;
     padding: 7px 11px; color: var(--text); font-family: var(--mono); font-size: 12.5px; min-width: 0; }
   .bb-field input:focus, .ux-input:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,0.08); }
+  .goal-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 8px 0 4px; }
+  .goal-row label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: var(--muted, #8b8fa8); text-transform: uppercase; letter-spacing: .04em; }
+  .goal-row textarea { width: 100%; resize: vertical; text-transform: none; letter-spacing: 0; font-size: 12px; }
+  @media (max-width: 760px) { .goal-row { grid-template-columns: 1fr; } }
   .bb-nav { position: relative; }
   .bb-nav > summary { list-style: none; cursor: pointer; }
   .bb-nav > summary::-webkit-details-marker { display: none; }
@@ -578,8 +582,8 @@
         <summary class="btn btn-ghost btn-sm">↪ Navigate…</summary>
         <div class="bb-pop">
           <div class="hint" style="margin:0 0 4px">Send an already-open window to another page.</div>
-          <div class="flex-row"><input type="text" class="ux-input" id="nav-url-a" placeholder="Portal A to…"><button class="btn btn-ghost btn-sm" onclick="navigateBrowser('A')">→ Go</button></div>
-          <div class="flex-row"><input type="text" class="ux-input" id="nav-url-b" placeholder="Portal B to…"><button class="btn btn-ghost btn-sm" onclick="navigateBrowser('B')">→ Go</button></div>
+          <div class="flex-row"><input type="text" class="ux-input" id="nav-url-a" placeholder="Portal A to…"><button class="btn btn-ghost btn-sm" onclick="navigateBrowser('A')">→ Go</button><button class="btn btn-ghost btn-sm" onclick="goBack('A')" title="Back to the previous page (recorded while recording)">◀ Back</button></div>
+          <div class="flex-row"><input type="text" class="ux-input" id="nav-url-b" placeholder="Portal B to…"><button class="btn btn-ghost btn-sm" onclick="navigateBrowser('B')">→ Go</button><button class="btn btn-ghost btn-sm" onclick="goBack('B')" title="Back to the previous page (recorded while recording)">◀ Back</button></div>
         </div>
       </details>
     </div>
@@ -794,6 +798,10 @@
                 <label class="chk" title="Takes a screenshot after every step during Replay and builds a shareable HTML report (goal, expected result, verdict, issues, steps with screenshots, final screen). Makes the replay a little slower."><input type="checkbox" id="ui-report"> 📄 Report</label>
                 <button class="btn btn-ghost btn-sm" id="btn-ui-replay" onclick="uiReplay()" title="Run every step in fresh browser windows and mark each ✓ / ✗">▶ Replay all</button>
                 <button class="btn btn-ghost btn-sm" onclick="uiClearSteps()" title="Remove all steps from the editor">Clear</button>
+              </div>
+              <div class="goal-row">
+                <label>Test goal<textarea id="ui-test-goal" class="ux-input" rows="2" placeholder="What this test checks, e.g. A coach can log in and open the client list"></textarea></label>
+                <label>Expected result<textarea id="ui-test-expected" class="ux-input" rows="2" placeholder="What should be true when it works, e.g. Client list opens and shows at least one client"></textarea></label>
               </div>
               <div class="steps-status"><span id="ui-replay-status" class="pw-run-status"></span><span id="ui-report-row" style="display:none;font-size:12px"></span></div>
               <div id="ui-steps" class="steps-list"></div>
@@ -1050,6 +1058,7 @@ function navigateBrowser(portal) {
   if (!url) { toast(`Enter a URL to navigate Portal ${portal} to`, 'err'); return; }
   socket.emit('navigate', { url, portal });
 }
+function goBack(portal) { socket.emit('go_back', { portal }); }
 function stopBrowser() { socket.emit('stop_browser'); }
 
 // ── Network log ───────────────────────────────────────────────────────────────
@@ -1713,12 +1722,12 @@ function uiRowMenu(id, ev) {
   m.style.left = Math.max(8, r.right - m.offsetWidth) + 'px';
 }
 
-const UI_VERB = { goto: 'Go to', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
+const UI_VERB = { goto: 'Go to', back: 'Go back', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
   press: 'Press', press_page: 'Press', assert_text: 'Assert text', assert_value: 'Assert value', assert_visible: 'Assert visible',
   assert_attr: 'Assert attr', assert_js: 'Assert script', hover: 'Hover', scroll_into_view: 'Scroll to', wait_for: 'Wait for', wait: 'Wait (ms)',
   scroll_page: 'Scroll page', note: 'Note' };
 const UI_EDITABLE = ['goto', 'fill', 'select', 'press', 'press_page', 'assert_text', 'assert_value', 'assert_attr', 'assert_js', 'wait_for', 'wait', 'scroll_page'];
-function uiVerbClass(t) { return /^assert/.test(t) ? 'v-assert' : (t === 'wait' || t === 'wait_for' || /^scroll/.test(t)) ? 'v-wait' : t === 'goto' ? 'v-nav' : ''; }
+function uiVerbClass(t) { return /^assert/.test(t) ? 'v-assert' : (t === 'wait' || t === 'wait_for' || /^scroll/.test(t)) ? 'v-wait' : (t === 'goto' || t === 'back') ? 'v-nav' : ''; }
 
 const UI_EMPTY = `<div class="empty"><div class="big">🧪</div><h4>No steps yet</h4>
   <p>Record your first flow in three moves:</p>
@@ -1867,7 +1876,8 @@ async function uiSaveRecording() {
   const exists = Array.from(document.querySelectorAll('#ui-saved-list .si-name')).some(b => b.textContent.replace('▶ ', '') === name);
   if (exists && uiLoadedName !== name && !confirm(`A recording named "${name}" already exists. Overwrite it?`)) return;
   const settings = { timeout_s: uiTimeout(), shared_session: document.getElementById('ui-shared-session').checked,
-                     test_name: document.getElementById('ui-test-name').value };
+                     test_name: document.getElementById('ui-test-name').value,
+                     goal: document.getElementById('ui-test-goal').value, expected: document.getElementById('ui-test-expected').value };
   const res = await fetch(BRIDGE_URL + '/api/ui-recordings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
                                                                body: JSON.stringify({ name, settings }) });
   const d = await res.json();
@@ -1889,6 +1899,8 @@ async function uiLoadRecording(file) {
   document.getElementById('ui-save-name').value = d.name;
   const st = d.settings || {};
   if (st.test_name) document.getElementById('ui-test-name').value = st.test_name; else document.getElementById('ui-test-name').value = d.name;
+  document.getElementById('ui-test-goal').value = st.goal || '';
+  document.getElementById('ui-test-expected').value = st.expected || '';
   if (st.timeout_s) document.getElementById('ui-timeout').value = st.timeout_s;
   if (st.shared_session != null) document.getElementById('ui-shared-session').checked = !!st.shared_session;
   uiUpdateEditingBadge(); uiRefreshSaved();
@@ -1933,6 +1945,7 @@ function uiReplay() {
   renderUiSteps(uiLastSteps);
   document.getElementById('ui-report-row').style.display = 'none';
   socket.emit('ui_replay', { report: document.getElementById('ui-report').checked, name: document.getElementById('ui-test-name').value || uiLoadedName || '',
+                             goal: document.getElementById('ui-test-goal').value, expected: document.getElementById('ui-test-expected').value,
                              portal: document.getElementById('ui-portal').value,
                              slow_mo: parseInt(document.getElementById('ui-slowmo').value, 10) || 0,
                              timeout_s: uiTimeout() });
@@ -2367,7 +2380,7 @@ function pickCustomUrl(sel) {
 customUrls.forEach(addCustomUrlOption);
 
 // ── remember the small choices between sessions (never keys) ──
-const UX_VALUES = ['target-url', 'target-url-b', 'ui-portal', 'ui-timeout', 'ui-structure', 'ui-slowmo', 'explore-portal', 'explore-max-cases', 'explore-max-steps'];
+const UX_VALUES = ['ui-test-goal', 'ui-test-expected', 'target-url', 'target-url-b', 'ui-portal', 'ui-timeout', 'ui-structure', 'ui-slowmo', 'explore-portal', 'explore-max-cases', 'explore-max-steps'];
 const UX_CHECKS = ['ui-shared-session', 'ui-headless', 'ui-report', 'explore-record-steps', 'explore-screenshots', 'explore-broaden'];
 function uxSave() {
   try {

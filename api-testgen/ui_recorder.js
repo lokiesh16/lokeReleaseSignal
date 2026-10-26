@@ -359,8 +359,9 @@
       '<div id="bar"><span class="rec" id="rec">&#9679; REC</span><button id="pick" title="Select an element without clicking it (Esc to leave)">&#127919; Pick</button>' +
       '<button id="anchor" title="Prefer locators anchored to the nearest label (ignores a field\'s current value, e.g. a date or selected option)">&#9875; Anchor</button>' +
       '<input id="ms" type="number" value="1000" min="0" step="250" title="milliseconds"><button id="wait">&#9201; Wait</button>' +
+      '<button id="back" title="Go back to the previous page (recorded as a step)">&#9664; Back</button>' +
       '<button id="top" title="Scroll to top">&#10514;</button><button id="bot" title="Scroll to bottom">&#10515;</button><span id="msg"></span></div>';
-    ['box', 'menu', 'rec', 'pick', 'anchor', 'ms', 'wait', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
+    ['box', 'menu', 'rec', 'pick', 'anchor', 'ms', 'wait', 'back', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
     ui.pick.onclick = function () { pickOn ? exitPick() : enterPick(); };
     ui.anchor.onclick = function () {
       anchorOn = !anchorOn; ui.anchor.classList.toggle('on', anchorOn);
@@ -368,6 +369,7 @@
       say(anchorOn ? 'Anchor on: locators use the nearest label' : 'Anchor off');
     };
     ui.wait.onclick = function () { send({ type: 'wait', value: String(parseInt(ui.ms.value, 10) || 0) }); say('Added: wait ' + ui.ms.value + 'ms'); };
+    ui.back.onclick = function () { send({ type: 'back' }); say('Added: go back'); history.back(); };
     ui.top.onclick = function () { window.scrollTo(0, 0); send({ type: 'scroll_page', value: 'top' }); say('Added: scroll to top'); };
     ui.bot.onclick = function () { window.scrollTo(0, document.documentElement.scrollHeight); send({ type: 'scroll_page', value: 'bottom' }); say('Added: scroll to bottom'); };
     document.documentElement.appendChild(host);

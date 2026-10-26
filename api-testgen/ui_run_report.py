@@ -14,7 +14,7 @@ from datetime import datetime
 
 MASK = "••••••"
 _VERBS = {
-    "goto": "go to", "click": "click", "fill": "fill", "clear": "clear", "select": "select",
+    "goto": "go to", "back": "go back", "click": "click", "fill": "fill", "clear": "clear", "select": "select",
     "check": "check", "uncheck": "uncheck", "press": "press", "press_page": "press",
     "hover": "hover", "scroll_into_view": "scroll to", "wait_for": "wait for", "wait": "wait",
     "scroll_page": "scroll page", "assert_text": "assert text", "assert_value": "assert value",
@@ -104,7 +104,7 @@ _JS = ("document.addEventListener('click',function(e){var i=e.target;var lb=docu
        "if(i.tagName==='IMG'&&i.dataset.zoom){lb.firstChild.src=i.src;lb.style.display='flex'}else if(lb.contains(i)||i===lb){lb.style.display='none'}});")
 
 
-def build_report(name, steps, rows, finals=None, started=None, total_ms=0):
+def build_report(name, steps, rows, finals=None, started=None, total_ms=0, goal="", expected=""):
     started = started or datetime.now()
     by_id = {r["id"]: r for r in rows}
     secrets = {str(s.get("value")) for s in steps if s.get("secret") and s.get("value")}
@@ -123,14 +123,21 @@ def build_report(name, steps, rows, finals=None, started=None, total_ms=0):
     meta = f"{len(real)} steps" + (f" · {cases} test case{'s' if cases != 1 else ''}" if cases else "") + f" · {_fmt_ms(total_ms)}" + (" · 2 portals" if multi else "")
 
     # Expected result: what the run actually asserts (and an honest note when it asserts nothing)
+    exp = ""
+    if expected:
+        exp += f'<div style="white-space:pre-wrap">{e(expected)}</div>'
     if asserts:
-        exp = "<ul>" + "".join(f"<li>{e(step_label(s))} — {e(step_detail(s))}</li>" for s in asserts) + "</ul>"
+        exp += ("<div class=\"sub\">Checked automatically:</div>" if expected else "") + \
+               "<ul>" + "".join(f"<li>{e(step_label(s))} — {e(step_detail(s))}</li>" for s in asserts) + "</ul>"
+    elif expected:
+        exp += '<div class="sub"><i>Not checked automatically — no assertions were recorded, so compare it with the step screenshots below.</i></div>'
     else:
-        exp = "<i>No assertions were recorded, so this run only shows the steps executing without error.</i>"
+        exp = "<i>No expected result was entered and no assertions were recorded, so this run only shows the steps executing without error.</i>"
 
     # Verdict
     if passed:
-        verdict = f"All {len(real)} steps ran without error" + (f", including {len(asserts)} assertion(s)." if asserts else ".")
+        verdict = f"All {len(real)} steps ran without error" + (f", including {len(asserts)} assertion(s)." if asserts else
+                                                                  (". The expected result was not verified automatically." if expected else "."))
     elif failed_step:
         n = real.index(failed_step) + 1 if failed_step in real else "?"
         skipped = len(real) - len(ran)
@@ -145,7 +152,8 @@ def build_report(name, steps, rows, finals=None, started=None, total_ms=0):
     if failed and failed_step:
         issues.append(f"Step failed — {step_label(failed_step)}: {failed.get('error') or ''}")
     if not asserts:
-        issues.append("No assertions recorded — add checks (Pick → Assert text/value/visible) so a pass means the app is correct, not just that the clicks worked.")
+        issues.append("No assertions recorded — add checks (Pick → Assert text/value/visible) so a pass means the app is correct, not just that the clicks worked."
+                      + (" Your expected result was not verified automatically." if expected else ""))
     for r in rows:
         if r.get("ok") and r.get("ms", 0) > 10000:
             s = next((x for x in steps if x["id"] == r["id"]), {})
@@ -194,7 +202,7 @@ def build_report(name, steps, rows, finals=None, started=None, total_ms=0):
 <title>{e(title)}</title><style>{_CSS}</style></head><body><div class="wrap">
 <h1>{e(title)}</h1><span class="status {'pass' if passed else 'fail'}">{status}</span>
 <div class="meta">{e(meta)}</div>
-<h2>Goal</h2><div class="box">{e((name or 'UI test').strip())}</div>
+<h2>Goal</h2><div class="box" style="white-space:pre-wrap">{e(goal or (name or 'UI test').strip())}</div>
 <h2>Expected result</h2><div class="box">{exp}</div>
 <h2>Verdict</h2><div class="box">{e(verdict)}</div>
 <h2>Issues found</h2><div class="box">{issues_html}</div>
