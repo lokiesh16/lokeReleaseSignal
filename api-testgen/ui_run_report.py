@@ -18,9 +18,9 @@ _VERBS = {
     "check": "check", "uncheck": "uncheck", "press": "press", "press_page": "press",
     "hover": "hover", "scroll_into_view": "scroll to", "wait_for": "wait for", "wait": "wait",
     "scroll_page": "scroll page", "assert_text": "assert text", "assert_value": "assert value",
-    "assert_visible": "assert visible", "assert_attr": "assert attribute", "assert_js": "assert script",
+    "assert_visible": "assert visible", "assert_attr": "assert attribute", "assert_js": "assert script", "assert_url": "assert URL", "capture": "capture", "compare": "compare",
 }
-_ASSERTS = ("assert_text", "assert_value", "assert_visible", "assert_attr", "assert_js")
+_ASSERTS = ("assert_text", "assert_value", "assert_visible", "assert_attr", "assert_js", "assert_url", "compare")
 _SECRET_IN_TEXT = re.compile(r"(?i)\b(pass(?:word|wd)?|pwd|secret|token|api[_-]?key|otp|cvv)\b(\s*[=:]\s*)(\S+)")
 
 
@@ -63,6 +63,12 @@ def step_detail(s):
         return f'expected value: "{s.get("value", "")}"'
     if t == "assert_attr":
         return f'expected {s.get("attr") or "attribute"} = "{s.get("value", "")}"'
+    if t == "capture":
+        return f'{s.get("source") or "text"} → {s.get("var", "")}'
+    if t == "compare":
+        return f'expected: {s.get("left", "")} {(s.get("op") or "equals").replace("_", " ")} {s.get("right", "")}'
+    if t == "assert_url":
+        return f'expected URL to contain: "{s.get("value", "")}"'
     if t == "assert_visible":
         return "expected: visible"
     if t == "assert_js":

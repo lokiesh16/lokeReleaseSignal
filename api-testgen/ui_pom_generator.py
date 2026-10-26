@@ -15,7 +15,8 @@ import re
 from datetime import datetime
 
 from ui_test_generator import (
-    _ROLES, _SCROLL_JS, _locator, _py_label, _render_step_page, _s, slugify, split_cases,
+    CAPTURE_HELPER_SRC, _ROLES, _SCROLL_JS, _locator, _py_label, _render_step_page, _s, slugify, split_cases,
+    uses_capture, with_capture_support,
 )
 
 _ROLE_SUFFIX = {"button": "button", "link": "link", "textbox": "input", "searchbox": "search_input",
@@ -177,6 +178,10 @@ def generate_ui_pom(name, steps, timeout_s=15, shared_session=True):
             line = _render_step_page(st, secrets, locfn=locfn)
             if line and portal == "B" and line.startswith(("page.",)):
                 line = "page_b" + line[4:]
+            elif line and portal == "B" and line.startswith("captured[") and "capture_value(page." in line:
+                line = line.replace("capture_value(page.", "capture_value(page_b.", 1)
+            elif line and portal == "B" and line.startswith("expect(page)"):
+                line = "expect(page_b" + line[len("expect(page"):]
             lines += pending
             if line:
                 lines.append(line)
@@ -188,6 +193,7 @@ def generate_ui_pom(name, steps, timeout_s=15, shared_session=True):
         funcs.append((fn, cname, lines or ["pass"], needs_b))
     if not funcs:
         funcs.append((f"test_{slug}", name or slug, ["pass  # no steps were recorded"], False))
+    funcs = with_capture_support(funcs)
 
     # ── page file ────────────────────────────────────────────────────────────
     pg = [
@@ -259,6 +265,7 @@ def generate_ui_pom(name, steps, timeout_s=15, shared_session=True):
         "expect.set_options(timeout=TIMEOUT_MS)",
         "",
         "",
+        *((CAPTURE_HELPER_SRC.splitlines() + ["", ""]) if uses_capture(steps) else []),
         '@pytest.fixture(scope="session")',
         "def browser():",
         "    with sync_playwright() as p:",

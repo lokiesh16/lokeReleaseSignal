@@ -34,6 +34,57 @@ def assert_js_source(expr, expected_text):
             "catch (e) { return false; } }")
 
 
+# Reads one value off the page for a "Capture" step: the element's text, an input's value, an attribute,
+# or its tooltip (hover, then the visible role=tooltip text, else its title/aria-label). Whitespace is
+# collapsed so line breaks and padding never cause a false mismatch. The generated test embeds this exact
+# source, and the live replay execs it, so the two always read values the same way.
+CAPTURE_HELPER_SRC = '''def capture_value(locator, source="text", attr=None):
+    """Reads a value off the page: element text, input value, an attribute, or its tooltip."""
+    if source == "value":
+        v = locator.input_value()
+    elif source == "attr":
+        v = locator.get_attribute(attr or "title")
+    elif source == "tooltip":
+        locator.hover()
+        tip = locator.page.locator('[role="tooltip"]').first
+        try:
+            tip.wait_for(state="visible", timeout=2000)
+            v = tip.inner_text()
+        except Exception:
+            v = locator.get_attribute("title") or locator.get_attribute("aria-label")
+    else:
+        v = locator.inner_text()
+    return " ".join((v or "").split())'''
+exec(CAPTURE_HELPER_SRC)   # defines capture_value() for the live replay
+
+COMPARE_OPS = {"equals": "==", "not_equals": "!=", "contains": "in", "not_contains": "not in"}
+
+
+def compare_values(a, op, b):
+    """`a` vs `b` for a Compare step. `contains` means: `a` contains `b`."""
+    if op == "not_equals":
+        return a != b
+    if op == "contains":
+        return b in a
+    if op == "not_contains":
+        return b not in a
+    return a == b
+
+
+def uses_capture(steps):
+    return any(s.get("type") in ("capture", "compare") for s in steps)
+
+
+def with_capture_support(funcs):
+    """Gives each test function that captures/compares its own `captured = {}` dict."""
+    out = []
+    for fn, cname, lines, needs_b in funcs:
+        if any(ln.startswith(("captured[", "assert compare_")) for ln in lines):
+            lines = ["captured = {}"] + lines
+        out.append((fn, cname, lines, needs_b))
+    return out
+
+
 def _position(step):
     pos = step.get("position") or {}
     return f'position={{"x": {int(pos.get("x", 0))}, "y": {int(pos.get("y", 0))}}}' if pos else ""
@@ -106,6 +157,10 @@ def _for_portal(line, portal):
         return line
     if line.startswith("page."):
         return var + line[4:]
+    if line.startswith("captured[") and "capture_value(page." in line:
+        return line.replace("capture_value(page.", f"capture_value({var}.", 1)
+    if line.startswith("expect(page)"):
+        return "expect(" + var + line[len("expect(page"):]
     if line.startswith("expect(page."):
         return "expect(" + var + line[len("expect(page"):]
     return line
@@ -152,6 +207,18 @@ def _render_step_page(s, secrets, locfn=None):
         return f"expect({_locator_expr(loc)}).to_have_value({_s(s.get('value'))})"
     if t == "assert_visible":
         return f"expect({_locator_expr(loc)}).to_be_visible()"
+    if t == "capture":
+        return (f"captured[{_s(s.get('var'))}] = capture_value({_locator_expr(loc)}, {_s(s.get('source') or 'text')}"
+                + (f", {_s(s.get('attr'))}" if s.get("source") == "attr" else "") + ")")
+    if t == "compare":
+        a, b = f"captured[{_s(s.get('left'))}]", f"captured[{_s(s.get('right'))}]"
+        op = s.get("op") or "equals"
+        expr = {"equals": f"{a} == {b}", "not_equals": f"{a} != {b}", "contains": f"{b} in {a}",
+                "not_contains": f"{b} not in {a}"}.get(op, f"{a} == {b}")
+        am, bm = (f"captured[{json.dumps(str(s.get(k)))[1:-1].join(chr(39) * 2)}]" for k in ("left", "right"))   # single-quoted keys: legal inside the f-string on older Pythons
+        return f"assert {expr}, f\"compare {s.get('left')} {op} {s.get('right')}: {{{am}!r}} vs {{{bm}!r}}\""
+    if t == "assert_url":
+        return f"expect(page).to_have_url(re.compile(re.escape({_s(s.get('value'))})))"
     if t == "hover":
         return f"{_locator_expr(loc)}.hover({_position(s)})"
     if t == "assert_js":
@@ -231,6 +298,7 @@ def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
         funcs.append((fn, cname, lines or ["pass"], needs_b))
     if not funcs:
         funcs.append((f"test_{slug}", name or slug, ["pass  # no steps were recorded"], False))
+    funcs = with_capture_support(funcs)
 
     out = [
         f'"""UI test: {name or slug}',
@@ -276,6 +344,7 @@ def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
         "expect.set_options(timeout=TIMEOUT_MS)",
         "",
         "",
+        *((CAPTURE_HELPER_SRC.splitlines() + ["", ""]) if uses_capture(steps) else []),
         '@pytest.fixture(scope="session")',
         "def browser():",
         "    with sync_playwright() as p:",
@@ -344,7 +413,7 @@ def resolve_locator(page, loc):
     return target
 
 
-def replay_step(page, step, expect):
+def replay_step(page, step, expect, captured=None):
     """Runs one recorded step. Raises on failure; `expect` is playwright's expect."""
     t, loc = step.get("type"), step.get("locator") or {}
     val = step.get("value")
@@ -374,6 +443,22 @@ def replay_step(page, step, expect):
         expect(resolve_locator(page, loc)).to_have_value(val)
     elif t == "assert_visible":
         expect(resolve_locator(page, loc)).to_be_visible()
+    elif t == "assert_url":
+        expect(page).to_have_url(re.compile(re.escape(val or "")))
+    elif t == "capture":
+        got = capture_value(resolve_locator(page, loc), step.get("source") or "text", step.get("attr"))
+        if captured is not None:
+            captured[step.get("var")] = got
+            captured["__saw__"] = got
+    elif t == "compare":
+        captured = captured if captured is not None else {}
+        for k in (step.get("left"), step.get("right")):
+            if k not in captured:
+                raise AssertionError(f"Nothing was captured as '{k}' before this comparison")
+        a, b, op = captured[step["left"]], captured[step["right"]], step.get("op") or "equals"
+        captured["__saw__"] = f"{a!r} vs {b!r}"
+        if not compare_values(a, op, b):
+            raise AssertionError(f"{step['left']} {op.replace('_', ' ')} {step['right']} failed: {a!r} vs {b!r}")
     elif t == "hover":
         pos = step.get("position")
         resolve_locator(page, loc).hover(position={"x": pos["x"], "y": pos["y"]} if pos else None)
