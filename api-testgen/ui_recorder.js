@@ -359,9 +359,11 @@
       '<div id="bar"><span class="rec" id="rec">&#9679; REC</span><button id="pick" title="Select an element without clicking it (Esc to leave)">&#127919; Pick</button>' +
       '<button id="anchor" title="Prefer locators anchored to the nearest label (ignores a field\'s current value, e.g. a date or selected option)">&#9875; Anchor</button>' +
       '<input id="ms" type="number" value="1000" min="0" step="250" title="milliseconds"><button id="wait">&#9201; Wait</button>' +
+      '<button id="cmp" title="Compare two captured values, e.g.  price_list = price_cart   (also: !=, contains, !contains)">&#9878; Compare</button>' +
+      '<button id="url" title="Assert the current page URL (path without query; edit the step to loosen or tighten it)">&#128279; URL</button>' +
       '<button id="back" title="Go back to the previous page (recorded as a step)">&#9664; Back</button>' +
       '<button id="top" title="Scroll to top">&#10514;</button><button id="bot" title="Scroll to bottom">&#10515;</button><span id="msg"></span></div>';
-    ['box', 'menu', 'rec', 'pick', 'anchor', 'ms', 'wait', 'back', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
+    ['box', 'menu', 'rec', 'pick', 'anchor', 'ms', 'wait', 'cmp', 'url', 'back', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
     ui.pick.onclick = function () { pickOn ? exitPick() : enterPick(); };
     ui.anchor.onclick = function () {
       anchorOn = !anchorOn; ui.anchor.classList.toggle('on', anchorOn);
@@ -369,6 +371,17 @@
       say(anchorOn ? 'Anchor on: locators use the nearest label' : 'Anchor off');
     };
     ui.wait.onclick = function () { send({ type: 'wait', value: String(parseInt(ui.ms.value, 10) || 0) }); say('Added: wait ' + ui.ms.value + 'ms'); };
+    ui.cmp.onclick = function () {
+      var t = (window.prompt('Compare two captured variables.\nExamples:  price_list = price_cart   |   title != old_title   |   banner contains name', '') || '').trim();
+      var m = t.match(/^(\w+)\s*(!=|=|!contains|contains)\s*(\w+)$/);
+      if (!m) { if (t) say('Use:  first = second'); return; }
+      send({ type: 'compare', left: m[1], right: m[3], op: { '=': 'equals', '!=': 'not_equals', contains: 'contains', '!contains': 'not_contains' }[m[2]], value: '' });
+      say('Added: compare ' + m[1] + ' ' + m[2] + ' ' + m[3]);
+    };
+    ui.url.onclick = function () {
+      var u = location.origin + location.pathname;
+      send({ type: 'assert_url', value: u }); say('Added: assert URL contains ' + u);
+    };
     ui.back.onclick = function () { send({ type: 'back' }); say('Added: go back'); history.back(); };
     ui.top.onclick = function () { window.scrollTo(0, 0); send({ type: 'scroll_page', value: 'top' }); say('Added: scroll to top'); };
     ui.bot.onclick = function () { window.scrollTo(0, document.documentElement.scrollHeight); send({ type: 'scroll_page', value: 'bottom' }); say('Added: scroll to bottom'); };
@@ -458,6 +471,10 @@
     if (!isField && text && text.length <= 200) ops.push(['Assert text: "' + trunc(text, 40) + '"', 'assert_text']);
     if (isField && !isToggle && tag !== 'select') ops.splice(1, 0, ['Clear field', 'clear']);
     if (isField && !isToggle && type !== 'password') ops.push(['Assert value: "' + trunc(String(el.value || ''), 40) + '"', 'assert_value']);
+    var canText = !isField && text && text.length <= 200;
+    if (canText) ops.push(['Capture text as variable…', 'capture_text']);
+    if (isField && !isToggle && type !== 'password') ops.push(['Capture value as variable…', 'capture_value']);
+    ops.push(['Capture tooltip (hover) as variable…', 'capture_tooltip']);
     if (href) ops.push(['Assert href: ' + trunc(href, 40), 'assert_attr']);
     var isCanvas = tag === 'canvas', cd = isCanvas ? chartData(el) : null;
     if (isCanvas && pickCtx) ops.splice(2, 0, ['Hover at this point (opens a tooltip)', 'hover_at']);
@@ -508,7 +525,8 @@
   function applyOp(op, el) {
     var loc = buildLocator(el), tag = el.tagName.toLowerCase();
     var label = { hover_at: 'hover', assert_chart: 'assert chart data', click: 'click', clear: 'clear', hover: 'hover', scroll_into_view: 'scroll', wait_for: 'wait for element',
-                  assert_visible: 'assert visible', assert_text: 'assert text', assert_value: 'assert value', assert_attr: 'assert href' }[op];
+                  assert_visible: 'assert visible', assert_text: 'assert text', assert_value: 'assert value', assert_attr: 'assert href',
+                  capture_text: 'capture text', capture_value: 'capture value', capture_tooltip: 'capture tooltip' }[op];
     var isToggle = tag === 'input' && /^(checkbox|radio)$/i.test(el.getAttribute('type') || '');
     drawBox(el, '#22c55e');
     if (pickCtx && pickCtx.ghost && pickCtx.under && op !== 'hover') {
@@ -547,6 +565,13 @@
       send({ type: 'assert_text', locator: loc, value: norm(el.textContent) });
     } else if (op === 'assert_value') {
       send({ type: 'assert_value', locator: loc, value: String(el.value || '') });
+    } else if (/^capture_/.test(op)) {
+      var source = op.slice(8);
+      var dflt = (describe(loc).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase().slice(0, 24)) || 'value';
+      var vname = (window.prompt('Name this captured ' + source + ' (use it later in a Compare):', dflt) || '').trim().replace(/\W+/g, '_').replace(/^_+|_+$/g, '');
+      if (!vname) { say('Capture cancelled'); clearSel(); return; }
+      send({ type: 'capture', locator: loc, source: source, 'var': vname });
+      label = 'capture ' + source + ' as ' + vname;
     } else if (op === 'assert_attr') {
       send({ type: 'assert_attr', locator: loc, attr: 'href', value: el.getAttribute('href') });
     }

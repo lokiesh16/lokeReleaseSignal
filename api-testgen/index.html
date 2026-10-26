@@ -1710,10 +1710,19 @@ function uiRowMenu(id, ev) {
 
 const UI_VERB = { goto: 'Go to', back: 'Go back', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
   press: 'Press', press_page: 'Press', assert_text: 'Assert text', assert_value: 'Assert value', assert_visible: 'Assert visible',
-  assert_attr: 'Assert attr', assert_js: 'Assert script', hover: 'Hover', scroll_into_view: 'Scroll to', wait_for: 'Wait for', wait: 'Wait (ms)',
+  assert_attr: 'Assert attr', assert_js: 'Assert script', assert_url: 'Assert URL', capture: 'Capture', compare: 'Compare', hover: 'Hover', scroll_into_view: 'Scroll to', wait_for: 'Wait for', wait: 'Wait (ms)',
   scroll_page: 'Scroll page', note: 'Note' };
-const UI_EDITABLE = ['goto', 'fill', 'select', 'press', 'press_page', 'assert_text', 'assert_value', 'assert_attr', 'assert_js', 'wait_for', 'wait', 'scroll_page'];
-function uiVerbClass(t) { return /^assert/.test(t) ? 'v-assert' : (t === 'wait' || t === 'wait_for' || /^scroll/.test(t)) ? 'v-wait' : (t === 'goto' || t === 'back') ? 'v-nav' : ''; }
+const UI_EDITABLE = ['goto', 'fill', 'select', 'press', 'press_page', 'assert_text', 'assert_value', 'assert_attr', 'assert_js', 'assert_url', 'wait_for', 'wait', 'scroll_page'];
+const UI_CMP_OPS = [['equals', 'equals'], ['not_equals', 'does not equal'], ['contains', 'contains'], ['not_contains', 'does not contain']];
+function uiCaptureVars() { return Array.from(new Set(uiLastSteps.filter(s => s.type === 'capture' && s.var).map(s => s.var))); }
+function uiInsertCompare(afterId) {
+  const names = uiCaptureVars();
+  const left = uiDraft.cmpLeft || names[0], right = uiDraft.cmpRight || names[1] || names[0];
+  if (!left || !right) { toast('Capture two values first (Pick → Capture…), then compare them', 'err'); return; }
+  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'compare', left, right, op: uiDraft.cmpOp || 'equals' } });
+  uiInsertOpen = null;
+}
+function uiVerbClass(t) { return /^(assert|compare)/.test(t) ? 'v-assert' : (t === 'wait' || t === 'wait_for' || /^scroll/.test(t)) ? 'v-wait' : (t === 'goto' || t === 'back') ? 'v-nav' : ''; }
 
 const UI_EMPTY = `<div class="empty"><div class="big">🧪</div><h4>No steps yet</h4>
   <p>Record your first flow in three moves:</p>
@@ -1743,9 +1752,16 @@ function uiStepDetail(s, n, r) {
       + `<span style="color:var(--muted)">│</span><span><b>🧮 Assert script</b></span><input type="text" class="ux-input" placeholder="JS, e.g. document.title" value="${escapeHtml(uiDraft.expr || '')}" oninput="uiDraft.expr=this.value" style="width:210px">`
       + `<input type="text" class="ux-input" placeholder='expected (JSON), e.g. "Home"' value="${escapeHtml(uiDraft.expect || '')}" oninput="uiDraft.expect=this.value" style="width:150px">`
       + `<button class="btn btn-ghost btn-sm" onclick="uiInsertScript(${s.id})" title="Adds a check on the result of a JavaScript expression - for things with no element to locate, like a chart's data">Add</button>`
+      + `<span style="color:var(--muted)">│</span><span><b>⚖ Compare</b></span>` + (uiCaptureVars().length
+        ? `<select class="ux-input" onchange="uiDraft.cmpLeft=this.value">${uiCaptureVars().map(v => `<option${v === uiDraft.cmpLeft ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('')}</select>`
+          + `<select class="ux-input" onchange="uiDraft.cmpOp=this.value">${UI_CMP_OPS.map(([v, l]) => `<option value="${v}"${v === uiDraft.cmpOp ? ' selected' : ''}>${l}</option>`).join('')}</select>`
+          + `<select class="ux-input" onchange="uiDraft.cmpRight=this.value">${uiCaptureVars().map(v => `<option${v === (uiDraft.cmpRight || uiCaptureVars()[1]) ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('')}</select>`
+          + `<button class="btn btn-ghost btn-sm" onclick="uiInsertCompare(${s.id})" title="Adds a check comparing two captured values">Add</button>`
+        : `<span class="hint" style="margin:0">capture two values first (Pick → Capture…)</span>`)
       + `<span style="color:var(--muted)">│</span><span><b>📋 New test case</b></span><input type="text" class="ux-input" placeholder="name (optional)" value="${escapeHtml(uiDraft.name)}" oninput="uiDraft.name=this.value" style="width:170px">`
       + `<button class="btn btn-ghost btn-sm" onclick="uiInsertCase(${s.id})" title="Steps after this one start a new test case">Split after this step</button></div>`);
   }
+  if (r && r.ok && r.detail) parts.push(`<div class="sr-note hint">${s.type === 'capture' ? 'Captured: ' : 'Compared: '}${escapeHtml(r.detail)}</div>`);
   if (r && !r.ok) {
     parts.push(`<div class="sr-note err">${escapeHtml(r.error)}${r.screenshot ? `<img src="data:image/jpeg;base64,${r.screenshot}" alt="page at the failure">` : ''}</div>`);
     if (/matched 0/.test(r.error || '')) parts.push('<div class="sr-note hint">The locator finds nothing on the page at this point. Use <b>⋯ → Edit or swap the locator</b> to try a better selector (a data-testid, an id or a CSS path), then <b>Check</b> it.</div>');
@@ -1775,6 +1791,13 @@ function renderUiSteps(steps) {
     const chk = c ? (c.count === 1 ? ' <span class="pill ok">✓ 1 match</span>' : c.count === 0 ? ' <span class="pill no">✗ 0 matches</span>' : ` <span class="pill warn">⚠ ${c.count} matches</span>`) : '';
     let val = '';
     if (s.type === 'fill' && s.secret) val = '<span class="pill">🔒 secret → env var</span>';
+    else if (s.type === 'capture') val = `<span class="pill">${escapeHtml(s.source === 'attr' ? (s.attr || 'attribute') : (s.source || 'text'))}</span> → <input type="text" class="ux-input" style="width:160px" title="Variable name" value="${escapeHtml(s.var || '')}" onchange="uiUpdateStep(${s.id}, this.value, 'var')">`;
+    else if (s.type === 'compare') {
+      const names = uiCaptureVars(); if (s.left && !names.includes(s.left)) names.push(s.left); if (s.right && !names.includes(s.right)) names.push(s.right);
+      const sel = (field, cur) => `<select class="ux-input" onchange="uiUpdateStep(${s.id}, this.value, '${field}')">${names.map(v => `<option${v === cur ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('')}</select>`;
+      val = `<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${sel('left', s.left)}<select class="ux-input" onchange="uiUpdateStep(${s.id}, this.value, 'op')">`
+        + UI_CMP_OPS.map(([v, l]) => `<option value="${v}"${v === (s.op || 'equals') ? ' selected' : ''}>${l}</option>`).join('') + `</select>${sel('right', s.right)}</span>`;
+    }
     else if (UI_EDITABLE.includes(s.type)) val = `<input type="text" class="ux-input" value="${escapeHtml(s.value)}" onchange="uiUpdateStep(${s.id}, this.value)">`;
     else if (s.type === 'note') val = `<span style="color:var(--muted)">${escapeHtml(s.value)}</span>`;
     return `<div class="srow ${r && !r.ok ? 'bad' : ''}" data-id="${s.id}">`

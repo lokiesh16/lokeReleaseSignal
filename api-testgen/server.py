@@ -688,6 +688,7 @@ def playwright_worker():
                 return rpages[portal]
 
             opened = set()
+            replay_vars = {}   # values read by Capture steps, for Compare steps later in the run
             want_report = bool(cmd.get("report"))
             report_rows, run_t0, finals = [], time.time(), {}
 
@@ -698,7 +699,11 @@ def playwright_worker():
                     row["url"], row["title"] = pg.url, pg.title()
                 except Exception:
                     pass
-                if st.get("type") in ("assert_text", "assert_value") and st.get("locator"):
+                if st.get("type") == "assert_url":
+                    row["saw"] = pg.url[:200]
+                elif st.get("type") in ("capture", "compare") and "__saw__" in replay_vars:
+                    row["saw"] = str(replay_vars["__saw__"])[:200]
+                elif st.get("type") in ("assert_text", "assert_value") and st.get("locator"):
                     try:   # the value actually observed, next to the one expected (most useful when the assertion failed)
                         el = resolve_locator(pg, st["locator"]).first
                         row["saw"] = (el.input_value() if st["type"] == "assert_value" else el.inner_text())[:200]
@@ -733,8 +738,10 @@ def playwright_worker():
                                 rpage.wait_for_timeout(1200)
                             except Exception:
                                 pass
-                        replay_step(rpage, s, pw_expect)
+                        replay_step(rpage, s, pw_expect, replay_vars)
                         res = {"id": s["id"], "ok": True}
+                        if s.get("type") in ("capture", "compare"):
+                            res["detail"] = replay_vars.get("__saw__", "")
                         if want_report:
                             report_rows.append(report_row(rpage, s, True, step_t0))
                     except Exception as e:
@@ -1067,7 +1074,13 @@ def ui_step_update(data):
     """Edit a step's text: its value by default, or `expr` (the script of an assert-script step)."""
     sid, value = (data or {}).get("id"), (data or {}).get("value")
     field = (data or {}).get("field") or "value"
-    if field not in ("value", "expr"):
+    if field not in ("value", "expr", "var", "left", "right", "op", "source"):
+        return
+    if field == "var":   # a variable name: letters, digits, underscore
+        value = re.sub(r"\W+", "_", str(value or "").strip()).strip("_")[:40]
+    if field == "op" and value not in ("equals", "not_equals", "contains", "not_contains"):
+        return
+    if field == "source" and value not in ("text", "value", "tooltip", "attr"):
         return
     with ui_rec_lock:
         for s in ui_rec["steps"]:
@@ -1082,7 +1095,7 @@ def ui_step_insert(data):
     waits and for splitting the list into test cases ('case' markers)."""
     data = data or {}
     after_id, step = data.get("after_id"), dict(data.get("step") or {})
-    if step.get("type") not in ("wait", "case", "goto", "assert_js"):
+    if step.get("type") not in ("wait", "case", "goto", "assert_js", "compare"):
         emit("error", {"msg": "Unsupported step type"}); return
     with ui_rec_lock:
         steps = ui_rec["steps"]
@@ -1105,6 +1118,12 @@ def ui_step_insert(data):
             if not url:
                 emit("error", {"msg": "Enter a URL"}); return
             step.update(value=url, url=url, portal=step.get("portal") if step.get("portal") in ("A", "B") else "A")
+        elif step["type"] == "compare":
+            left, right = (step.get("left") or "").strip(), (step.get("right") or "").strip()
+            if not left or not right:
+                emit("error", {"msg": "Pick the two captured values to compare"}); return
+            step.update(left=left, right=right, value="",
+                        op=step.get("op") if step.get("op") in ("equals", "not_equals", "contains", "not_contains") else "equals")
         elif step["type"] == "assert_js":
             expr = (step.get("expr") or "").strip()
             if not expr:
