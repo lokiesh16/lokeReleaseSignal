@@ -536,8 +536,9 @@
     <div class="browserbar" id="browserbar">
       <div class="bb-field">
         <label for="target-url">Portal A — app URL</label>
-        <select id="target-url">
+        <select id="target-url" onchange="pickCustomUrl(this)">
               <option value="">Select target URL...</option>
+              <option value="__custom__">✎ Custom URL…</option>
               <optgroup label="Staging env">
                 <option value="https://hub-develop.habitnu.com/">https://hub-develop.habitnu.com/</option>
                 <option value="https://app-musc-develop.habitnu.com/">https://app-musc-develop.habitnu.com/</option>
@@ -554,8 +555,9 @@
       </div>
       <div class="bb-field bb-b">
         <label for="target-url-b">Portal B <small>(optional second window)</small></label>
-        <select id="target-url-b">
+        <select id="target-url-b" onchange="pickCustomUrl(this)">
               <option value="">Select target URL...</option>
+              <option value="__custom__">✎ Custom URL…</option>
               <optgroup label="Staging env">
                 <option value="https://hub-develop.habitnu.com/">https://hub-develop.habitnu.com/</option>
                 <option value="https://app-musc-develop.habitnu.com/">https://app-musc-develop.habitnu.com/</option>
@@ -2334,6 +2336,35 @@ function getProviderFields() {
   if (!apiKey) { toast('Enter an API key first', 'err'); openProviderDialog(); return null; }
   return { provider: 'anthropic', api_key: apiKey, model: '' };
 }
+
+// ── custom target URLs (added to the Portal A/B dropdowns, remembered between sessions) ──
+let customUrls = [];
+try { customUrls = JSON.parse(localStorage.getItem('apitestgen.customUrls') || '[]').filter(u => typeof u === 'string'); } catch (e) {}
+function addCustomUrlOption(url) {
+  ['target-url', 'target-url-b'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (Array.from(sel.options).some(o => o.value === url)) return;
+    let grp = sel.querySelector('optgroup[data-custom]');
+    if (!grp) { grp = document.createElement('optgroup'); grp.label = 'Custom'; grp.dataset.custom = '1'; sel.appendChild(grp); }
+    const o = document.createElement('option'); o.value = url; o.textContent = url; grp.appendChild(o);
+  });
+}
+function pickCustomUrl(sel) {
+  if (sel.value !== '__custom__') return;
+  sel.value = '';
+  let url = (prompt('Enter the app URL', 'https://') || '').trim();
+  if (!url || url === 'https://') { uxSave(); return; }
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  try { new URL(url); } catch (e) { toast('That is not a valid URL', 'err'); return; }
+  if (!customUrls.includes(url)) {
+    customUrls.push(url);
+    try { localStorage.setItem('apitestgen.customUrls', JSON.stringify(customUrls)); } catch (e) {}
+  }
+  addCustomUrlOption(url);
+  sel.value = url;
+  uxSave();
+}
+customUrls.forEach(addCustomUrlOption);
 
 // ── remember the small choices between sessions (never keys) ──
 const UX_VALUES = ['target-url', 'target-url-b', 'ui-portal', 'ui-timeout', 'ui-structure', 'ui-slowmo', 'explore-portal', 'explore-max-cases', 'explore-max-steps'];
