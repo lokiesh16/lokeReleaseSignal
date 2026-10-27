@@ -1069,6 +1069,25 @@ def ui_step_delete(data):
     _ui_emit_steps()
 
 
+@socketio.on("ui_step_move")
+def ui_step_move(data):
+    """Drag-and-drop reorder: moves step `id` before/after step `target_id` (a case marker works as a
+    target too: 'after' it = first step of that case). Case markers themselves are not moved."""
+    data = data or {}
+    sid, tid, where = data.get("id"), data.get("target_id"), data.get("where")
+    if sid is None or tid is None or sid == tid or where not in ("before", "after"):
+        return
+    with ui_rec_lock:
+        steps = ui_rec["steps"]
+        mv = next((s for s in steps if s.get("id") == sid), None)
+        if mv is None or mv.get("type") == "case" or not any(s.get("id") == tid for s in steps):
+            return
+        steps.remove(mv)
+        i = next(i for i, s in enumerate(steps) if s.get("id") == tid)
+        steps.insert(i if where == "before" else i + 1, mv)
+    _ui_emit_steps()
+
+
 @socketio.on("ui_step_update")
 def ui_step_update(data):
     """Edit a step's text: its value by default, or `expr` (the script of an assert-script step)."""

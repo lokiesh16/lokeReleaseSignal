@@ -458,6 +458,15 @@
   .ibtn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--muted); cursor: pointer; font-size: 14px; display: grid; place-items: center; transition: all .12s; }
   .ibtn:hover { background: var(--glass-hover); border-color: var(--glass-border); color: var(--text); }
   .ibtn.run:hover { color: var(--green); }
+  .srow { position: relative; padding-left: 20px; }
+  .srow .grip { position: absolute; left: 3px; top: 50%; transform: translateY(-50%); width: 14px; text-align: center; cursor: grab; color: var(--muted); opacity: 0; font-size: 13px; user-select: none; }
+  .srow:hover .grip { opacity: .8; }
+  .srow .grip:active { cursor: grabbing; }
+  .srow.dragging { opacity: .4; }
+  .srow.drop-before, .case-head.drop-before { box-shadow: 0 -2px 0 0 var(--accent, #7c6aff); }
+  .srow.drop-after, .case-head.drop-after { box-shadow: 0 2px 0 0 var(--accent, #7c6aff); }
+  .ibtn.del { opacity: .55; }
+  .ibtn.del:hover { opacity: 1; color: var(--red, #ff5f6d); border-color: #ff5f6d55; background: rgba(255,95,109,.12); }
   .pill { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: rgba(255,255,255,.08); color: var(--muted); font-family: var(--mono); }
   .pill.b { color: #38bdf8; background: rgba(56,189,248,.12); } .pill.a { color: var(--accent2); background: rgba(124,106,255,.14); }
   .pill.ok { color: var(--green); background: rgba(45,212,160,.12); } .pill.no { color: var(--red); background: rgba(255,95,109,.12); } .pill.warn { color: var(--amber); background: rgba(255,183,77,.12); }
@@ -1801,13 +1810,15 @@ function renderUiSteps(steps) {
     else if (UI_EDITABLE.includes(s.type)) val = `<input type="text" class="ux-input" value="${escapeHtml(s.value)}" onchange="uiUpdateStep(${s.id}, this.value)">`;
     else if (s.type === 'note') val = `<span style="color:var(--muted)">${escapeHtml(s.value)}</span>`;
     return `<div class="srow ${r && !r.ok ? 'bad' : ''}" data-id="${s.id}">`
+      + (uiFilter ? '' : `<span class="grip" title="Drag to reorder">⋮⋮</span>`)
       + `<span>${mark}</span><span class="sr-num">${n}</span>`
       + `<span class="sr-verb ${uiVerbClass(s.type)}">${pill}${UI_VERB[s.type] || s.type}</span>`
       + (s.type === 'assert_js' ? `<span class="sr-val"><input type="text" class="ux-input" title="JavaScript evaluated in the page" value="${escapeHtml(s.expr)}" onchange="uiUpdateStep(${s.id}, this.value, 'expr')"></span>`
         : (target || !val ? `<span class="sr-target${val ? '' : ' span2'}" title="${escapeHtml(target)}">${escapeHtml(target)}${chk}</span>` : ''))
       + (val ? `<span class="sr-val${target ? '' : ' span2'}">${val}</span>` : '')
       + `<span class="sr-actions"><button class="ibtn run" title="Run to here: replay steps 1–${n} in fresh windows and outline this step's element" onclick="uiRunTo(${s.id})">▶</button>`
-      + `<button class="ibtn" title="More: check or edit the locator, insert a wait, delete…" onclick="uiRowMenu(${s.id}, event)">⋯</button></span></div>`
+      + `<button class="ibtn" title="More: check or edit the locator, insert a wait, delete…" onclick="uiRowMenu(${s.id}, event)">⋯</button>`
+      + `<button class="ibtn del" title="Delete this step" onclick="socket.emit('ui_step_delete',{id:${s.id}})">🗑</button></span></div>`
       + uiStepDetail(s, n, r);
   };
   const textOf = ({ s }) => [UI_VERB[s.type] || s.type, s.locator ? uiDescribeLocator(s.locator) : '', s.value || '', s.attr || ''].join(' ').toLowerCase();
@@ -1822,7 +1833,7 @@ function renderUiSteps(steps) {
     const res = g.rows.map(x => uiReplayResults[x.s.id]).filter(Boolean);
     const bad = res.filter(x => !x.ok).length;
     const meta = `${g.rows.length} step${g.rows.length === 1 ? '' : 's'}` + (res.length ? (bad ? ` · <span style="color:var(--red)">${bad} failed</span>` : ` · <span style="color:var(--green)">✓ passed</span>`) : '');
-    return `<div class="case-head ${collapsed ? 'collapsed' : ''}"><span class="caret" onclick="uiToggleCase(${g.head.id})" title="Collapse / expand">▾</span>`
+    return `<div class="case-head ${collapsed ? 'collapsed' : ''}" data-case-id="${g.head.id}"><span class="caret" onclick="uiToggleCase(${g.head.id})" title="Collapse / expand">▾</span>`
       + `<b style="white-space:nowrap">📋 Test case</b>`
       + `<input type="text" class="ux-input" value="${escapeHtml(g.head.value)}" onchange="uiUpdateStep(${g.head.id}, this.value)" title="Rename this test case">`
       + `<span class="case-meta">${meta}</span>`
@@ -1831,6 +1842,53 @@ function renderUiSteps(steps) {
   }).join('');
   box.innerHTML = html + (uiFilter && !shown ? `<div class="empty" style="padding:22px">No steps match “${escapeHtml(uiFilter)}”.</div>` : '');
 }
+
+// ── drag & drop reordering (grab the ⋮⋮ handle; drop on the top/bottom half of a row, or on a test-case header) ──
+(function uiDragSetup() {
+  const box = document.getElementById('ui-steps');
+  let dragId = null;
+  const clearMarks = () => box.querySelectorAll('.drop-before,.drop-after,.dragging').forEach(e => e.classList.remove('drop-before', 'drop-after', 'dragging'));
+  const targetOf = (e) => e.target.closest && e.target.closest('.srow, .case-head');
+  box.addEventListener('mousedown', (e) => {
+    const g = e.target.closest && e.target.closest('.grip');
+    if (g) g.closest('.srow').draggable = true;
+  });
+  box.addEventListener('dragstart', (e) => {
+    const row = e.target.closest && e.target.closest('.srow');
+    if (!row || !row.draggable) return;
+    dragId = parseInt(row.dataset.id, 10);
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', String(dragId)); } catch (err) {}
+    setTimeout(() => row.classList.add('dragging'), 0);
+  });
+  box.addEventListener('dragover', (e) => {
+    if (dragId == null) return;
+    const t = targetOf(e);
+    if (!t) return;
+    e.preventDefault();
+    box.querySelectorAll('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after'));
+    if (t.classList.contains('case-head')) { t.classList.add('drop-after'); return; }   // top of that case
+    const r = t.getBoundingClientRect();
+    t.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after');
+  });
+  box.addEventListener('drop', (e) => {
+    if (dragId == null) return;
+    const t = targetOf(e);
+    if (!t) return;
+    e.preventDefault();
+    const isCase = t.classList.contains('case-head');
+    const targetId = parseInt(isCase ? t.dataset.caseId : t.dataset.id, 10);
+    const where = isCase || t.classList.contains('drop-after') ? 'after' : 'before';
+    const id = dragId;
+    dragId = null; clearMarks();
+    if (id !== targetId) socket.emit('ui_step_move', { id, target_id: targetId, where });
+  });
+  box.addEventListener('dragend', () => {
+    dragId = null; clearMarks();
+    box.querySelectorAll('.srow[draggable="true"]').forEach(r => { r.draggable = false; });
+  });
+  document.addEventListener('mouseup', () => box.querySelectorAll('.srow[draggable="true"]').forEach(r => { if (dragId == null) r.draggable = false; }));
+})();
 
 function uiOutTab(name) {
   document.querySelectorAll('#ui-out-card .out-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
