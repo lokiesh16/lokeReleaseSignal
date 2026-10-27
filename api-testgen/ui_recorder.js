@@ -20,10 +20,34 @@
 
   var committed = new WeakMap();                   // element -> last value we reported
   var host = null, root = null, ui = {};           // toolbar (created lazily)
-  var recOn = false, pickOn = false, selEl = null, anchorOn = false;   // anchorOn: prefer label-anchored locators
+  var recOn = false, pickOn = false, holdOn = false, selEl = null, anchorOn = false;   // anchorOn: prefer label-anchored locators
 
   function isOurs(e) {
     return !!(host && e.composedPath && e.composedPath().indexOf(host) >= 0);
+  }
+
+  // Hold: lets you inspect hover/blur-driven UI (dropdown lists, tooltips, popovers) that normally vanishes the
+  // moment the pointer leaves it or focus moves. While Hold or Pick is on, the page no longer hears
+  // mouse-leave / focus-loss events, so those widgets stay open while you reach for the toolbar and pick.
+  // (Widgets driven purely by CSS :hover can't be held this way.) Registered first, so it runs before the page's own handlers.
+  ['mouseout', 'mouseleave', 'pointerout', 'pointerleave', 'blur', 'focusout'].forEach(function (t) {
+    window.addEventListener(t, function (e) {
+      if (!recOn || !(holdOn || pickOn) || !e.isTrusted || isOurs(e)) return;
+      e.stopImmediatePropagation();
+    }, true);
+  });
+  // Keyboard shortcuts work while the pointer is parked on the widget you want to keep open:
+  // Alt+H = hold, Alt+P = pick, Esc leaves pick.
+  window.addEventListener('keydown', function (e) {
+    if (!recOn || !e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.code === 'KeyH') { e.preventDefault(); e.stopImmediatePropagation(); setHold(!holdOn); }
+    else if (e.code === 'KeyP') { e.preventDefault(); e.stopImmediatePropagation(); ensureUi(); pickOn ? exitPick() : enterPick(); }
+  }, true);
+  function setHold(on) {
+    holdOn = !!on;
+    if (ui.hold) ui.hold.classList.toggle('on', holdOn);
+    if (ui.rec) ui.rec.classList.toggle('held', holdOn);
+    say(holdOn ? 'Hold on: dropdowns/tooltips stay open (Alt+H to release)' : 'Hold off');
   }
 
   function send(step) {
@@ -321,6 +345,7 @@
   }, true);
 
   document.addEventListener('keydown', function (e) {
+    if (asking) return;                                           // the name prompt owns the keyboard
     if (pickOn && e.key === 'Escape') { exitPick(); return; }   // before the isOurs guard: focus is usually on the toolbar
     var el = e.target;
     if (!(el instanceof Element) || e.isComposing || isOurs(e)) return;
@@ -339,6 +364,13 @@
     ':host{all:initial}*{box-sizing:border-box;font:12px/1.3 -apple-system,Segoe UI,sans-serif}' +
     '#bar{position:fixed;top:10px;right:10px;display:flex;align-items:center;gap:6px;background:#111827;color:#f9fafb;' +
     'padding:6px 8px;border-radius:9px;box-shadow:0 4px 18px rgba(0,0,0,.35);pointer-events:auto}' +
+    '#ask{position:fixed;display:none;top:70px;left:50%;transform:translateX(-50%);flex-direction:column;gap:6px;background:#111827;color:#f9fafb;padding:10px 12px;' +
+    'border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.5);width:min(420px,90vw);pointer-events:auto}' +
+    '#askq{white-space:pre-line;color:#d1d5db;font-size:12px}#askin{width:100%;font-size:13px;padding:6px 8px}' +
+    '#ask .row{display:flex;gap:6px;justify-content:flex-end}#askok{background:#7c6aff}' +
+    '#grip{cursor:grab;color:#9ca3af;padding:0 2px;letter-spacing:-2px;user-select:none;touch-action:none}#grip:active{cursor:grabbing}' +
+    '#bar.mini>*:not(#grip):not(#rec):not(#hold):not(#pick):not(#min){display:none}' +
+    '.rec.held:after{content:" \\2744";color:#7dd3fc}' +
     '.rec{color:#f87171;font-weight:600}#msg{color:#86efac;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
     'button{background:#374151;color:#f9fafb;border:0;border-radius:6px;padding:5px 9px;cursor:pointer}' +
     'button:hover{background:#4b5563}button.on{background:#7c6aff}' +
@@ -355,15 +387,34 @@
     host = document.createElement('div');
     host.style.cssText = 'all:initial;position:fixed;top:0;left:0;width:0;height:0;overflow:visible;pointer-events:none;z-index:2147483647';
     root = host.attachShadow({ mode: 'open' });
-    root.innerHTML = '<style>' + CSS_TEXT + '</style><div id="box"></div><div id="menu"></div>' +
-      '<div id="bar"><span class="rec" id="rec">&#9679; REC</span><button id="pick" title="Select an element without clicking it (Esc to leave)">&#127919; Pick</button>' +
+    root.innerHTML = '<style>' + CSS_TEXT + '</style><div id="box"></div><div id="menu"></div><div id="ask"><label id="askq"></label><input id="askin" type="text" autocomplete="off" spellcheck="false"><div class="row"><button id="askok">OK</button><button id="askno">Cancel</button></div></div>' +
+      '<div id="bar"><span id="grip" title="Drag to move the toolbar (double-click to reset)">&#8942;&#8942;</span><span class="rec" id="rec">&#9679; REC</span>' +
+      '<button id="hold" title="Hold: keep dropdowns, tooltips and popovers open even when the pointer leaves them (shortcut Alt+H - use it while hovering the widget)">&#10052; Hold</button>' +
+      '<button id="pick" title="Select an element without clicking it (Alt+P, Esc to leave)">&#127919; Pick</button>' +
       '<button id="anchor" title="Prefer locators anchored to the nearest label (ignores a field\'s current value, e.g. a date or selected option)">&#9875; Anchor</button>' +
       '<input id="ms" type="number" value="1000" min="0" step="250" title="milliseconds"><button id="wait">&#9201; Wait</button>' +
       '<button id="cmp" title="Compare two captured values, e.g.  price_list = price_cart   (also: !=, contains, !contains)">&#9878; Compare</button>' +
       '<button id="url" title="Assert the current page URL (path without query; edit the step to loosen or tighten it)">&#128279; URL</button>' +
       '<button id="back" title="Go back to the previous page (recorded as a step)">&#9664; Back</button>' +
-      '<button id="top" title="Scroll to top">&#10514;</button><button id="bot" title="Scroll to bottom">&#10515;</button><span id="msg"></span></div>';
-    ['box', 'menu', 'rec', 'pick', 'anchor', 'ms', 'wait', 'cmp', 'url', 'back', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
+      '<button id="top" title="Scroll to top">&#10514;</button><button id="bot" title="Scroll to bottom">&#10515;</button><span id="msg"></span>' +
+      '<button id="min" title="Shrink / expand the toolbar">&#8211;</button></div>';
+    ['box', 'menu', 'ask', 'askq', 'askin', 'askok', 'askno', 'bar', 'grip', 'min', 'hold', 'rec', 'pick', 'anchor', 'ms', 'wait', 'cmp', 'url', 'back', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
+    ui.hold.onclick = function () { setHold(!holdOn); };
+    ui.min.onclick = function () { ui.bar.classList.toggle('mini'); savePos(); };
+    // Keep focus in the page when a toolbar button is pressed, so a blur-closed widget isn't dismissed by the click itself.
+    ui.bar.addEventListener('mousedown', function (e) { if (e.target.tagName !== 'INPUT') e.preventDefault(); });
+    // Drag the toolbar anywhere (it can cover what you're trying to pick); the spot is remembered across pages.
+    var drag = null;
+    ui.grip.addEventListener('pointerdown', function (e) {
+      var r = ui.bar.getBoundingClientRect();
+      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+      try { ui.grip.setPointerCapture(e.pointerId); } catch (err) {}
+      e.preventDefault();
+    });
+    ui.grip.addEventListener('pointermove', function (e) { if (drag) placeBar(e.clientX - drag.dx, e.clientY - drag.dy); });
+    ui.grip.addEventListener('pointerup', function () { if (drag) { drag = null; savePos(); } });
+    ui.grip.addEventListener('dblclick', function () { barPos = null; ui.bar.classList.remove('mini'); ui.bar.style.left = ui.bar.style.top = ''; ui.bar.style.right = '10px'; savePos(); });
+    window.addEventListener('resize', function () { if (barPos) placeBar(barPos.x, barPos.y); });
     ui.pick.onclick = function () { pickOn ? exitPick() : enterPick(); };
     ui.anchor.onclick = function () {
       anchorOn = !anchorOn; ui.anchor.classList.toggle('on', anchorOn);
@@ -372,11 +423,14 @@
     };
     ui.wait.onclick = function () { send({ type: 'wait', value: String(parseInt(ui.ms.value, 10) || 0) }); say('Added: wait ' + ui.ms.value + 'ms'); };
     ui.cmp.onclick = function () {
-      var t = (window.prompt('Compare two captured variables.\nExamples:  price_list = price_cart   |   title != old_title   |   banner contains name', '') || '').trim();
-      var m = t.match(/^(\w+)\s*(!=|=|!contains|contains)\s*(\w+)$/);
-      if (!m) { if (t) say('Use:  first = second'); return; }
-      send({ type: 'compare', left: m[1], right: m[3], op: { '=': 'equals', '!=': 'not_equals', contains: 'contains', '!contains': 'not_contains' }[m[2]], value: '' });
-      say('Added: compare ' + m[1] + ' ' + m[2] + ' ' + m[3]);
+      ask('Compare two captured variables.\nExamples:  price_list = price_cart   |   title != old_title   |   banner contains name', '', function (t) {
+        t = (t || '').trim();
+        if (!t) return;
+        var m = t.match(/^(\w+)\s*(!=|=|!contains|contains)\s*(\w+)$/);
+        if (!m) { say('Use:  first = second'); return; }
+        send({ type: 'compare', left: m[1], right: m[3], op: { '=': 'equals', '!=': 'not_equals', contains: 'contains', '!contains': 'not_contains' }[m[2]], value: '' });
+        say('Added: compare ' + m[1] + ' ' + m[2] + ' ' + m[3]);
+      });
     };
     ui.url.onclick = function () {
       var u = location.origin + location.pathname;
@@ -387,6 +441,50 @@
     ui.bot.onclick = function () { window.scrollTo(0, document.documentElement.scrollHeight); send({ type: 'scroll_page', value: 'bottom' }); say('Added: scroll to bottom'); };
     document.documentElement.appendChild(host);
     host.style.display = 'none';
+  }
+
+  // In-page replacement for window.prompt(): the automation browser auto-accepts native dialogs (so the
+  // old prompt flashed and closed with its default answer). Calls done(text) on OK/Enter, done(null) on Cancel/Esc.
+  var asking = false;
+  function ask(question, dflt, done) {
+    ensureUi();
+    asking = true;
+    ui.askq.textContent = question;
+    ui.askin.value = dflt || '';
+    ui.ask.style.display = 'flex';
+    function close(val) {
+      asking = false;
+      ui.ask.style.display = 'none';
+      ui.askok.onclick = ui.askno.onclick = ui.askin.onkeydown = null;
+      done(val);
+    }
+    ui.askok.onclick = function () { close(ui.askin.value); };
+    ui.askno.onclick = function () { close(null); };
+    ui.askin.onkeydown = function (e) {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); close(ui.askin.value); }
+      else if (e.key === 'Escape') { e.preventDefault(); close(null); }
+    };
+    ['keyup', 'keypress'].forEach(function (t) { ui.askin['on' + t] = function (e) { e.stopPropagation(); }; });
+    setTimeout(function () { ui.askin.focus(); ui.askin.select(); }, 0);
+  }
+
+  var barPos = null;   // {x, y} of the toolbar's top-left when the user has moved it
+  function placeBar(x, y) {
+    if (!ui.bar) return;
+    var w = ui.bar.offsetWidth, h = ui.bar.offsetHeight;
+    x = Math.max(0, Math.min(x, window.innerWidth - Math.min(w, window.innerWidth)));
+    y = Math.max(0, Math.min(y, window.innerHeight - h));
+    barPos = { x: x, y: y };
+    ui.bar.style.right = 'auto'; ui.bar.style.left = x + 'px'; ui.bar.style.top = y + 'px';
+  }
+  function savePos() {   // remembered by the Python side, so it follows the toolbar across pages and origins
+    try { window.__tgRecordStep({ type: '__toolpos', pos: barPos, mini: !!(ui.bar && ui.bar.classList.contains('mini')) }); } catch (e) {}
+  }
+  function applyPos(st) {
+    if (!ui.bar || !st) return;
+    if (st.pos) placeBar(st.pos.x, st.pos.y);
+    ui.bar.classList.toggle('mini', !!st.mini);
   }
 
   function say(m) {
@@ -567,11 +665,16 @@
       send({ type: 'assert_value', locator: loc, value: String(el.value || '') });
     } else if (/^capture_/.test(op)) {
       var source = op.slice(8);
+      ui.menu.style.display = 'none';
       var dflt = (describe(loc).replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase().slice(0, 24)) || 'value';
-      var vname = (window.prompt('Name this captured ' + source + ' (use it later in a Compare):', dflt) || '').trim().replace(/\W+/g, '_').replace(/^_+|_+$/g, '');
-      if (!vname) { say('Capture cancelled'); clearSel(); return; }
-      send({ type: 'capture', locator: loc, source: source, 'var': vname });
-      label = 'capture ' + source + ' as ' + vname;
+      ask('Name this captured ' + source + ' (use it later in a Compare):', dflt, function (name) {
+        var vname = (name || '').trim().replace(/\W+/g, '_').replace(/^_+|_+$/g, '');
+        if (!vname) { say('Capture cancelled'); clearSel(); return; }
+        send({ type: 'capture', locator: loc, source: source, 'var': vname });
+        say('Added: capture ' + source + ' as ' + vname);
+        if (!pickOn) clearSel(); else setTimeout(function () { if (pickOn) clearSel(); }, 450);
+      });
+      return;
     } else if (op === 'assert_attr') {
       send({ type: 'assert_attr', locator: loc, attr: 'href', value: el.getAttribute('href') });
     }
@@ -611,14 +714,14 @@
     if (host) host.style.display = (on && showToolbar) ? '' : 'none';
     if (ui.anchor) ui.anchor.classList.toggle('on', anchorOn);
     if (ui.rec) ui.rec.innerHTML = '&#9679; REC' + (label ? ' &middot; ' + label : '');   // which portal, when recording several
-    if (!on) exitPick();
+    if (!on) { exitPick(); setHold(false); }
   };
 
   // A fresh document (navigation/reload) asks Python whether a recording is live.
   function syncState() {
     try {
       var p = window.__tgRecordStep && window.__tgRecordStep({ type: '__state' });
-      if (p && p.then) p.then(function (st) { if (st) window.__tgSetRec(st.rec, st.toolbar, st.anchor, st.label); });
+      if (p && p.then) p.then(function (st) { if (st) { window.__tgSetRec(st.rec, st.toolbar, st.anchor, st.label); applyPos(st); } });
     } catch (e) {}
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncState);

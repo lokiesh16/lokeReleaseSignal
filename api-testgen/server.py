@@ -400,7 +400,11 @@ def _ui_binding(source, step):
     if step.get("type") == "__state":
         return {"rec": ui_rec["recording"] and portal in ui_rec["portals"], "toolbar": ui_rec["toolbar"],
                 "anchor": ui_rec.get("anchor", False),
+                "pos": ui_rec.get("toolpos"), "mini": ui_rec.get("toolmini", False),
                 "label": f"Portal {portal}" if len(ui_rec["portals"]) > 1 else ""}
+    if step.get("type") == "__toolpos":   # the toolbar was dragged / shrunk; remembered across page loads
+        ui_rec["toolpos"], ui_rec["toolmini"] = step.get("pos"), bool(step.get("mini"))
+        return None
     if step.get("type") == "__anchor":   # the toolbar's ⚓ toggle; remembered across page loads
         ui_rec["anchor"] = bool(step.get("value"))
         return None
