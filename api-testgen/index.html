@@ -781,6 +781,7 @@
                 <h3>Steps <span id="ui-step-count" class="badge">0</span></h3>
                 <input type="search" id="ui-filter" class="ux-input steps-search" placeholder="Filter steps…" oninput="uiSetFilter(this.value)">
                 <div class="spacer"></div>
+                <button class="btn btn-primary btn-sm" id="btn-ui-newflow" onclick="uiNewFlow()" title="Start a fresh flow: clears the steps, name, goal and expected result, then starts recording if the browser is open">＋ New flow</button>
                 <button class="btn btn-ghost btn-sm" id="btn-ui-collapse" onclick="uiCollapseAll()" title="Collapse / expand all test cases">⇕ Cases</button>
                 <label class="chk" title="Takes a screenshot after every step during Replay and builds a shareable HTML report (goal, expected result, verdict, issues, steps with screenshots, final screen). Makes the replay a little slower."><input type="checkbox" id="ui-report"> 📄 Report</label>
                 <button class="btn btn-ghost btn-sm" id="btn-ui-replay" onclick="uiReplay()" title="Run every step in fresh browser windows and mark each ✓ / ✗">▶ Replay all</button>
@@ -2003,6 +2004,26 @@ function uiToggleRecord(append) {
   const hasSteps = uiLastSteps.length > 0;
   if (hasSteps && !append && !confirm(`Start a new recording? This replaces the ${uiLastSteps.length} steps currently in the list.\n\n(Use "Record more (append)" to keep them, or Save them first.)`)) return;
   socket.emit('ui_record_start', { portals: document.getElementById('ui-portal').value.split(','), keep_steps: !!append && hasSteps });
+}
+// "＋ New flow": one click to a blank slate (steps, names, goal/expected, replay/output state), then record if the browser is open.
+function uiNewFlow() {
+  if (uiRecording) { toast('Stop the current recording first', 'err'); return; }
+  const unsaved = uiLastSteps.length > 0 && (uiLoadedName == null || uiDirty());
+  if (unsaved && !confirm(`Start a new flow? The ${uiLastSteps.length} steps in the list are not saved and will be discarded.\n\n(Cancel, then use Save to keep them.)`)) return;
+  uiReplayResults = {}; uiCheckResults = {}; uiGeneratedFile = null; uiInsertOpen = null; uiEditLoc = null;
+  ['ui-test-name', 'ui-test-goal', 'ui-test-expected', 'ui-save-name'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  document.getElementById('ui-report-row').style.display = 'none';
+  const runLog = document.getElementById('ui-run-log'); if (runLog) { runLog.textContent = ''; runLog.classList.remove('show'); }
+  socket.emit('ui_steps_clear');
+  uiRunButtons(false);
+  uiSnapshot = null;
+  if (browserOpen) {
+    socket.emit('ui_record_start', { portals: document.getElementById('ui-portal').value.split(','), keep_steps: false });
+    toast('New flow - recording started');
+  } else {
+    toast('New flow ready - launch the browser, then Start recording');
+  }
+  const nm = document.getElementById('ui-test-name'); if (nm) nm.focus();
 }
 function uiClearSteps() { uiReplayResults = {}; uiCheckResults = {}; socket.emit('ui_steps_clear'); }
 function uiReplay() {
