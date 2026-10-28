@@ -36,6 +36,17 @@
       e.stopImmediatePropagation();
     }, true);
   });
+  // An explicit Hold also freezes the page's pointer tracking (mousemove / enter / over). Chart and map tooltips
+  // follow mousemove and hide as soon as the pointer is anywhere that isn't a data point - including on the way to
+  // the toolbar - so without this they vanish before you can pick them. Pick on its own leaves moves alone
+  // (hover styles keep working), but Pick's own highlight still tracks the pointer.
+  ['mousemove', 'pointermove', 'mouseover', 'pointerover', 'mouseenter', 'pointerenter'].forEach(function (t) {
+    window.addEventListener(t, function (e) {
+      if (!recOn || !e.isTrusted || isOurs(e)) return;
+      if (t === 'mousemove' && pickOn && !selEl && e.target instanceof Element) drawBox(e.target);
+      if (holdOn) e.stopImmediatePropagation();
+    }, true);
+  });
   // Keyboard shortcuts work while the pointer is parked on the widget you want to keep open:
   // Alt+H = hold, Alt+P = pick, Esc leaves pick.
   window.addEventListener('keydown', function (e) {
@@ -700,10 +711,6 @@
     var ghosts = findGhosts(e.clientX, e.clientY, e.target), inside = ghosts.length && ghosts[0].inside ? ghosts[0].el : null;
     showMenu(inside || e.target, { x: e.clientX, y: e.clientY, under: e.target, ghost: !!inside,
                                    overlays: ghosts.filter(function (g) { return g.el !== inside; }).map(function (g) { return g.el; }) });
-  }, true);
-  window.addEventListener('mousemove', function (e) {
-    if (!pickOn || selEl || isOurs(e) || !(e.target instanceof Element)) return;
-    drawBox(e.target);
   }, true);
   window.addEventListener('scroll', function () { if (selEl) drawBox(selEl); }, true);
 
