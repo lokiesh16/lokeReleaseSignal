@@ -44,7 +44,7 @@
   ['mousemove', 'pointermove', 'mouseover', 'pointerover', 'mouseenter', 'pointerenter'].forEach(function (t) {
     window.addEventListener(t, function (e) {
       if (!recOn || !e.isTrusted || isOurs(e)) return;
-      if (t === 'mousemove' && pickOn && !selEl && e.target instanceof Element) drawBox(e.target);
+      if (t === 'mousemove' && pickOn && !selEl && e.target instanceof Element) drawBox(pickTarget(e.clientX, e.clientY, e.target));
       if (holdOn) e.stopImmediatePropagation();
     }, true);
   });
@@ -399,7 +399,123 @@
     return { kind: 'pw', selector: sel, py: py, desc: inner.desc + ' in the row "' + key + '"' + (rowIdx != null ? ' (#' + (rowIdx + 1) + ' of ' + matching.length + ')' : ''), stable: true, matches: 1 };
   }
 
+  // Charts (Google Charts, D3, Highcharts...) lay an invisible rect over the plot to catch the mouse, so a click lands on
+  // that rect and never on the circle / bar / line underneath. Look through invisible SVG shapes to the first visible one.
+  var SVG_SHAPE = /^(circle|ellipse|path|rect|line|polyline|polygon)$/;
+  // Point markers (circle/ellipse) only count when they have a fill. Hovering a point makes charts move it into a new group together
+  // with a few unfilled highlight rings, which would shift its position in the list while the mouse is on it - and only then.
+  var MARK_FILTER = ':not([fill="none"]):not([fill-opacity="0"])';
+  function countsAsMark(n) {
+    return !/^(circle|ellipse)$/.test(n.tagName.toLowerCase()) || (n.getAttribute('fill') !== 'none' && n.getAttribute('fill-opacity') !== '0');
+  }
+  function seeThrough(n) {
+    if (!(n instanceof SVGElement) || !SVG_SHAPE.test(n.tagName.toLowerCase())) return false;
+    var cs = getComputedStyle(n);
+    if (parseFloat(cs.opacity) < 0.05) return true;
+    var noFill = cs.fill === 'none' || cs.fill === 'transparent' || parseFloat(cs.fillOpacity) < 0.05;
+    var noStroke = cs.stroke === 'none' || parseFloat(cs.strokeOpacity) < 0.05 || parseFloat(cs.strokeWidth) === 0;
+    return noFill && noStroke;
+  }
+  function pickTarget(x, y, t) {
+    if (!(t instanceof SVGElement) || t.tagName.toLowerCase() === 'svg' || !SVG_SHAPE.test(t.tagName.toLowerCase())) return t;
+    var root = t.ownerSVGElement, ra = root ? root.getBoundingClientRect() : null, stack = document.elementsFromPoint(x, y), first = null;
+    var shapes = [];
+    for (var i = 0; i < stack.length; i++) {
+      var n = stack[i];
+      if (host && (n === host || host.contains(n))) continue;
+      if (!(n instanceof SVGElement) || n.ownerSVGElement !== root || !SVG_SHAPE.test(n.tagName.toLowerCase()) || seeThrough(n)) continue;
+      var r = n.getBoundingClientRect();
+      if (ra && r.width * r.height > ra.width * ra.height * 0.6) continue;       // the chart's background rect
+      shapes.push({ n: n, cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
+    }
+    if (!shapes.length) return t;
+    first = shapes[0];
+    // Hovering a point makes charts draw a temporary highlight ring on top of it, alone in its own group. It is gone at replay,
+    // so skip shapes that have no same-kind siblings (data points always come many to a group). Several data series can also
+    // stack at one spot (initial and latest value): keep the topmost, the one that was visibly clicked.
+    function isDataPoint(n) {
+      if (!countsAsMark(n)) return false;
+      var sib = Array.prototype.filter.call(n.parentNode ? n.parentNode.children : [], function (c) { return c.tagName === n.tagName; });
+      return sib.length > 1;
+    }
+    var data = shapes.filter(function (c) { return isDataPoint(c.n); });
+    return (data.length ? data[0] : first).n;
+  }
+  // Several charts on a page often carry the same aria-label (Google Charts: "A chart."). The title above each chart tells
+  // them apart: "the chart under the heading 'HbA1c Changes By Participants'". Returns null when no such title is unique.
+  var HEAD_SEL = '.card-header, .card-title, h1, h2, h3, h4, h5, h6, legend, [role="heading"]';
+  function chartTitleScope(root, label) {
+    if (label && /["\\]/.test(label)) return null;
+    var svgCss = label ? 'svg[aria-label=' + JSON.stringify(label) + ']' : 'svg';
+    var heads = Array.prototype.slice.call(document.querySelectorAll(HEAD_SEL));
+    for (var a = root.parentElement; a && a !== document.body; a = a.parentElement) {
+      var inside = heads.filter(function (h) { return a.contains(h) && !h.contains(root); });
+      if (!inside.length) continue;
+      if (a.querySelectorAll(svgCss).length !== 1) return null;                  // the chart is not alone under this heading
+      var h = inside[0], hc = h.cloneNode(true);
+      Array.prototype.forEach.call(hc.querySelectorAll('button,svg,img,i,[role="button"]'), function (n) { n.remove(); });   // an info icon's text is not part of the title
+      var title = norm(hc.textContent);
+      if (title.length < 3 || title.length > 60 || /["\\]/.test(title) || fragileText(title, null)) return null;
+      var sameTitle = heads.filter(function (x) { return norm(x.textContent).indexOf(title) >= 0; }).length;
+      if (sameTitle !== 1) return null;
+      var hs = ':is(' + HEAD_SEL + '):has-text(' + JSON.stringify(title) + ')';
+      var xp = 'xpath=ancestor::*[.//*[local-name()="svg"]' + (label ? '[@aria-label=' + JSON.stringify(label) + ']' : '') + '][1]';
+      return { title: title, sel: hs + ' >> ' + xp + ' >> ' + svgCss, py: 'locator(' + JSON.stringify(hs) + ').locator(' + JSON.stringify(xp) + ').locator(' + JSON.stringify(svgCss) + ')' };
+    }
+    return null;
+  }
+  // A chart shape (data point, bar, slice) is found by its chart and its position among that chart's shapes of the same kind.
+  function svgShapeLocator(el) {
+    var tag = el.tagName.toLowerCase(), root = el.ownerSVGElement;
+    if (!(el instanceof SVGElement) || !root || !SVG_SHAPE.test(tag)) return null;
+    // Count EVERY shape of this kind in the chart (hidden and <defs> ones too): the replay selector `svg >> circle >> nth=N`
+    // counts them all, so a number worked out from the visible ones alone would land on a different shape.
+    var shapes = Array.prototype.filter.call(root.querySelectorAll(tag), countsAsMark), fillSel = /^(circle|ellipse)$/.test(tag) ? MARK_FILTER : '', fill = '';
+    // (no colour filter: a series' colour follows the data - e.g. latest value green/red/grey - so it would shift the number)
+    var at = shapes.indexOf(el);
+    if (at < 0) return null;
+    var label = root.getAttribute('aria-label'), sel, py, name, warn = '';
+    var all = Array.prototype.slice.call(document.querySelectorAll('svg'));
+    var scope = chartTitleScope(root, label);
+    if (scope) {
+      sel = scope.sel; py = scope.py; name = 'the chart "' + scope.title + '"';
+    } else if (label) {
+      var same = all.filter(function (v) { return v.getAttribute('aria-label') === label; }), k = same.indexOf(root);
+      sel = 'svg[aria-label=' + JSON.stringify(label) + ']'; py = 'locator(' + JSON.stringify(sel) + ')';
+      name = 'the chart "' + label + '"';
+      if (same.length > 1) { sel += ' >> nth=' + k; py += '.nth(' + k + ')'; name += ' (#' + (k + 1) + ' of ' + same.length + ' on the page)'; warn = 'there are ' + same.length + ' charts labelled "' + label + '", so this relies on their order on the page'; }
+    } else {
+      var k2 = all.indexOf(root);
+      sel = 'svg >> nth=' + k2; py = 'locator("svg").nth(' + k2 + ')'; name = 'chart #' + (k2 + 1) + ' on the page';
+      warn = 'the chart has no label, so this relies on its order on the page';
+    }
+    // A point marker (circle) is identified by WHERE it is drawn: column = rank of its x among the chart's points, row = rank of its y
+    // within that column. Not by its place in the HTML: charts re-render on hover and move the hovered point elsewhere in it.
+    if (/^(circle|ellipse)$/.test(tag) && el.getAttribute('cx') != null && el.getAttribute('cy') != null) {
+      var num = function (a, b) { return parseFloat(a) - parseFloat(b); }, ex = el.getAttribute('cx'), ey = el.getAttribute('cy');
+      var xs = [], ys = [];
+      shapes.forEach(function (n) { var x = n.getAttribute('cx'); if (x != null && xs.indexOf(x) < 0) xs.push(x); });
+      xs.sort(num);
+      shapes.forEach(function (n) { var y = n.getAttribute('cy'); if (n.getAttribute('cx') === ex && y != null && ys.indexOf(y) < 0) ys.push(y); });
+      ys.sort(num);
+      var col = xs.indexOf(ex), row = ys.indexOf(ey);
+      if (col >= 0 && row >= 0) {
+        var cp = { kind: 'chartpoint', scope: sel, tag: tag, col: col, row: row, matches: 1, force: true,
+                   desc: 'point in column ' + (col + 1) + ' of ' + xs.length + (ys.length > 1 ? ', row ' + (row + 1) + ' of ' + ys.length : '') + ' of ' + name };
+        if (warn) cp.warn = warn; else cp.stable = true;
+        return cp;
+      }
+    }
+    sel += ' >> ' + tag + fillSel + (shapes.length > 1 ? ' >> nth=' + at : ''); py += '.locator(' + JSON.stringify(tag + fillSel) + ')' + (shapes.length > 1 ? '.nth(' + at + ')' : '');
+    var loc = { kind: 'pw', selector: sel, py: py, desc: tag + (shapes.length > 1 ? ' #' + (at + 1) + ' of ' + shapes.length : '') + ' in ' + name, matches: 1, force: true };    // chart overlays cover the shape: replay must not wait for it to be "uncovered"
+    if (warn) loc.warn = warn; else loc.stable = true;
+    return loc;
+  }
+
   function buildLocator(el) {
+    var shape = null;
+    try { shape = svgShapeLocator(el); } catch (e) {}
+    if (shape) return shape;
     var primary = playwrightLocator(el) || buildLocatorFallback(el), anchored = null;
     var issues = [];
     try { issues = locatorIssues(primary, el); } catch (e) {}
@@ -993,8 +1109,9 @@
     if (!pickOn || isOurs(e)) return;
     e.preventDefault(); e.stopImmediatePropagation();
     if (!(e.target instanceof Element)) return;
-    var ghosts = findGhosts(e.clientX, e.clientY, e.target), inside = ghosts.length && ghosts[0].inside ? ghosts[0].el : null;
-    showMenu(inside || e.target, { x: e.clientX, y: e.clientY, under: e.target, ghost: !!inside,
+    var tgt = pickTarget(e.clientX, e.clientY, e.target);
+    var ghosts = findGhosts(e.clientX, e.clientY, tgt), inside = ghosts.length && ghosts[0].inside ? ghosts[0].el : null;
+    showMenu(inside || tgt, { x: e.clientX, y: e.clientY, under: tgt, ghost: !!inside,
                                    overlays: ghosts.filter(function (g) { return g.el !== inside; }).map(function (g) { return g.el; }) });
   }, true);
   window.addEventListener('scroll', function () { if (selEl) drawBox(selEl); }, true);

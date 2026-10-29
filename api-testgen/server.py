@@ -667,7 +667,14 @@ def playwright_worker():
                 n = loc.count()
                 if n:
                     loc.first.scroll_into_view_if_needed(timeout=2000)
-                    loc.first.evaluate("e => { const o = e.style.outline; e.style.outline = '3px solid #f59e0b'; "
+                    # SVG shapes (chart points) are a few px wide, so an outline is invisible: draw a ring around them instead
+                    loc.first.evaluate("e => { if (e instanceof SVGElement && e.tagName.toLowerCase() !== 'svg') { "
+                                       "const r = e.getBoundingClientRect(), d = document.createElement('div'), pad = 9; "
+                                       "d.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;border:3px solid #f59e0b;"
+                                       "border-radius:50%;background:rgba(245,158,11,.25);box-shadow:0 0 0 2px #fff;"
+                                       "left:' + (r.left - pad) + 'px;top:' + (r.top - pad) + 'px;width:' + (r.width + 2 * pad) + 'px;height:' + (r.height + 2 * pad) + 'px'; "
+                                       "document.body.appendChild(d); setTimeout(() => d.remove(), 3500); return; } "
+                                       "const o = e.style.outline; e.style.outline = '3px solid #f59e0b'; "
                                        "setTimeout(() => { e.style.outline = o; }, 2500); }")
                 _put_result(cmd, {"ok": True, "count": n})
             except Exception as e:
