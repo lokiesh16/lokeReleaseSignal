@@ -19,6 +19,7 @@
   window.__tgUiRecorderInjected = true;
 
   var committed = new WeakMap();                   // element -> last value we reported
+  var askKey = null;                               // keydown handler of the open prompt (see ask())
   var host = null, root = null, ui = {};           // toolbar (created lazily)
   var recOn = false, pickOn = false, holdOn = false, selEl = null, anchorOn = false;   // anchorOn: prefer label-anchored locators
 
@@ -49,9 +50,11 @@
   });
   // While our prompt is open, keep the page from hearing focus/keyboard traffic aimed at it. Modal dialogs
   // (focus traps) otherwise yank focus back out of the input, so typing and clearing silently do nothing.
-  ['focusin', 'focusout', 'blur', 'keydown', 'keypress', 'keyup', 'beforeinput', 'input'].forEach(function (t) {
+  ['focus', 'focusin', 'focusout', 'blur', 'keydown', 'keypress', 'keyup', 'beforeinput', 'input'].forEach(function (t) {
     window.addEventListener(t, function (e) {
-      if (asking && isOurs(e)) e.stopImmediatePropagation();
+      if (!(asking && isOurs(e))) return;
+      e.stopImmediatePropagation();
+      if (t === 'keydown' && askKey) askKey(e);     // the prompt's own Enter / Esc handler never sees the event once it is stopped here
     }, true);
   });
   // Keyboard shortcuts work while the pointer is parked on the widget you want to keep open:
@@ -652,25 +655,40 @@
   // In-page replacement for window.prompt(): the automation browser auto-accepts native dialogs (so the
   // old prompt flashed and closed with its default answer). Calls done(text) on OK/Enter, done(null) on Cancel/Esc.
   var asking = false;
+  // A modal dialog that is open right now (react-bootstrap .modal, role=dialog, aria-modal, <dialog open>), or null.
+  // Its focus trap / `inert` handling treats anything outside it as unreachable, so the prompt has to live inside it.
+  function openModal() {
+    var list = document.querySelectorAll('dialog[open],[aria-modal="true"],[role="dialog"],[role="alertdialog"],.modal.show'), found = null;
+    for (var i = 0; i < list.length; i++) {
+      var n = list[i];
+      if (n === host || host.contains(n) || n.contains(host)) continue;
+      var r = n.getBoundingClientRect(), cs = getComputedStyle(n);
+      if (r.width > 40 && r.height > 40 && cs.visibility !== 'hidden' && cs.display !== 'none') found = n;   // last one = topmost
+    }
+    return found;
+  }
   function ask(question, dflt, done) {
     ensureUi();
     asking = true;
+    var modal = openModal();
+    if (modal) { try { modal.appendChild(host); host.inert = false; host.removeAttribute('inert'); host.removeAttribute('aria-hidden'); } catch (e) {} }
     ui.askq.textContent = question;
     ui.askin.value = dflt || '';
     ui.ask.style.display = 'flex';
     function close(val) {
-      asking = false;
+      asking = false; askKey = null;
+      if (host.parentNode !== document.documentElement) document.documentElement.appendChild(host);
       ui.ask.style.display = 'none';
       ui.askok.onclick = ui.askno.onclick = ui.askin.onkeydown = null;
       done(val);
     }
     ui.askok.onclick = function () { close(ui.askin.value); };
     ui.askno.onclick = function () { close(null); };
-    ui.askin.onkeydown = function (e) {
-      e.stopPropagation();
+    askKey = function (e) {
       if (e.key === 'Enter') { e.preventDefault(); close(ui.askin.value); }
       else if (e.key === 'Escape') { e.preventDefault(); close(null); }
     };
+    ui.askin.onkeydown = function (e) { e.stopPropagation(); askKey(e); };
     ['keyup', 'keypress'].forEach(function (t) { ui.askin['on' + t] = function (e) { e.stopPropagation(); }; });
     setTimeout(function () { ui.askin.focus(); ui.askin.select(); }, 0);
   }
