@@ -600,9 +600,10 @@
       '<button id="cmp" title="Compare two captured values, e.g.  price_list = price_cart   (also: !=, contains, !contains)">&#9878; Compare</button>' +
       '<button id="url" title="Assert the current page URL (path without query; edit the step to loosen or tighten it)">&#128279; URL</button>' +
       '<button id="back" title="Go back to the previous page (recorded as a step)">&#9664; Back</button>' +
+      '<button id="reload" title="Reload the page (recorded as a step)">&#8635; Reload</button>' +
       '<button id="top" title="Scroll to top">&#10514;</button><button id="bot" title="Scroll to bottom">&#10515;</button><span id="msg"></span>' +
       '<button id="min" title="Shrink / expand the toolbar">&#8211;</button></div>';
-    ['box', 'menu', 'ask', 'askq', 'askin', 'askok', 'askno', 'bar', 'grip', 'min', 'hold', 'rec', 'pick', 'anchor', 'ms', 'wait', 'cmp', 'url', 'back', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
+    ['box', 'menu', 'ask', 'askq', 'askin', 'askok', 'askno', 'bar', 'grip', 'min', 'hold', 'rec', 'pick', 'anchor', 'ms', 'wait', 'cmp', 'url', 'back', 'reload', 'top', 'bot', 'msg'].forEach(function (id) { ui[id] = root.getElementById(id); });
     ui.hold.onclick = function () { setHold(!holdOn); };
     ui.min.onclick = function () { ui.bar.classList.toggle('mini'); savePos(); };
     // Keep focus in the page when a toolbar button is pressed, so a blur-closed widget isn't dismissed by the click itself.
@@ -641,6 +642,7 @@
       send({ type: 'assert_url', value: u }); say('Added: assert URL contains ' + u);
     };
     ui.back.onclick = function () { send({ type: 'back' }); say('Added: go back'); history.back(); };
+    ui.reload.onclick = function () { send({ type: 'reload' }); say('Added: reload'); location.reload(); };
     ui.top.onclick = function () { window.scrollTo(0, 0); send({ type: 'scroll_page', value: 'top' }); say('Added: scroll to top'); };
     ui.bot.onclick = function () { window.scrollTo(0, document.documentElement.scrollHeight); send({ type: 'scroll_page', value: 'bottom' }); say('Added: scroll to bottom'); };
     document.documentElement.appendChild(host);

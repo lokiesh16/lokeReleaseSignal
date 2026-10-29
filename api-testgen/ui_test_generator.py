@@ -265,6 +265,8 @@ def _render_step_page(s, secrets, locfn=None):
         return f"page.goto({_s(s.get('value') or s.get('url'))})"
     if t == "back":
         return "page.go_back()"
+    if t == "reload":
+        return "page.reload()"
     if t == "click":
         return f"{_locator_expr(loc)}.click()"
     if t == "fill":
@@ -511,6 +513,8 @@ def replay_step(page, step, expect, captured=None):
         page.goto(val or step.get("url"))
     elif t == "back":
         page.go_back(wait_until="domcontentloaded")
+    elif t == "reload":
+        page.reload(wait_until="domcontentloaded")
     elif t == "click":
         resolve_locator(page, loc).click()
     elif t == "fill":

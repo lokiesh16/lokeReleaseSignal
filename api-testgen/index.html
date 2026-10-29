@@ -832,8 +832,8 @@
         <summary class="btn btn-ghost btn-sm">↪ Navigate…</summary>
         <div class="bb-pop">
           <div class="hint" style="margin:0 0 4px">Send an already-open window to another page.</div>
-          <div class="flex-row"><input type="text" class="ux-input" id="nav-url-a" placeholder="Portal A to…"><button class="btn btn-ghost btn-sm" onclick="navigateBrowser('A')">→ Go</button><button class="btn btn-ghost btn-sm" onclick="goBack('A')" title="Back to the previous page (recorded while recording)">◀ Back</button></div>
-          <div class="flex-row"><input type="text" class="ux-input" id="nav-url-b" placeholder="Portal B to…"><button class="btn btn-ghost btn-sm" onclick="navigateBrowser('B')">→ Go</button><button class="btn btn-ghost btn-sm" onclick="goBack('B')" title="Back to the previous page (recorded while recording)">◀ Back</button></div>
+          <div class="flex-row"><input type="text" class="ux-input" id="nav-url-a" placeholder="Portal A to…"><button class="btn btn-ghost btn-sm" onclick="navigateBrowser('A')">→ Go</button><button class="btn btn-ghost btn-sm" onclick="goBack('A')" title="Back to the previous page (recorded while recording)">◀ Back</button><button class="btn btn-ghost btn-sm" onclick="goReload('A')" title="Reload the page (recorded while recording)">↻ Reload</button></div>
+          <div class="flex-row"><input type="text" class="ux-input" id="nav-url-b" placeholder="Portal B to…"><button class="btn btn-ghost btn-sm" onclick="navigateBrowser('B')">→ Go</button><button class="btn btn-ghost btn-sm" onclick="goBack('B')" title="Back to the previous page (recorded while recording)">◀ Back</button><button class="btn btn-ghost btn-sm" onclick="goReload('B')" title="Reload the page (recorded while recording)">↻ Reload</button></div>
         </div>
       </details>
     </div>
@@ -1334,6 +1334,7 @@ function navigateBrowser(portal) {
   socket.emit('navigate', { url, portal });
 }
 function goBack(portal) { socket.emit('go_back', { portal }); }
+function goReload(portal) { socket.emit('go_reload', { portal }); }
 function stopBrowser() { socket.emit('stop_browser'); }
 
 // ── Network log ───────────────────────────────────────────────────────────────
@@ -1999,7 +2000,7 @@ function uiRowMenu(id, ev) {
   m.style.left = Math.max(8, r.right - m.offsetWidth) + 'px';
 }
 
-const UI_VERB = { goto: 'Go to', back: 'Go back', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
+const UI_VERB = { goto: 'Go to', back: 'Go back', reload: 'Reload', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
   press: 'Press', press_page: 'Press', assert_text: 'Assert text', assert_value: 'Assert value', assert_visible: 'Assert visible',
   assert_attr: 'Assert attr', assert_js: 'Assert script', assert_url: 'Assert URL', capture: 'Capture', compare: 'Compare', assert_datetime: 'Assert date/time', hover: 'Hover', scroll_into_view: 'Scroll to', wait_for: 'Wait for', wait: 'Wait (ms)',
   scroll_page: 'Scroll page', note: 'Note' };
@@ -2014,7 +2015,7 @@ function uiInsertCompare(afterId) {
   socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'compare', left, right, op: uiDraft.cmpOp || 'equals' } });
   uiInsertOpen = null;
 }
-function uiVerbClass(t) { return /^(assert|compare)/.test(t) ? 'v-assert' : (t === 'wait' || t === 'wait_for' || /^scroll/.test(t)) ? 'v-wait' : (t === 'goto' || t === 'back') ? 'v-nav' : ''; }
+function uiVerbClass(t) { return /^(assert|compare)/.test(t) ? 'v-assert' : (t === 'wait' || t === 'wait_for' || /^scroll/.test(t)) ? 'v-wait' : (t === 'goto' || t === 'back' || t === 'reload') ? 'v-nav' : ''; }
 
 const UI_EMPTY = `<div class="empty"><div class="big">🧪</div><h4>No steps yet</h4>
   <p>Record your first flow in three moves:</p>

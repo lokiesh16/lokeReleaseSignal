@@ -14,7 +14,7 @@ from datetime import datetime
 
 MASK = "••••••"
 _VERBS = {
-    "goto": "go to", "back": "go back", "click": "click", "fill": "fill", "clear": "clear", "select": "select",
+    "goto": "go to", "back": "go back", "reload": "reload", "click": "click", "fill": "fill", "clear": "clear", "select": "select",
     "check": "check", "uncheck": "uncheck", "press": "press", "press_page": "press",
     "hover": "hover", "scroll_into_view": "scroll to", "wait_for": "wait for", "wait": "wait",
     "scroll_page": "scroll page", "assert_text": "assert text", "assert_value": "assert value",

@@ -612,8 +612,12 @@ def playwright_worker():
             if page is None:
                 _put_result(cmd, {"ok": False, "error": "No browser open"}); continue
             try:
-                page.go_back(wait_until="domcontentloaded", timeout=30000)
-                _ui_add_step({"type": "back", "url": page.url}, cmd.get("portal", "A"))
+                if cmd.get("reload"):
+                    page.reload(wait_until="domcontentloaded", timeout=30000)
+                    _ui_add_step({"type": "reload", "url": page.url}, cmd.get("portal", "A"))
+                else:
+                    page.go_back(wait_until="domcontentloaded", timeout=30000)
+                    _ui_add_step({"type": "back", "url": page.url}, cmd.get("portal", "A"))
                 _put_result(cmd, {"ok": True, "url": page.url, "title": page.title()})
             except Exception as e:
                 _put_result(cmd, {"ok": False, "error": str(e)})
@@ -1000,6 +1004,18 @@ def go_back(data):
         emit("navigated", {"url": res.get("url"), "title": res.get("title"), "portal": portal})
     else:
         emit("error", {"msg": "Back failed: " + res.get("error", "")})
+
+
+@socketio.on("go_reload")
+def go_reload(data):
+    """Browser-bar Reload button: reload a portal's page (recorded as a 'reload' step while recording)."""
+    portal = (data or {}).get("portal", "A")
+    res = pw_call({"action": "history", "portal": portal, "reload": True})
+    if res["ok"]:
+        emit("log", {"msg": "reloaded " + res.get("url", "")})
+        emit("navigated", {"url": res.get("url"), "title": res.get("title"), "portal": portal})
+    else:
+        emit("error", {"msg": "Reload failed: " + res.get("error", "")})
 
 
 @socketio.on("stop_browser")
