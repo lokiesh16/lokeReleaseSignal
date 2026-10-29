@@ -1875,6 +1875,7 @@ let uiRecording = false, uiGeneratedFile = null, uiRunId = null;
 function uiDescribeLocator(l) {
   if (!l) return '';
   if (l.anchor) return '⚓ label "' + l.anchor + '" → control next to it';
+  if (l.desc) return l.desc;
   if (l.kind === 'pw') return l.py;
   const nth = l.nth != null ? ` #${l.nth + 1}` : '';
   if (l.kind === 'role') return `${l.role} "${l.name}"${nth}`;
@@ -2079,7 +2080,10 @@ function renderUiSteps(steps) {
     const pill = multiPortal ? `<span class="pill ${s.portal === 'B' ? 'b' : 'a'}" title="Portal ${s.portal || 'A'}">${s.portal || 'A'}</span>` : '';
     const target = s.type === 'assert_js' ? (s.expr || '') : s.type === 'goto' || !s.locator ? '' : uiDescribeLocator(s.locator) + (s.attr ? ` [${s.attr}]` : '') + (s.position ? ` @ (${s.position.x}, ${s.position.y})` : '');
     const c = uiCheckResults[s.id];
-    const chk = c ? (c.count === 1 ? ' <span class="pill ok">✓ 1 match</span>' : c.count === 0 ? ' <span class="pill no">✗ 0 matches</span>' : ` <span class="pill warn">⚠ ${c.count} matches</span>`) : '';
+    const chk = c ? (c.count === 1 ? ' <span class="pill ok">✓ 1 match</span>' : c.count === 0 ? ' <span class="pill no">✗ 0 matches</span>' : ` <span class="pill warn">⚠ ${c.count} matches</span>`)
+      : (s.locator && s.locator.warn ? ` <span class="pill warn" title="${escapeHtml('May break on the next run: ' + s.locator.warn + '. Use ⋯ → Edit or swap the locator.')}">⚠ fragile</span>`
+        : s.locator && s.locator.hardened ? ` <span class="pill ok" title="${escapeHtml('Rebuilt from a steady anchor because the generated locator depended on changing text (' + s.locator.hardened[0] + '). The original is kept under ⋯ → Edit or swap the locator.')}">✓ steady</span>`
+        : s.locator && s.locator.anchor && s.locator.stable ? ` <span class="pill ok" title="${escapeHtml('Anchored on the label "' + s.locator.anchor + '", so it does not depend on the value shown.')}">✓ steady</span>` : '');
     let val = '';
     if (s.type === 'fill' && s.secret) val = '<span class="pill">🔒 secret → env var</span>';
     else if (s.type === 'capture') val = `<span class="pill">${escapeHtml(s.source === 'attr' ? (s.attr || 'attribute') : (s.source || 'text'))}</span> → <input type="text" class="ux-input" style="width:160px" title="Variable name" value="${escapeHtml(s.var || '')}" onchange="uiUpdateStep(${s.id}, this.value, 'var')">`;

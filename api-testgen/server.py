@@ -426,6 +426,8 @@ def _run_ui_pending():
                 resolve_locator(page, step["locator"]).hover(timeout=5000, position={"x": pos["x"], "y": pos["y"]} if pos else None)
             elif page is not None and step.get("type") == "clear":
                 resolve_locator(page, step["locator"]).clear(timeout=5000)
+            elif page is not None and step.get("type") == "fill":
+                resolve_locator(page, step["locator"]).fill(str(step.get("value") or ""), timeout=5000)
         except Exception as e:
             with app.app_context():
                 socketio.emit("error", {"msg": f"Could not {step.get('type')}: " + str(e).strip().splitlines()[0][:200]})

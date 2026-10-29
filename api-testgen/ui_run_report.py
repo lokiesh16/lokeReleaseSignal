@@ -31,6 +31,8 @@ def _target(s):
     loc = s.get("locator") or {}
     if loc.get("anchor"):
         return f'label "{loc["anchor"]}" → the control next to it'
+    if loc.get("desc"):
+        return loc["desc"]
     if loc.get("kind") == "pattern":
         where = " in " + loc["scope"] if loc.get("scope") else ""
         which = "last" if loc.get("nth") == -1 else "first" if loc.get("nth") == 0 else "any"

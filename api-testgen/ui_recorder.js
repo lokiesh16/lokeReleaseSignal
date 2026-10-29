@@ -224,11 +224,197 @@
     return null;
   }
 
+  // ── locator hardening ─────────────────────────────────────────────────────
+  // A generated locator is FRAGILE when it leans on text that changes: a row's accessible name is all of its cells'
+  // text (including what you typed or picked), a date, a number, a joined "A   B   C" string. Such a locator works
+  // at record time and finds nothing on the next run. Detect that, and for controls inside table rows rebuild the
+  // locator from a stable anchor: "the row whose name cell says X, then the control by its own name/label/column".
+  var CONTAINER_ROLE = /^(row|cell|gridcell|rowheader|columnheader|table|grid|group|list|listitem|region|article|form|toolbar|navigation|main|dialog|tablist|menu|tree|treeitem)$/;
+  function fragileText(s, el) {
+    if (/\s{2,}/.test(s)) return 'joins the text of several cells';
+    if (s.length > 50) return 'is a long text';
+    if (/\b\d{1,2}[\/.:-]\d{1,2}(?:[\/.:-]\d{2,4})?\b/.test(s)) return 'contains a date or time';
+    if (/\b\d{3,}\b/.test(s)) return 'contains a number';
+    if (el && el.value && String(el.value).length >= 2 && s.indexOf(String(el.value)) >= 0) return 'contains the field\'s current value';
+    return '';
+  }
+  function locatorIssues(loc, el) {
+    var issues = [], why;
+    function add(m) { if (issues.indexOf(m) < 0) issues.push(m); }
+    if (loc.kind === 'pw') {
+      var re = /get_by_role\("([\w-]+)"(?:,\s*name=("(?:[^"\\]|\\.)*"|re\.compile\([^)]*\)))?/g, m;
+      while ((m = re.exec(loc.py || '')) !== null) {
+        if (m[2] && CONTAINER_ROLE.test(m[1])) add('a ' + m[1] + '\'s name changes with its content');
+      }
+      var lre = /"((?:[^"\\]|\\.)*)"/g, lm;
+      while ((lm = lre.exec(loc.py || '')) !== null) { why = fragileText(lm[1].replace(/\\"/g, '"'), el); if (why) add('text ' + why); }
+      if (/\.nth\(/.test(loc.py || '') && el.closest('tr,[role="row"]')) add('depends on row position');
+    } else if (loc.kind === 'role') {
+      if (loc.name && CONTAINER_ROLE.test(loc.role)) add('a ' + loc.role + '\'s name changes with its content');
+      why = loc.name && fragileText(loc.name, el); if (why) add('text ' + why);
+      if (loc.nth != null && el.closest('tr,[role="row"]')) add('depends on row position');
+    } else if (loc.kind === 'text') {
+      why = fragileText(loc.value || '', el); if (why) add('text ' + why);
+    } else if (loc.kind === 'css' && /:nth-of-type|nth=/.test(loc.value || '') && el.closest('tr,[role="row"]')) {
+      add('depends on row position');
+    }
+    return issues;
+  }
+
+  var ROW_SEL = 'tr,[role="row"]', CELL_SEL = 'th,td,[role="cell"],[role="gridcell"],[role="rowheader"]';
+  function cellKey(c) {
+    var f = c.querySelector('a,strong,b,h1,h2,h3,h4,h5,h6,[class*="name" i]');
+    var t = f ? norm(f.textContent) : '';
+    if (!t) { for (var n = c.firstChild; n; n = n.nextSibling) { if (n.nodeType === 3 && norm(n.textContent)) { t = norm(n.textContent); break; } } }
+    if (!t) t = norm(c.textContent);
+    if (t.length < 2 || t.length > 40) return '';
+    if (/^[\d\s.,:\/$%+-]+$/.test(t) || /\d{1,2}[\/.:-]\d{1,2}/.test(t)) return '';
+    if (/^(select|save|edit|delete|remove|view|actions?|yes|no|submit|cancel)$/i.test(t)) return '';
+    return t;
+  }
+  function stableAttr(v) { return v && v.length <= 60 && !/\d{4,}|^[:_]|^[0-9a-f]{8,}$/i.test(v); }
+  // The control's own selector WITHIN its row: attribute-based for fields, role+name for buttons/links.
+  function innerFor(ctl, row) {
+    var tag = ctl.tagName.toLowerCase(), cands = [], v;
+    function q(a, val) { return '[' + a + '=' + JSON.stringify(val) + ']'; }
+    var testAttrs = ['data-testid', 'data-test-id', 'data-test', 'data-qa', 'data-cy'];
+    for (var i = 0; i < testAttrs.length; i++) { v = ctl.getAttribute(testAttrs[i]); if (v) cands.push({ css: q(testAttrs[i], v), desc: q(testAttrs[i], v) }); }
+    var isField = tag === 'input' || tag === 'textarea' || tag === 'select';
+    var role = roleOf(ctl), nm = accessibleName(ctl);
+    if (!isField && role && nm && nm.length <= 30 && !fragileText(nm, null)) {
+      cands.push({ role: role, name: nm, desc: role + ' "' + nm + '"' });
+    }
+    if ((v = ctl.getAttribute('name')) && stableAttr(v)) cands.push({ css: tag + q('name', v), desc: tag + q('name', v) });
+    if ((v = ctl.getAttribute('aria-label')) && stableAttr(v)) cands.push({ css: tag + q('aria-label', v), desc: tag + q('aria-label', v) });
+    if ((v = ctl.getAttribute('placeholder')) && stableAttr(v)) cands.push({ css: tag + q('placeholder', v), desc: tag + q('placeholder', v) });
+    if ((v = ctl.id) && stableId(v) && !/^react-select-\d|^(rc|headlessui|radix)[-_:]/i.test(v)) cands.push({ css: tag + q('id', v), desc: tag + q('id', v) });
+    // no steady attribute on the control itself: use the column it sits in (a table's columns rarely move)
+    var cell = ctl.closest(CELL_SEL), colNo = 0, colName = '';
+    if (cell && cell.parentElement === row) {
+      colNo = Array.prototype.indexOf.call(row.children, cell) + 1;
+      var table = row.closest('table'), hr = table && table.querySelector('thead tr'), hc = hr && hr.children[colNo - 1];
+      colName = hc ? norm(hc.textContent) : '';
+      if (colName.length > 30) colName = '';
+    }
+    var ty = (ctl.getAttribute('type') || '').toLowerCase();
+    if (colNo && tag === 'input') cands.push({ css: ':scope > :nth-child(' + colNo + ') ' + tag, desc: tag + ' in the ' + (colName ? '"' + colName + '" ' : '#' + colNo + ' ') + 'column' });
+    if (tag === 'input' && ty) cands.push({ css: 'input' + q('type', ty), desc: 'input' + q('type', ty) });
+    cands.push({ css: tag, desc: tag });
+    for (var k = 0; k < cands.length; k++) {
+      var c = cands[k], hits;
+      if (c.role) hits = Array.prototype.filter.call(row.querySelectorAll('*'), function (n) { return roleOf(n) === c.role && accessibleName(n) === c.name; });
+      else { try { hits = Array.prototype.slice.call(row.querySelectorAll(c.css)); } catch (e) { hits = []; } }
+      var at = hits.indexOf(ctl);
+      if (at < 0) continue;
+      c.nth = hits.length > 1 ? at : null;
+      return c;
+    }
+    return null;
+  }
+  // A row's own identity beats its text: data-id="6a5d…" on the <tr>, or a hidden input / link carrying the record id.
+  // Returns a CSS selector for the row that matches exactly this row in the page, or null.
+  function rowIdentity(row) {
+    var cands = [], v, i;
+    function q(a, val) { return '[' + a + '=' + JSON.stringify(val) + ']'; }
+    var attrs = ['data-id', 'data-row-id', 'data-rowid', 'data-row-key', 'data-key', 'data-testid', 'data-test-id', 'data-qa', 'data-cy', 'data-record-id', 'data-user-id'];
+    for (i = 0; i < attrs.length; i++) {
+      v = row.getAttribute(attrs[i]);
+      if (v && v.length <= 80) cands.push({ css: q(attrs[i], v), desc: attrs[i] + ' ' + (v.length > 14 ? v.slice(0, 8) + '…' : v) });
+    }
+    var hid = row.querySelectorAll('input[type="hidden"][value]');
+    for (i = 0; i < hid.length; i++) {
+      var nm = hid[i].getAttribute('name'), hv = hid[i].getAttribute('value');
+      if (nm && hv && hv.length >= 4 && hv.length <= 80 && /id|key|uuid/i.test(nm)) cands.push({ css: ':has(input[type="hidden"]' + q('name', nm) + q('value', hv) + ')', desc: nm + ' ' + (hv.length > 14 ? hv.slice(0, 8) + '…' : hv) });
+    }
+    for (i = 0; i < cands.length; i++) {
+      var css = ':is(tr, [role="row"])' + cands[i].css, hits;
+      try { hits = document.querySelectorAll(css); } catch (e) { continue; }
+      if (hits.length === 1 && hits[0] === row) return { css: css, desc: cands[i].desc };
+    }
+    return null;
+  }
+  // Picking a row itself (or one of its cells) rather than a control inside it.
+  function rowSelfLocator(el) {
+    var isRow = el.matches && el.matches(ROW_SEL), cell = !isRow && el.closest(CELL_SEL);
+    var row = isRow ? el : (cell && cell.parentElement && cell.parentElement.matches(ROW_SEL) ? cell.parentElement : null);
+    if (!row) return null;
+    var ident = rowIdentity(row);
+    if (!ident) return null;
+    var sel = ident.css, py = 'locator(' + JSON.stringify(ident.css) + ')', desc = 'the row with ' + ident.desc;
+    if (cell) {
+      var no = Array.prototype.indexOf.call(row.children, cell) + 1;
+      sel += ' >> :scope > :nth-child(' + no + ')'; py += '.locator(":scope > :nth-child(' + no + ')")';
+      desc = 'cell #' + no + ' of ' + desc;
+    }
+    return { kind: 'pw', selector: sel, py: py, desc: desc, stable: true, matches: 1 };
+  }
+  function rowScopedLocator(el) {
+    var ctl = el.closest(INTERACTIVE) || el;
+    var tag = ctl.tagName.toLowerCase();
+    if (!(ctl.matches && ctl.matches(INTERACTIVE))) return rowSelfLocator(el);    // text/containers keep their normal locator unless the row has an id
+    var row = ctl.closest(ROW_SEL);
+    if (!row) return null;
+    var ident = rowIdentity(row);
+    if (ident) {
+      var innerI = innerFor(ctl, row);
+      if (innerI) {
+        var selI = ident.css + ' >> ', pyI = 'locator(' + JSON.stringify(ident.css) + ')';
+        if (innerI.role) {
+          selI += 'role=' + innerI.role + '[name=' + JSON.stringify(innerI.name) + 's]';
+          pyI += '.get_by_role(' + JSON.stringify(innerI.role) + ', name=' + JSON.stringify(innerI.name) + ', exact=True)';
+        } else { selI += innerI.css; pyI += '.locator(' + JSON.stringify(innerI.css) + ')'; }
+        if (innerI.nth != null) { selI += ' >> nth=' + innerI.nth; pyI += '.nth(' + innerI.nth + ')'; }
+        return { kind: 'pw', selector: selI, py: pyI, desc: innerI.desc + ' in the row with ' + ident.desc, stable: true, matches: 1 };
+      }
+    }
+    var allRows = Array.prototype.slice.call(document.querySelectorAll(ROW_SEL));
+    var cells = Array.prototype.slice.call(row.querySelectorAll(CELL_SEL)).filter(function (c) { return !c.contains(ctl); });
+    var key = '', matching = null;
+    for (var i = 0; i < cells.length; i++) {
+      var kk = cellKey(cells[i]);
+      if (!kk) continue;
+      var m = allRows.filter(function (r) { return norm(r.textContent).toLowerCase().indexOf(kk.toLowerCase()) >= 0; });
+      if (m.indexOf(row) < 0) continue;
+      if (!key || m.length < matching.length) { key = kk; matching = m; }
+      if (m.length === 1) break;
+    }
+    if (!key) return null;
+    var inner = innerFor(ctl, row);
+    if (!inner) return null;
+    var rowIdx = matching.length > 1 ? matching.indexOf(row) : null;
+    // PW engine selector (used by replay) and the matching Python expression (used by generated tests)
+    var sel = ':is(tr, [role="row"]):has-text(' + JSON.stringify(key) + ')' + (rowIdx != null ? ' >> nth=' + rowIdx : '') + ' >> ';
+    var py = 'locator("tr, [role=\\"row\\"]").filter(has_text=' + JSON.stringify(key) + ')' + (rowIdx != null ? '.nth(' + rowIdx + ')' : '');
+    if (inner.role) {
+      sel += 'role=' + inner.role + '[name=' + JSON.stringify(inner.name) + 's]';
+      py += '.get_by_role(' + JSON.stringify(inner.role) + ', name=' + JSON.stringify(inner.name) + ', exact=True)';
+    } else {
+      sel += inner.css;
+      py += '.locator(' + JSON.stringify(inner.css) + ')';
+    }
+    if (inner.nth != null) { sel += ' >> nth=' + inner.nth; py += '.nth(' + inner.nth + ')'; }
+    return { kind: 'pw', selector: sel, py: py, desc: inner.desc + ' in the row "' + key + '"' + (rowIdx != null ? ' (#' + (rowIdx + 1) + ' of ' + matching.length + ')' : ''), stable: true, matches: 1 };
+  }
+
   function buildLocator(el) {
     var primary = playwrightLocator(el) || buildLocatorFallback(el), anchored = null;
+    var issues = [];
+    try { issues = locatorIssues(primary, el); } catch (e) {}
+    if (issues.length) {
+      var robust = null;
+      try { robust = rowScopedLocator(el); } catch (e) {}
+      if (robust) { robust.alts = [primary]; robust.hardened = issues; primary = robust; }   // the fragile one stays as an alternative
+      else primary.warn = issues.join('; ');
+    }
     try { anchored = labelAnchoredLocator(el); } catch (e) {}
+    if (anchored) {                                       // grade it too: steady unless the label itself is changing text or it needs a position
+      var aw = fragileText(anchored.anchor, null);
+      if (aw) anchored.warn = 'the label "' + trunc(anchored.anchor, 30) + '" ' + aw;
+      else if (/\)\[\d+\]$/.test(anchored.value || '')) anchored.warn = 'several controls share the label "' + trunc(anchored.anchor, 30) + '", so it relies on their order';
+      else anchored.stable = true;
+    }
     if (anchored && anchorOn) { anchored.alts = [primary]; return anchored; }   // ⚓ mode: value-independent first
-    if (anchored) primary.alts = [anchored];                                    // otherwise keep it as an alternative
+    if (anchored) primary.alts = (primary.alts || []).concat([anchored]);       // otherwise keep it as an alternative
     return primary;
   }
 
@@ -534,6 +720,7 @@
 
   function describe(loc) {
     if (loc.anchor) return '\u2693 label "' + loc.anchor + '"';
+    if (loc.desc) return loc.desc;
     if (loc.kind === 'pw') return loc.py;
     var d = loc.kind === 'role' ? loc.role + ' "' + loc.name + '"' : loc.kind + ' ' + JSON.stringify(loc.value);
     if (loc.kind === 'pattern') return 'text like /' + loc.value + '/' + (loc.scope ? ' in ' + loc.scope : '') + (loc.nth === -1 ? ' (last)' : loc.nth === 0 ? ' (first)' : '');
@@ -586,7 +773,7 @@
     var ops = [['Click', 'click'], ['Hover', 'hover'], ['Scroll into view', 'scroll_into_view'],
                ['Wait for element', 'wait_for'], ['Assert visible', 'assert_visible']];
     if (!isField && text && text.length <= 200) ops.push(['Assert text: "' + trunc(text, 40) + '"', 'assert_text']);
-    if (isField && !isToggle && tag !== 'select') ops.splice(1, 0, ['Clear field', 'clear']);
+    if (isField && !isToggle && tag !== 'select') { ops.splice(1, 0, ['Fill value…', 'fill']); ops.splice(2, 0, ['Clear field', 'clear']); }
     if (isField && !isToggle && type !== 'password') ops.push(['Assert value: "' + trunc(String(el.value || ''), 40) + '"', 'assert_value']);
     var canText = !isField && text && text.length <= 200;
     var dtText = isField ? String(el.value || '') : text;
@@ -606,8 +793,22 @@
     var menu = ui.menu;
     menu.innerHTML = '';
     var hd = document.createElement('div'); hd.className = 'hd';
-    hd.textContent = '<' + tag + '> ' + describe(buildLocator(el));
+    var hl = buildLocator(el);
+    hd.textContent = '<' + tag + '> ' + describe(hl);
     menu.appendChild(hd);
+    var qual = document.createElement('div'); qual.className = 'hd';
+    if (hl.hardened) { qual.textContent = '✓ Steady locator (the generated one depended on changing text: ' + hl.hardened[0] + ')'; qual.style.color = '#6fd8b4'; }
+    else if (hl.warn) { qual.textContent = '⚠ May break next run: ' + hl.warn + '. ' + (anchorOn ? 'Try ▲ Parent to move to a steadier element, or ask developers to add a data-testid (or data-id on the row).' : 'Try ▲ Parent or ⚓ Anchor for a steadier one.'); qual.style.color = '#ffc766'; }
+    else if (hl.stable) { qual.textContent = hl.anchor ? '✓ Steady locator (⚓ anchored on the label "' + trunc(hl.anchor, 30) + '")' : '✓ Steady locator'; qual.style.color = '#6fd8b4'; }
+    if (hl.anchor && hl.warn) { qual.textContent = '⚠ ⚓ Anchor may break next run: ' + hl.warn + '.'; qual.style.color = '#ffc766'; }
+    if (qual.textContent) menu.appendChild(qual);
+    var anAlt = !hl.anchor && (hl.alts || []).filter(function (a) { return a.anchor; })[0];   // the ⚓ option, when it is not the one in use
+    if (anAlt && (hl.warn || hl.hardened)) {
+      var aq = document.createElement('div'); aq.className = 'hd';
+      aq.textContent = (anAlt.stable ? '⚓ Also possible: anchor on the label "' : '⚓ Anchor on the label "') + trunc(anAlt.anchor, 30) + '"' + (anAlt.stable ? ' (steady) - turn on ⚓ Anchor in the toolbar' : ' (' + (anAlt.warn || 'less certain') + ')');
+      aq.style.color = anAlt.stable ? '#6fd8b4' : '#ffc766';
+      menu.appendChild(aq);
+    }
     if (pickCtx && pickCtx.overlays && pickCtx.overlays.length) {
       var lab = document.createElement('div'); lab.className = 'hd'; lab.textContent = 'Overlays on screen right now (e.g. tooltips):';
       menu.appendChild(lab);
@@ -680,7 +881,7 @@
 
   function applyOp(op, el) {
     var loc = buildLocator(el), tag = el.tagName.toLowerCase();
-    var label = { hover_at: 'hover', assert_chart: 'assert chart data', click: 'click', clear: 'clear', hover: 'hover', scroll_into_view: 'scroll', wait_for: 'wait for element',
+    var label = { hover_at: 'hover', assert_chart: 'assert chart data', click: 'click', clear: 'clear', fill: 'fill', hover: 'hover', scroll_into_view: 'scroll', wait_for: 'wait for element',
                   assert_visible: 'assert visible', assert_text: 'assert text', assert_value: 'assert value', assert_attr: 'assert href',
                   capture_text: 'capture text', capture_value: 'capture value', capture_tooltip: 'capture tooltip' }[op];
     var isToggle = tag === 'input' && /^(checkbox|radio)$/i.test(el.getAttribute('type') || '');
@@ -706,6 +907,18 @@
       // Checkboxes/radios report their own check/uncheck step; anything else is recorded here.
       if (!isToggle) send({ type: 'click', locator: loc });
       try { target.click(); } catch (e) {}
+    } else if (op === 'fill') {
+      // Pick mode swallows clicks and keystrokes, so typing into a field isn't possible here: ask for the text instead.
+      ui.menu.style.display = 'none';
+      var isSecretField = (el.getAttribute('type') || '').toLowerCase() === 'password' ||
+                          /pass(word)?|secret|token|otp|cvv|cvc/i.test((el.name || '') + ' ' + (el.id || '') + ' ' + (el.getAttribute('autocomplete') || ''));
+      ask('Text to fill into this field:', isSecretField ? '' : String(el.value || ''), function (txt) {
+        if (txt === null) { say('Fill cancelled'); clearSel(); return; }
+        if (txt === '') { send({ type: 'clear', locator: loc, perform: true }); say('Added: clear'); }
+        else { send({ type: 'fill', locator: loc, value: txt, secret: !!isSecretField, perform: true }); say('Added: fill'); }
+        if (!pickOn) clearSel(); else setTimeout(function () { if (pickOn) clearSel(); }, 450);
+      });
+      return;
     } else if (op === 'clear') {
       send({ type: 'clear', locator: loc, perform: true });  // done by Playwright so frameworks see real input events
     } else if (op === 'hover') {
