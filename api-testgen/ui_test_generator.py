@@ -124,6 +124,29 @@ DATETIME_HELPER_SRC = '''def assert_datetime(locator, mode="datetime_now", tol=2
 exec(DATETIME_HELPER_SRC)   # defines assert_datetime() for the live replay
 
 
+# Chart data points (SVG circles) are found by their place ON the chart - column = rank of the x position among the chart's
+# points, row = rank of the y position within that column - never by their place in the DOM. Charts re-render when hovered and
+# put the hovered point in a different spot of the DOM, so a DOM position changes from one hover to the next.
+CHARTPOINT_HELPER_SRC = '''def chart_point(page, chart, tag="circle", col=0, row=0):
+    """A data point of a chart, found by where it is drawn (column / row) rather than by its position in the page's HTML."""
+    scope = page.locator(chart)
+    scope.locator(tag).first.wait_for(state="attached")
+    pts = scope.locator(tag).evaluate_all(
+        "els => els.filter(e => e.getAttribute('fill') !== 'none' && e.getAttribute('fill-opacity') !== '0')"
+        ".map(e => [e.getAttribute('cx'), e.getAttribute('cy')])")
+    xs = sorted({x for x, y in pts if x is not None}, key=float)
+    assert xs, f"no data points found in the chart {chart!r}"
+    x = xs[min(col, len(xs) - 1)]
+    ys = sorted({y for px, y in pts if px == x}, key=float)
+    y = ys[min(row, len(ys) - 1)]
+    return scope.locator(f'{tag}[cx="{x}"][cy="{y}"]:not([fill="none"]):not([fill-opacity="0"])').last'''
+exec(CHARTPOINT_HELPER_SRC)   # defines chart_point() for the live replay
+
+
+def uses_chartpoint(steps):
+    return any((s.get("locator") or {}).get("kind") == "chartpoint" for s in steps)
+
+
 def _tol(step):
     try:
         return max(0, min(1440, int(float(step.get("tol", 2)))))
@@ -168,6 +191,21 @@ def _position(step):
     return f'position={{"x": {int(pos.get("x", 0))}, "y": {int(pos.get("y", 0))}}}' if pos else ""
 
 
+def _force(loc):
+    """Chart shapes (data-point circles, bars) sit under an invisible overlay that catches the mouse, which makes Playwright's
+    'is something covering it?' check time out. Locators flagged `force` skip that check; the event still goes to the same spot."""
+    if not loc:
+        return False
+    if loc.get("force"):
+        return True
+    # an edited selector loses the flag, so recognise "<svg> >> circle" style chart-shape selectors too
+    return bool(re.search(r"\bsvg\b.*>>\s*(circle|ellipse|path|rect|line|polyline|polygon)\b", loc.get("selector") or loc.get("py") or ""))
+
+
+def _args(*parts):
+    return ", ".join(p for p in parts if p)
+
+
 def _ms(value):
     try:
         return max(0, int(float(value)))
@@ -194,6 +232,8 @@ def _locator(loc):
         expr = f"page.get_by_placeholder({_s(loc['value'])}, exact=True)"
     elif kind == "text":
         expr = f"page.get_by_text({_s(loc['value'])}, exact=True)"
+    elif kind == "chartpoint":
+        return f"chart_point(page, {_s(loc['scope'])}, {_s(loc.get('tag') or 'circle')}, {int(loc.get('col', 0))}, {int(loc.get('row', 0))})"
     elif kind == "pattern":   # matched by the SHAPE of the text (e.g. 12:34 PM), so a time that changes every run still resolves
         root = f"page.locator({_s(loc['scope'])})" if loc.get("scope") else "page"
         expr = f"{root}.get_by_text(re.compile({_s(loc['value'])}))"
@@ -241,6 +281,8 @@ def _for_portal(line, portal):
         return var + line[4:]
     if line.startswith("captured[") and "capture_value(page." in line:
         return line.replace("capture_value(page.", f"capture_value({var}.", 1)
+    if line.startswith("chart_point(page,"):
+        return "chart_point(" + var + line[len("chart_point(page"):]
     if line.startswith("assert_datetime(page."):
         return "assert_datetime(" + var + line[len("assert_datetime(page"):]
     if line.startswith("expect(page)"):
@@ -268,7 +310,7 @@ def _render_step_page(s, secrets, locfn=None):
     if t == "reload":
         return "page.reload()"
     if t == "click":
-        return f"{_locator_expr(loc)}.click()"
+        return f"{_locator_expr(loc)}.click({'force=True' if _force(loc) else ''})"
     if t == "fill":
         if s.get("secret"):
             var = _secret_var(loc, secrets)
@@ -309,7 +351,7 @@ def _render_step_page(s, secrets, locfn=None):
     if t == "assert_url":
         return f"expect(page).to_have_url(re.compile(re.escape({_s(s.get('value'))})))"
     if t == "hover":
-        return f"{_locator_expr(loc)}.hover({_position(s)})"
+        return f"{_locator_expr(loc)}.hover({_args(_position(s), 'force=True' if _force(loc) else '')})"
     if t == "assert_js":
         return f"page.wait_for_function({_s(assert_js_source(s.get('expr'), s.get('value')))})"
     if t == "scroll_into_view":
@@ -435,6 +477,7 @@ def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
         "",
         *((CAPTURE_HELPER_SRC.splitlines() + ["", ""]) if uses_capture(steps) else []),
         *((DATETIME_HELPER_SRC.splitlines() + ["", ""]) if uses_datetime(steps) else []),
+        *((CHARTPOINT_HELPER_SRC.splitlines() + ["", ""]) if uses_chartpoint(steps) else []),
         '@pytest.fixture(scope="session")',
         "def browser():",
         "    with sync_playwright() as p:",
@@ -486,6 +529,8 @@ def resolve_locator(page, loc):
     kind = loc.get("kind")
     if kind == "pw":
         return page.locator(loc["selector"])
+    if kind == "chartpoint":
+        return chart_point(page, loc["scope"], loc.get("tag") or "circle", int(loc.get("col", 0)), int(loc.get("row", 0)))
     if kind == "testid":
         target = page.get_by_test_id(loc["value"])
     elif kind == "role":
@@ -516,7 +561,7 @@ def replay_step(page, step, expect, captured=None):
     elif t == "reload":
         page.reload(wait_until="domcontentloaded")
     elif t == "click":
-        resolve_locator(page, loc).click()
+        resolve_locator(page, loc).click(force=_force(loc))
     elif t == "fill":
         resolve_locator(page, loc).fill(val or "")
     elif t == "clear":
@@ -560,7 +605,7 @@ def replay_step(page, step, expect, captured=None):
             captured["__saw__"] = saw
     elif t == "hover":
         pos = step.get("position")
-        resolve_locator(page, loc).hover(position={"x": pos["x"], "y": pos["y"]} if pos else None)
+        resolve_locator(page, loc).hover(position={"x": pos["x"], "y": pos["y"]} if pos else None, force=_force(loc))
     elif t == "assert_js":
         page.wait_for_function(assert_js_source(step.get("expr"), val))
     elif t == "scroll_into_view":

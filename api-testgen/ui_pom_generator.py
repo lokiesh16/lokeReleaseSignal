@@ -16,7 +16,7 @@ from datetime import datetime
 
 from ui_test_generator import (
     CAPTURE_HELPER_SRC, _ROLES, _SCROLL_JS, _locator, _py_label, _render_step_page, _s, slugify, split_cases,
-    uses_capture, with_capture_support, uses_datetime, DATETIME_HELPER_SRC,
+    uses_capture, with_capture_support, uses_datetime, DATETIME_HELPER_SRC, CHARTPOINT_HELPER_SRC,
 )
 
 _ROLE_SUFFIX = {"button": "button", "link": "link", "textbox": "input", "searchbox": "search_input",
@@ -88,6 +88,8 @@ def locator_name(loc):
             suffix = "element"
         parts = words + ([suffix] if suffix and (not words or words[-1] != suffix) else [])
         return "_".join(parts) or "element"
+    if loc.get("kind") == "chartpoint":
+        return "chart_point"
     if loc.get("kind") == "pattern":
         return "time_label" if re.search(r"\d.*:|:.*\d", loc.get("value") or "") else "date_label"
     val = loc.get("value") or ""
@@ -159,6 +161,8 @@ def generate_ui_pom(name, steps, timeout_s=15, shared_session=True):
             expr = _locator(loc)
             if expr.startswith("page."):
                 expr = "self.page." + expr[5:]
+            elif expr.startswith("chart_point(page,"):
+                expr = "chart_point(self.page," + expr[len("chart_point(page,"):]
             attr = reg.attr(cls, loc, expr)
             if st.get("url"):
                 reg.classes[cls].setdefault("path", page_path_for(st["url"]))
@@ -211,6 +215,8 @@ def generate_ui_pom(name, steps, timeout_s=15, shared_session=True):
         "",
         "from playwright.sync_api import Page",
     ]
+    if any("chart_point(" in expr for c in reg.classes.values() for _a, expr in c["order"]):
+        pg += ["", ""] + CHARTPOINT_HELPER_SRC.splitlines()      # the page objects call it, so it lives in this file
     for cls in sorted(reg.classes):
         where = reg.classes[cls].get("path")
         pg += ["", "", f"class {cls}:", f'    """Locators for the screen at {where}."""' if where else '    """Locators for this screen."""', "",
