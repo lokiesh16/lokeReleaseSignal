@@ -57,6 +57,84 @@ CAPTURE_HELPER_SRC = '''def capture_value(locator, source="text", attr=None):
     return " ".join((v or "").split())'''
 exec(CAPTURE_HELPER_SRC)   # defines capture_value() for the live replay
 
+# "Assert date/time" steps: read the element's text, find the date and/or time in it, and check it against the clock
+# of the machine running the test. Modes: time_now (just the time of day), datetime_now (date AND time),
+# date_today (just the date). Displayed times have no seconds, so both clocks are cut to the minute and
+# `tol` minutes of slack is allowed either way. The generated test embeds this exact source, and the live replay execs it.
+DATETIME_MODES = {
+    "time_now": "time is now (just the time)",
+    "datetime_now": "date and time are now",
+    "date_today": "date is today (just the date)",
+}
+DATETIME_HELPER_SRC = '''def assert_datetime(locator, mode="datetime_now", tol=2):
+    """Checks a date/time shown on the page against the current time. Returns what it read, for the report."""
+    import re
+    from datetime import datetime, timedelta
+    raw = locator.evaluate("e => /^(INPUT|TEXTAREA)$/.test(e.tagName) ? e.value : e.innerText")
+    text = " ".join((raw or "").split())
+    now = datetime.now().replace(second=0, microsecond=0)
+    mons = {m: i + 1 for i, m in enumerate("jan feb mar apr may jun jul aug sep oct nov dec".split())}
+
+    def read_time():
+        m = re.search(r"\\b(\\d{1,2}):(\\d{2})(?::\\d{2})?\\s*([AaPp])\\.?[Mm]\\.?", text)
+        if m:
+            return int(m.group(1)) % 12 + (12 if m.group(3).lower() == "p" else 0), int(m.group(2))
+        m = re.search(r"\\b([01]?\\d|2[0-3]):([0-5]\\d)(?::[0-5]\\d)?\\b", text)
+        return (int(m.group(1)), int(m.group(2))) if m else None
+
+    def read_date():
+        low = text.lower()
+        if re.search(r"\\btoday\\b", low):
+            return now.date()
+        if re.search(r"\\byesterday\\b", low):
+            return (now - timedelta(days=1)).date()
+        try:
+            m = re.search(r"\\b(\\d{4})-(\\d{2})-(\\d{2})\\b", text)
+            if m:
+                return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3))).date()
+            m = re.search(r"\\b(\\d{1,2})/(\\d{1,2})/(\\d{4})\\b", text)
+            if m:
+                return datetime(int(m.group(3)), int(m.group(1)), int(m.group(2))).date()
+            m = re.search(r"\\b([A-Za-z]{3,9})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})\\b", text)
+            if m and m.group(1)[:3].lower() in mons:
+                return datetime(int(m.group(3)), mons[m.group(1)[:3].lower()], int(m.group(2))).date()
+            m = re.search(r"\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+([A-Za-z]{3,9})\\.?,?\\s+(\\d{4})\\b", text)
+            if m and m.group(2)[:3].lower() in mons:
+                return datetime(int(m.group(3)), mons[m.group(2)[:3].lower()], int(m.group(1))).date()
+        except ValueError:
+            return None
+        return None
+
+    if mode == "date_today":
+        d = read_date()
+        assert d is not None, f"no date found in {text!r}"
+        assert d == now.date(), f"date {d} is not today ({now.date()}); read {text!r}"
+        return f"read {text!r}: date is today"
+    t = read_time()
+    assert t is not None, f"no time found in {text!r}"
+    if mode == "time_now":
+        shown = now.replace(hour=t[0], minute=t[1])
+        diff = min(abs((shown + timedelta(days=k) - now).total_seconds()) for k in (-1, 0, 1)) / 60
+    else:
+        d = read_date()
+        assert d is not None, f"no date found in {text!r}"
+        diff = abs((datetime(d.year, d.month, d.day, t[0], t[1]) - now).total_seconds()) / 60
+    assert diff <= tol, f"{text!r} is {diff:.0f} min from now ({now:%Y-%m-%d %H:%M}); allowed {tol} min"
+    return f"read {text!r}: {diff:.0f} min from now (allowed {tol})"'''
+exec(DATETIME_HELPER_SRC)   # defines assert_datetime() for the live replay
+
+
+def _tol(step):
+    try:
+        return max(0, min(1440, int(float(step.get("tol", 2)))))
+    except (TypeError, ValueError):
+        return 2
+
+
+def uses_datetime(steps):
+    return any(s.get("type") == "assert_datetime" for s in steps)
+
+
 COMPARE_OPS = {"equals": "==", "not_equals": "!=", "contains": "in", "not_contains": "not in"}
 
 
@@ -116,10 +194,14 @@ def _locator(loc):
         expr = f"page.get_by_placeholder({_s(loc['value'])}, exact=True)"
     elif kind == "text":
         expr = f"page.get_by_text({_s(loc['value'])}, exact=True)"
+    elif kind == "pattern":   # matched by the SHAPE of the text (e.g. 12:34 PM), so a time that changes every run still resolves
+        root = f"page.locator({_s(loc['scope'])})" if loc.get("scope") else "page"
+        expr = f"{root}.get_by_text(re.compile({_s(loc['value'])}))"
     else:
         expr = f"page.locator({_s(loc.get('value'))})"
     if loc.get("nth") is not None:
-        expr += f".nth({int(loc['nth'])})"
+        n = int(loc["nth"])
+        expr += ".last" if n == -1 else ".first" if n == 0 else f".nth({n})"
     return expr
 
 
@@ -159,6 +241,8 @@ def _for_portal(line, portal):
         return var + line[4:]
     if line.startswith("captured[") and "capture_value(page." in line:
         return line.replace("capture_value(page.", f"capture_value({var}.", 1)
+    if line.startswith("assert_datetime(page."):
+        return "assert_datetime(" + var + line[len("assert_datetime(page"):]
     if line.startswith("expect(page)"):
         return "expect(" + var + line[len("expect(page"):]
     if line.startswith("expect(page."):
@@ -217,6 +301,9 @@ def _render_step_page(s, secrets, locfn=None):
                 "not_contains": f"{b} not in {a}"}.get(op, f"{a} == {b}")
         am, bm = (f"captured[{json.dumps(str(s.get(k)))[1:-1].join(chr(39) * 2)}]" for k in ("left", "right"))   # single-quoted keys: legal inside the f-string on older Pythons
         return f"assert {expr}, f\"compare {s.get('left')} {op} {s.get('right')}: {{{am}!r}} vs {{{bm}!r}}\""
+    if t == "assert_datetime":
+        mode = s.get("mode") if s.get("mode") in DATETIME_MODES else "datetime_now"
+        return f"assert_datetime({_locator_expr(loc)}, {_s(mode)}, {_tol(s)})"
     if t == "assert_url":
         return f"expect(page).to_have_url(re.compile(re.escape({_s(s.get('value'))})))"
     if t == "hover":
@@ -345,6 +432,7 @@ def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
         "",
         "",
         *((CAPTURE_HELPER_SRC.splitlines() + ["", ""]) if uses_capture(steps) else []),
+        *((DATETIME_HELPER_SRC.splitlines() + ["", ""]) if uses_datetime(steps) else []),
         '@pytest.fixture(scope="session")',
         "def browser():",
         "    with sync_playwright() as p:",
@@ -406,6 +494,8 @@ def resolve_locator(page, loc):
         target = page.get_by_placeholder(loc["value"], exact=True)
     elif kind == "text":
         target = page.get_by_text(loc["value"], exact=True)
+    elif kind == "pattern":
+        target = (page.locator(loc["scope"]) if loc.get("scope") else page).get_by_text(re.compile(loc["value"]))
     else:
         target = page.locator(loc.get("value") or "")
     if loc.get("nth") is not None:
@@ -459,6 +549,11 @@ def replay_step(page, step, expect, captured=None):
         captured["__saw__"] = f"{a!r} vs {b!r}"
         if not compare_values(a, op, b):
             raise AssertionError(f"{step['left']} {op.replace('_', ' ')} {step['right']} failed: {a!r} vs {b!r}")
+    elif t == "assert_datetime":
+        mode = step.get("mode") if step.get("mode") in DATETIME_MODES else "datetime_now"
+        saw = assert_datetime(resolve_locator(page, loc), mode, _tol(step))
+        if captured is not None:
+            captured["__saw__"] = saw
     elif t == "hover":
         pos = step.get("position")
         resolve_locator(page, loc).hover(position={"x": pos["x"], "y": pos["y"]} if pos else None)

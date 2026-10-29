@@ -16,7 +16,7 @@ from datetime import datetime
 
 from ui_test_generator import (
     CAPTURE_HELPER_SRC, _ROLES, _SCROLL_JS, _locator, _py_label, _render_step_page, _s, slugify, split_cases,
-    uses_capture, with_capture_support,
+    uses_capture, with_capture_support, uses_datetime, DATETIME_HELPER_SRC,
 )
 
 _ROLE_SUFFIX = {"button": "button", "link": "link", "textbox": "input", "searchbox": "search_input",
@@ -88,6 +88,8 @@ def locator_name(loc):
             suffix = "element"
         parts = words + ([suffix] if suffix and (not words or words[-1] != suffix) else [])
         return "_".join(parts) or "element"
+    if loc.get("kind") == "pattern":
+        return "time_label" if re.search(r"\d.*:|:.*\d", loc.get("value") or "") else "date_label"
     val = loc.get("value") or ""
     lab = re.search(r"normalize-space\(\.\)=['\"]([^'\"]+)['\"]", val)
     if lab:
@@ -180,6 +182,8 @@ def generate_ui_pom(name, steps, timeout_s=15, shared_session=True):
                 line = "page_b" + line[4:]
             elif line and portal == "B" and line.startswith("captured[") and "capture_value(page." in line:
                 line = line.replace("capture_value(page.", "capture_value(page_b.", 1)
+            elif line and portal == "B" and line.startswith("assert_datetime(page."):
+                line = "assert_datetime(page_b" + line[len("assert_datetime(page"):]
             elif line and portal == "B" and line.startswith("expect(page)"):
                 line = "expect(page_b" + line[len("expect(page"):]
             lines += pending
@@ -266,6 +270,7 @@ def generate_ui_pom(name, steps, timeout_s=15, shared_session=True):
         "",
         "",
         *((CAPTURE_HELPER_SRC.splitlines() + ["", ""]) if uses_capture(steps) else []),
+        *((DATETIME_HELPER_SRC.splitlines() + ["", ""]) if uses_datetime(steps) else []),
         '@pytest.fixture(scope="session")',
         "def browser():",
         "    with sync_playwright() as p:",

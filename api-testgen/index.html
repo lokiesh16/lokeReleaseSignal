@@ -6,14 +6,14 @@
 <title>API Test Generator</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
     --bg:     #0a0a0f; --bg2: #111118; --bg3: #1a1a24;
     --border: #2a2a3a; --border2: #3a3a50;
     --text:   #e8e8f0; --muted: #9494a8;
-    --accent: #7c6aff; --accent2: #b09aff;
+    --accent: #f5a524; --accent2: #b09aff;
     --green:  #2dd4a0; --red: #ff5f6d; --amber: #ffb74d;
     --mono:   'IBM Plex Mono', monospace;
     --sans:   'Syne', sans-serif;
@@ -31,7 +31,7 @@
     height: 100%; color: var(--text); font-family: var(--sans); overflow: hidden;
     background-color: #08080d;
     background-image:
-      radial-gradient(ellipse 900px 700px at 12% 8%,  rgba(124,106,255,0.32), transparent 60%),
+      radial-gradient(ellipse 900px 700px at 12% 8%,  rgba(245,165,36,0.32), transparent 60%),
       radial-gradient(ellipse 800px 700px at 90% 0%,  rgba(45,212,160,0.20), transparent 55%),
       radial-gradient(ellipse 900px 800px at 100% 95%, rgba(255,183,77,0.16), transparent 55%),
       radial-gradient(ellipse 700px 700px at 0% 100%, rgba(255,95,109,0.14), transparent 55%),
@@ -76,7 +76,7 @@
   .step:hover { background: var(--glass-strong); }
   .step.active { background: var(--glass-strong); border-color: var(--glass-border-strong); box-shadow: var(--glass-shadow); }
   .step-num { width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.08); color: var(--muted); font-size: 11px; font-weight: 600; font-family: var(--mono); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .2s; }
-  .step.active .step-num { background: var(--accent); color: #fff; box-shadow: 0 0 12px rgba(124,106,255,0.6); }
+  .step.active .step-num { background: var(--accent); color: #2a1130; box-shadow: 0 0 12px rgba(245,165,36,0.6); }
   .step.done   .step-num { background: var(--green); color: #000; }
   .step-label { font-size: 13px; font-weight: 600; }
   .step.active .step-label { color: var(--accent2); }
@@ -99,8 +99,8 @@
   .panel-body { flex: 1; overflow-y: auto; padding: 24px 28px; }
 
   .btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; border-radius: 9px; font-size: 13px; font-weight: 600; font-family: var(--sans); cursor: pointer; border: none; transition: all .15s; }
-  .btn-primary { background: linear-gradient(155deg, var(--accent2), var(--accent)); color: #fff; box-shadow: 0 4px 18px rgba(124,106,255,0.35), inset 0 1px 0 rgba(255,255,255,0.3); }
-  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 6px 22px rgba(124,106,255,0.45), inset 0 1px 0 rgba(255,255,255,0.35); }
+  .btn-primary { background: linear-gradient(155deg, var(--accent2), var(--accent)); color: #fff; box-shadow: 0 4px 18px rgba(245,165,36,0.35), inset 0 1px 0 rgba(255,255,255,0.3); }
+  .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 6px 22px rgba(245,165,36,0.45), inset 0 1px 0 rgba(255,255,255,0.35); }
   .btn-primary:disabled { opacity: .4; cursor: default; transform: none; }
   .btn-ghost  { background: var(--glass); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); color: var(--text); border: 1px solid var(--glass-border); }
   .btn-ghost:hover  { border-color: var(--accent); color: var(--accent2); background: var(--glass-hover); }
@@ -155,7 +155,7 @@
   .network-method.DELETE { background:#ff5f6d20; color:#ff5f6d; }
   .network-method.PATCH { background:#9c27b020; color:#9c27b0; }
   .network-portal { font-weight:700; padding:2px 6px; border-radius:5px; font-size:10px; border:1px solid; }
-  .network-portal.portal-A { color:var(--accent2); border-color:var(--accent2); background:#7c6aff20; }
+  .network-portal.portal-A { color:var(--accent2); border-color:var(--accent2); background:#f5a52420; }
   .network-portal.portal-B { color:var(--amber); border-color:var(--amber); background:#ffb74d20; }
   .selected-apis-list { margin-bottom:10px; }
   .selected-apis-empty { color:var(--muted); font-size:11px; font-family:var(--mono); padding:8px 0; }
@@ -185,7 +185,7 @@
     background: rgba(255,255,255,0.035); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--glass-border); border-radius: 12px; padding: 14px; cursor: pointer; transition: all .15s;
   }
-  .gen-option:hover, .gen-option.selected { border-color: var(--accent); background: rgba(124,106,255,0.10); box-shadow: var(--glass-shadow); }
+  .gen-option:hover, .gen-option.selected { border-color: var(--accent); background: rgba(245,165,36,0.10); box-shadow: var(--glass-shadow); }
   .gen-option h4 { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
   .gen-option.selected h4 { color: var(--accent2); }
   .gen-option p  { font-size: 11px; color: var(--muted); }
@@ -255,7 +255,7 @@
   .run-section-io b { color: var(--accent2); font-weight: 600; }
   .run-scenario-summary {
     margin-top: 20px; padding: 14px 16px; border: 1px solid var(--glass-border-strong);
-    border-radius: 10px; background: rgba(124,106,255,0.08);
+    border-radius: 10px; background: rgba(245,165,36,0.08);
   }
   .run-scenario-summary h4 { margin: 0 0 6px; font-size: 11px; color: var(--accent2); text-transform: uppercase; letter-spacing: .5px; }
   .run-scenario-summary p { margin: 0; font-size: 12px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
@@ -267,7 +267,7 @@
   table.rt td { padding: 6px 8px; border-bottom: 1px solid var(--glass-border); vertical-align: top; word-break: break-word; }
   table.rt td.rt-data { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
   table.rt td.rt-num { color: var(--muted); }
-  table.rt tr.rt-step td { background: rgba(124,106,255,.10); color: var(--accent2); font-weight: 600; }
+  table.rt tr.rt-step td { background: rgba(245,165,36,.10); color: var(--accent2); font-weight: 600; }
   .rt-obj { color: var(--muted); font-weight: 400; }
   .rt-badge { padding: 1px 8px; border-radius: 5px; font-size: 10px; font-weight: 700; }
   .rt-badge.pass { background: rgba(74,222,128,.15); color: var(--green); }
@@ -306,7 +306,7 @@
   }
   .gen-progress.show { display: block; }
   .progress-bar-wrap { background: rgba(255,255,255,0.08); border-radius: 4px; height: 4px; margin: 10px 0; overflow: hidden; }
-  .progress-bar { height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 4px; width: 0%; transition: width .4s; box-shadow: 0 0 10px rgba(124,106,255,0.6); }
+  .progress-bar { height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 4px; width: 0%; transition: width .4s; box-shadow: 0 0 10px rgba(245,165,36,0.6); }
   .gen-status-text { font-size: 12px; font-family: var(--mono); color: var(--accent2); }
 
   .config-overlay {
@@ -391,8 +391,8 @@
   .sp-item { display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 7px; border: 1px solid var(--glass-border);
     border-radius: 99px; font-size: 12.5px; font-weight: 600; color: var(--muted); background: var(--glass); transition: all .2s; }
   .sp-item .n { width: 21px; height: 21px; border-radius: 50%; display: grid; place-items: center; font: 600 11px var(--mono); background: rgba(255,255,255,0.09); }
-  .sp-item.active { color: var(--text); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,106,255,.15); }
-  .sp-item.active .n { background: var(--accent); color: #fff; }
+  .sp-item.active { color: var(--text); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(245,165,36,.15); }
+  .sp-item.active .n { background: var(--accent); color: #2a1130; }
   .sp-item.done { color: var(--green); border-color: #2dd4a055; }
   .sp-item.done .n { background: var(--green); color: #04231a; }
   .sp-item.rec { color: var(--red); border-color: #ff5f6d77; }
@@ -435,7 +435,7 @@
   /* steps */
   .steps-card { padding: 0; }
   .steps-bar { position: sticky; top: 0; z-index: 6; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 11px 16px;
-    background: #14141f; box-shadow: 0 1px 0 var(--glass-border), 0 8px 18px -10px rgba(0,0,0,.6);
+    background: #1f1130; box-shadow: 0 1px 0 var(--glass-border), 0 8px 18px -10px rgba(0,0,0,.6);
     border-radius: 16px 16px 0 0; }
   .steps-bar h3 { margin: 0; display: flex; align-items: center; gap: 8px; }
   .steps-search { width: 150px; }
@@ -450,6 +450,8 @@
   .sr-num { color: var(--muted); font: 12px var(--mono); text-align: right; }
   .sr-verb { font-weight: 700; font-size: 12.5px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
   .v-assert { color: var(--green); } .v-wait { color: var(--amber); } .v-nav { color: var(--accent2); }
+  .srow.dt { grid-template-columns: 16px 30px 122px minmax(60px, 1fr) minmax(0, auto) auto; }
+  .srow.dt .sr-val { min-width: 0; }
   .sr-target.span2, .sr-val.span2 { grid-column: 4 / span 2; }
   .sr-target { font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .92; }
   .sr-val { min-width: 0; display: flex; }
@@ -463,19 +465,19 @@
   .srow:hover .grip { opacity: .8; }
   .srow .grip:active { cursor: grabbing; }
   .srow.dragging { opacity: .4; }
-  .srow.drop-before, .case-head.drop-before { box-shadow: 0 -2px 0 0 var(--accent, #7c6aff); }
-  .srow.drop-after, .case-head.drop-after { box-shadow: 0 2px 0 0 var(--accent, #7c6aff); }
+  .srow.drop-before, .case-head.drop-before { box-shadow: 0 -2px 0 0 var(--accent, #f5a524); }
+  .srow.drop-after, .case-head.drop-after { box-shadow: 0 2px 0 0 var(--accent, #f5a524); }
   .ibtn.del { opacity: .55; }
   .ibtn.del:hover { opacity: 1; color: var(--red, #ff5f6d); border-color: #ff5f6d55; background: rgba(255,95,109,.12); }
   .pill { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: rgba(255,255,255,.08); color: var(--muted); font-family: var(--mono); }
-  .pill.b { color: #38bdf8; background: rgba(56,189,248,.12); } .pill.a { color: var(--accent2); background: rgba(124,106,255,.14); }
+  .pill.b { color: #38bdf8; background: rgba(56,189,248,.12); } .pill.a { color: var(--accent2); background: rgba(245,165,36,.14); }
   .pill.ok { color: var(--green); background: rgba(45,212,160,.12); } .pill.no { color: var(--red); background: rgba(255,95,109,.12); } .pill.warn { color: var(--amber); background: rgba(255,183,77,.12); }
   .sr-detail { margin: 2px 8px 8px 56px; padding: 10px 12px; background: rgba(255,255,255,.04); border: 1px dashed var(--border2); border-radius: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; }
   .sr-note { margin: 0 8px 8px 56px; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
   .sr-note.err { color: var(--red); } .sr-note.hint { color: var(--amber); }
   .sr-note img { display: block; max-width: 340px; border: 1px solid var(--border); border-radius: 8px; margin-top: 6px; }
   .case-head { display: flex; align-items: center; gap: 10px; margin: 12px 2px 4px; padding: 8px 12px; border-radius: 10px;
-    background: rgba(124,106,255,.12); border: 1px solid #4c3f8a; }
+    background: rgba(245,165,36,.12); border: 1px solid #7a4a2a; }
   .case-head .caret { cursor: pointer; width: 18px; transition: transform .15s; color: var(--accent2); user-select: none; }
   .case-head.collapsed .caret { transform: rotate(-90deg); }
   .case-head .ux-input { flex: 1; padding: 4px 9px; font-family: var(--sans); font-weight: 700; font-size: 13px; }
@@ -505,17 +507,278 @@
   .out-pane .pw-log-box { max-height: 440px; }
   .out-pane .lab { font: 11px var(--mono); color: var(--muted); margin-bottom: 6px; }
 
+  /* uploaded test cases */
+  .tc-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 7px 10px;
+    border: 1px solid var(--glass-border); border-radius: 10px; background: rgba(255,255,255,.03); }
+  .tc-item.active { border-color: var(--accent); background: rgba(245,165,36,.1); }
+  .tc-id { font: 700 11.5px var(--mono); color: var(--accent); }
+  .tc-title { font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tc-meta { font-size: 11px; color: var(--muted); }
+  .tc-detail { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,.04); font-size: 12px; white-space: pre-wrap; }
+  .tc-detail b { color: var(--muted); font: 600 10.5px var(--mono); text-transform: uppercase; display: block; margin-top: 4px; }
+
   /* saved recordings list */
   .saved-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 8px 10px;
     border: 1px solid var(--glass-border); border-radius: 10px; background: rgba(255,255,255,.03); }
   .saved-item:hover { background: var(--glass-strong); }
-  .saved-item.current { border-color: var(--accent); background: rgba(124,106,255,.1); }
+  .saved-item.current { border-color: var(--accent); background: rgba(245,165,36,.1); }
   .si-name { font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .si-meta { font-size: 11.5px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .si-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
   .si-actions .btn { white-space: nowrap; }
   .card.compact h3 { flex-wrap: wrap; }
   #ui-editing-badge { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ═══════════ Premium theme layer ═══════════
+     Tokens first (everything above reads them), then component polish. One accent, quiet surfaces, Inter + JetBrains Mono. */
+  :root {
+    --bg: #12081c; --bg2: #1c0f2b; --bg3: #26163a;
+    --border: #35224a; --border2: #4a3363;
+    --text: #ebe8f0; --muted: #a396b5;
+    --accent: #f5a524; --accent2: #ffc766;
+    --green: #6fd8b4; --red: #ff7a8a; --amber: #ffd27a;
+    --sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    --glass: rgba(255,255,255,0.032); --glass-strong: rgba(255,255,255,0.055); --glass-hover: rgba(255,255,255,0.075);
+    --glass-border: rgba(255,255,255,0.075); --glass-border-strong: rgba(255,255,255,0.14);
+    --glass-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 10px 30px -12px rgba(0,0,0,0.6);
+    --glass-blur: blur(14px) saturate(130%);
+  }
+  html, body {
+    font-feature-settings: 'cv11', 'ss01'; -webkit-font-smoothing: antialiased; letter-spacing: -0.006em;
+    background-color: #0f0618;
+    background-image:
+      radial-gradient(ellipse 1100px 560px at 50% -10%, rgba(122,52,140,0.38), transparent 65%),
+      radial-gradient(ellipse 800px 520px at 100% 100%, rgba(245,165,36,0.09), transparent 60%),
+      linear-gradient(180deg, #160a24 0%, #0f0618 100%);
+  }
+  * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.16) transparent; }
+  ::selection { background: rgba(245,165,36,.4); }
+
+  .topbar { height: 52px; padding: 0 22px; background: rgba(28,12,44,.72); }
+  .logo { font-size: 15px; font-weight: 700; letter-spacing: -.02em; color: var(--text); }
+  .logo span { color: var(--accent); }
+  .tagline { font-size: 11.5px; letter-spacing: 0; opacity: .8; }
+  .shell { grid-template-rows: 52px 1fr; grid-template-columns: 232px 1fr; }
+  .sidebar { background: rgba(28,12,44,.55); }
+  .sidebar-title { font: 600 10.5px var(--sans); letter-spacing: .09em; }
+  .step { position: relative; padding: 9px 10px; border-radius: 9px; }
+  .step.active { background: rgba(245,165,36,.12); border-color: rgba(245,165,36,.3); box-shadow: none; }
+  .step.active::before { content: ''; position: absolute; left: -17px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+  .step-label { font-size: 13px; font-weight: 550; letter-spacing: -.01em; }
+  .step.active .step-label { color: var(--text); }
+
+  /* headings and labels */
+  .panel-header.ph-row h2 { font-size: 18px; font-weight: 650; letter-spacing: -.02em; }
+  .panel-header.ph-row p { font-size: 12.5px; }
+  .card h3 { font-size: 13.5px; font-weight: 650; letter-spacing: -.01em; }
+  .bb-field label, .field label, .goal-row label { font: 600 10.5px var(--sans); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+  .bb-field label small { font-weight: 500; opacity: .6; }
+
+  /* buttons */
+  .btn { border-radius: 8px; padding: 8px 14px; font-size: 12.5px; font-weight: 600; letter-spacing: -.005em; gap: 7px; transition: background .14s, border-color .14s, box-shadow .14s, transform .14s, filter .14s; }
+  .btn-sm { padding: 5px 11px; font-size: 12px; border-radius: 7px; }
+  .btn-primary { color: #2a1130; background: linear-gradient(180deg, #ffc25a, #f0980f); box-shadow: 0 1px 0 rgba(255,255,255,.4) inset, 0 6px 16px -6px rgba(224,140,20,.6); }
+  .btn-primary:hover { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,.3) inset, 0 10px 22px -8px rgba(224,140,20,.8); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-ghost { background: rgba(255,255,255,.04); border-color: var(--glass-border); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .btn-ghost:hover { background: rgba(255,255,255,.08); border-color: var(--glass-border-strong); color: var(--text); }
+  .btn-danger { background: rgba(255,107,122,.08); border-color: rgba(255,107,122,.28); }
+  .btn-green { background: linear-gradient(180deg, #4de3b0, #28c28f); box-shadow: 0 1px 0 rgba(255,255,255,.3) inset, 0 6px 16px -6px rgba(40,194,143,.6); color: #04261b; }
+  .btn:focus-visible, .ibtn:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+
+  /* inputs */
+  .bb-field input, .ux-input, .field input, .field select, .field textarea, select, textarea, input[type=text], input[type=url], input[type=number] {
+    font-family: var(--mono); font-size: 12.5px; border-radius: 8px; }
+  .bb-field input, .ux-input { background: rgba(255,255,255,.04); border: 1px solid var(--glass-border); padding: 8px 11px; transition: border-color .14s, box-shadow .14s, background .14s; }
+  .bb-field input:hover, .ux-input:hover { border-color: var(--glass-border-strong); }
+  .bb-field input:focus, .ux-input:focus, .field input:focus, .field select:focus, textarea:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,.06); box-shadow: 0 0 0 3px rgba(245,165,36,.22); }
+  .ux-input::placeholder, .bb-field input::placeholder, textarea::placeholder { color: #5f667b; }
+  .badge { font: 600 10.5px var(--sans); padding: 2px 8px; border-radius: 99px; letter-spacing: 0; }
+
+  /* cards */
+  .card { border-radius: 14px; background: rgba(255,255,255,.028); box-shadow: var(--glass-shadow); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .card.compact { padding: 16px; border-radius: 14px; }
+  .card.compact h3 { margin-bottom: 12px; }
+  .browserbar { background: rgba(28,12,44,.6); padding: 12px 28px 14px; gap: 14px; }
+  details.help { border-radius: 10px; background: rgba(255,255,255,.025); padding: 7px 13px; }
+  details.fold > summary, details.help > summary { color: var(--accent2); font-size: 12.5px; font-weight: 600; }
+
+  /* stepper: a quiet progress rail */
+  .stepper { gap: 4px; margin-bottom: 14px; }
+  .sp-item { background: transparent; border-color: transparent; padding: 5px 12px 5px 6px; font-size: 12.5px; font-weight: 550; }
+  .sp-item .n { width: 20px; height: 20px; font: 600 10.5px var(--sans); background: rgba(255,255,255,.07); }
+  .sp-item.active { background: rgba(245,165,36,.12); border-color: rgba(245,165,36,.35); box-shadow: none; }
+  .sp-item.done { border-color: transparent; } .sp-item.rec { background: rgba(255,107,122,.1); border-color: rgba(255,107,122,.4); }
+
+  /* steps card */
+  .steps-bar { flex-wrap: nowrap; gap: 8px; padding: 10px 14px; background: #1f1130; border-radius: 14px 14px 0 0; box-shadow: 0 1px 0 var(--glass-border); }
+  .steps-bar h3 { white-space: nowrap; } .steps-bar > * { flex-shrink: 0; }
+  .steps-bar .steps-search { flex: 1 1 80px; min-width: 70px; width: auto; flex-shrink: 1; }
+  .steps-bar .btn { white-space: nowrap; }
+  .goal-row { padding: 10px 14px 6px; gap: 12px; } .goal-row textarea { min-height: 52px; max-height: 120px; }
+  .steps-list { padding: 6px 8px 14px; }
+  .srow { border-radius: 8px; min-height: 38px; font-size: 13px; transition: background .12s; }
+  .srow:hover { background: rgba(255,255,255,.045); }
+  .sr-num { font: 500 11.5px var(--mono); opacity: .7; }
+  .sr-verb { font-weight: 600; font-size: 12.5px; letter-spacing: -.005em; }
+  .sr-target { font-size: 12px; }
+  .ibtn { border-radius: 7px; } .ibtn:hover { background: rgba(255,255,255,.08); }
+  .pill { font-weight: 600; border-radius: 99px; padding: 1px 8px; }
+  .case-head { margin: 14px 2px 6px; padding: 7px 12px; border-radius: 10px; background: linear-gradient(90deg, rgba(245,165,36,.18), rgba(122,52,140,.12)); border: 1px solid rgba(245,165,36,.28); border-left: 3px solid var(--accent); }
+  .case-head .ux-input { font-family: var(--sans); font-weight: 600; background: transparent; border-color: transparent; }
+  .case-head .ux-input:hover { border-color: var(--glass-border); }
+  .empty { padding: 44px 24px; }
+  .panel-header.ph-row { padding: 10px 28px; } details.help { margin-bottom: 10px; } #panel-ui .panel-body > :first-child { margin-top: 12px; }
+  .stepper { margin-bottom: 12px; }
+
+  /* record card */
+  .rec-big { padding: 11px 16px; font-size: 13.5px; border-radius: 10px; letter-spacing: -.01em; }
+  .rec-big.stop { background: linear-gradient(180deg, #ff8591, #f0505f); box-shadow: 0 1px 0 rgba(255,255,255,.3) inset, 0 8px 20px -8px rgba(240,80,95,.7); }
+  #rec-card.recording { border-color: rgba(255,107,122,.5); box-shadow: 0 0 0 1px rgba(255,107,122,.25), 0 0 32px -8px rgba(255,107,122,.35); }
+
+  /* uploaded test cases + saved recordings */
+  .tc-item, .saved-item { border-radius: 10px; background: rgba(255,255,255,.028); transition: background .12s, border-color .12s; }
+  .tc-item:hover, .saved-item:hover { background: rgba(255,255,255,.055); }
+  .tc-item.active, .saved-item.current { background: rgba(245,165,36,.1); border-color: rgba(245,165,36,.45); }
+  .tc-id { font: 600 11px var(--mono); padding: 1px 6px; margin-right: 4px; border-radius: 5px; background: rgba(245,165,36,.16); color: var(--accent2); }
+  .tc-title, .si-name { font-weight: 600; letter-spacing: -.01em; }
+  .tc-detail { border: 1px solid var(--glass-border); border-radius: 10px; background: rgba(255,255,255,.03); line-height: 1.55; }
+  .tc-detail b { font: 600 10px var(--sans); letter-spacing: .08em; }
+
+  /* overlays */
+  .rowmenu, .bb-pop, .modal-card { background: #1c0f2b; border-color: var(--glass-border-strong); border-radius: 12px; box-shadow: 0 24px 60px -12px rgba(0,0,0,.75); }
+  .modal { backdrop-filter: blur(6px); }
+  .toast { border-radius: 10px; font-family: var(--sans); }
+  .pw-log-box, .code-block, .run-log-raw { font-size: 12px; line-height: 1.65; }
+  .out-tab { font-weight: 600; font-size: 12.5px; border-radius: 8px 8px 0 0; }
+
+  /* ═══ Balanced workspace: roomier side column; the test-case library takes the spare height ═══ */
+  .ui-grid { grid-template-columns: minmax(0, 1fr) clamp(400px, 33vw, 500px); gap: 20px; }
+  .ui-side { top: 8px; max-height: calc(100vh - 70px); gap: 12px; padding: 0 4px 8px 0; }
+  .ui-side > .card { flex-shrink: 0; }
+  .ui-side > #tc-card { flex: 1 1 280px; min-height: 280px; display: flex; flex-direction: column; }
+  #tc-card #tc-list { flex: 1 1 auto; min-height: 120px; max-height: none !important; }
+  #tc-card #tc-detail { flex: 0 1 auto; max-height: 140px; overflow-y: auto; }
+  #tc-card .hint { margin-top: 8px; }
+  #rec-card { padding: 14px 16px; }
+  #rec-card .field.tight { margin-bottom: 8px; }
+  #rec-card > .hint { display: none; }                 /* the how-to lives in "How it works & tips" */
+  .rec-big { padding: 10px 16px; }
+  #ui-saved-list { max-height: 150px !important; }
+  .tc-item { padding: 9px 12px; }
+  .tc-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+  /* second pass: steps need less width than they were given; the recorder and library need more */
+  .ui-grid { grid-template-columns: minmax(0, 1fr) clamp(430px, 40vw, 600px); }
+  .ui-side { height: calc(100vh - 70px); max-height: none; overflow-y: auto; }
+  .ui-side > #tc-card { flex: 1 1 0; min-height: 300px; }
+  #tc-card #tc-list { flex: 1 1 0; min-height: 90px; }
+  #rec-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px; align-items: end; }
+  #rec-card > h3 { grid-column: 1 / -1; margin-bottom: 2px; }
+  #rec-card > .field { margin: 0; } #rec-card > .rec-big { width: 100%; }
+  #rec-card > #btn-ui-rec-append { grid-column: 1 / -1; margin-top: 0 !important; }
+  .steps-bar { flex-wrap: wrap; row-gap: 8px; }
+  .steps-bar .steps-search { flex: 1 1 110px; min-width: 110px; }
+  @media (max-width: 1180px) { .ui-side { height: auto; } .ui-side > #tc-card { flex: none; } }
+
+  /* third pass: reclaim vertical space for the case list */
+  #tc-card > .hint, .ui-side > .card:last-child > .hint { display: none; }
+  #tc-card #tc-list { flex: 1 1 0; min-height: 150px; }
+  #tc-card #tc-detail { max-height: 120px; }
+  details.help { margin-bottom: 6px; padding: 4px 12px; }
+  .stepper { margin-bottom: 8px; }
+  #panel-ui .panel-body > :first-child { margin-top: 8px; }
+  .ui-side { height: calc(100vh - 62px); }
+
+  /* ═══════════ Ice-silver surface, aubergine chrome, marigold accent ═══════════ */
+  :root {
+    --bg: #e9ecf0; --bg2: #f5f7f9; --bg3: #dde1e7;
+    --border: #cfd4dc; --border2: #bcc2cc;
+    --text: #25122f; --muted: #6a5f78;
+    --accent: #e8920a; --accent2: #9a5a00;
+    --green: #0f9d73; --red: #d6364b; --amber: #a86a00;
+    --glass: rgba(255,255,255,.6); --glass-strong: rgba(255,255,255,.85); --glass-hover: rgba(255,255,255,.95);
+    --glass-border: rgba(37,18,47,.11); --glass-border-strong: rgba(37,18,47,.22);
+    --glass-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 8px 24px -14px rgba(37,18,47,.35);
+  }
+  html, body {
+    background-color: #e6e9ee;
+    background-image:
+      radial-gradient(ellipse 1000px 520px at 50% -12%, rgba(255,255,255,.95), transparent 70%),
+      radial-gradient(ellipse 700px 500px at 100% 100%, rgba(232,146,10,.07), transparent 60%),
+      linear-gradient(180deg, #eef0f4 0%, #dfe3e9 100%);
+  }
+  ::selection { background: rgba(232,146,10,.35); }
+  * { scrollbar-color: rgba(37,18,47,.25) transparent; }
+
+  /* aubergine chrome: top bar and sidebar keep the dark palette */
+  .topbar, .sidebar {
+    --text: #ece8f1; --muted: #ab9fbb; --accent: #f5a524; --accent2: #ffc766;
+    --glass: rgba(255,255,255,.04); --glass-strong: rgba(255,255,255,.08); --glass-hover: rgba(255,255,255,.12);
+    --glass-border: rgba(255,255,255,.1); --glass-border-strong: rgba(255,255,255,.2); --green: #6fd8b4;
+    color: var(--text);
+  }
+  .topbar { background: #1d0f2c; border-bottom-color: #2f1b43; }
+  .sidebar { background: #1a0d28; border-right-color: #2f1b43; }
+  .step.active { background: rgba(245,165,36,.14); border-color: rgba(245,165,36,.35); }
+  .step.active::before { background: #f5a524; }
+  .step.active .step-num { color: #2a1130; background: #f5a524; }
+  .sidebar-footer { border-top-color: #2f1b43; }
+
+  /* surfaces */
+  .card { background: rgba(255,255,255,.62); }
+  .browserbar { background: rgba(255,255,255,.55); }
+  .steps-bar { background: #f7f8fa; }
+  details.help { background: rgba(255,255,255,.55); }
+  .bb-field input, .ux-input, .field input, .field select, .field textarea, select, textarea, input[type=text], input[type=url], input[type=number], .latency-threshold-input {
+    background: #fff; color: var(--text); border-color: var(--glass-border); }
+  .bb-field input:focus, .ux-input:focus, .field input:focus, .field select:focus, textarea:focus { background: #fff; box-shadow: 0 0 0 3px rgba(232,146,10,.25); }
+  .ux-input::placeholder, .bb-field input::placeholder, textarea::placeholder { color: #9a92a6; }
+  option { background: #fff; color: #25122f; }
+  .btn-ghost { background: rgba(255,255,255,.7); color: var(--text); }
+  .btn-ghost:hover { background: #fff; border-color: rgba(37,18,47,.3); color: var(--text); }
+  .topbar .btn-ghost, .sidebar .btn-ghost { background: rgba(255,255,255,.06); color: #ece8f1; border-color: rgba(255,255,255,.14); }
+  .topbar .btn-ghost:hover, .sidebar .btn-ghost:hover { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.26); }
+  .btn-primary { color: #2a1130; }
+  .btn-danger { background: rgba(214,54,75,.08); border-color: rgba(214,54,75,.3); }
+  .badge { background: rgba(37,18,47,.06); }
+  .sp-item .n { background: rgba(37,18,47,.1); }
+  .sp-item.active { background: rgba(232,146,10,.14); border-color: rgba(232,146,10,.5); }
+  .sp-item.active .n { color: #2a1130; }
+  .sp-item.done .n { background: var(--green); color: #fff; }
+  .srow:hover { background: rgba(37,18,47,.045); }
+  .srow.bad { background: rgba(214,54,75,.08); }
+  .ibtn:hover { background: rgba(37,18,47,.07); }
+  .pill { background: rgba(37,18,47,.07); }
+  .v-nav { color: #6b3fa0; } .v-wait { color: #a86a00; } .v-assert { color: #0f8a65; }
+  .case-head { background: linear-gradient(90deg, rgba(245,165,36,.22), rgba(245,165,36,.06)); border-color: rgba(232,146,10,.4); border-left-color: #e8920a; }
+  .case-head .caret { color: #9a5a00; }
+  .tc-item, .saved-item { background: rgba(255,255,255,.7); }
+  .tc-item:hover, .saved-item:hover { background: #fff; }
+  .tc-item.active, .saved-item.current { background: rgba(245,165,36,.16); border-color: rgba(232,146,10,.6); }
+  .tc-id { background: rgba(232,146,10,.16); color: #8a5000; }
+  .tc-detail { background: rgba(255,255,255,.7); }
+  #rec-card.recording { border-color: rgba(214,54,75,.55); }
+  .sr-detail { background: rgba(255,255,255,.7); }
+  .srow .grip { color: var(--muted); }
+
+  /* overlays and code stay readable */
+  .rowmenu, .bb-pop, .modal-card, .config-box { background: #f7f8fa; color: var(--text); }
+  .rowmenu button { color: var(--text); } .rowmenu button:hover { background: rgba(37,18,47,.07); }
+  .modal { background: rgba(26,13,40,.5); }
+  .pw-log-box, .code-block, .code-header, #config-editor { background: #1d0f2c; color: #ddd6e8; border-color: #2f1b43; }
+  .out-tab.active { background: #fff; }
+  .toast { background: #1d0f2c; color: #ece8f1; }
+  .log-wrap { background: #f3f5f8; backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+  /* recording folders */
+  .fold-head { display: flex; align-items: center; gap: 8px; padding: 6px 4px 4px; margin-top: 6px; cursor: pointer; user-select: none; font-weight: 650; font-size: 12.5px; }
+  .fold-head:first-child { margin-top: 0; }
+  .fold-head .caret { width: 14px; color: var(--muted); transition: transform .15s; } .fold-head .caret.shut { transform: rotate(-90deg); }
+  .fold-head .fh-count { margin-left: auto; font: 600 10.5px var(--sans); color: var(--muted); background: rgba(37,18,47,.07); border-radius: 99px; padding: 1px 8px; }
+  .fold-head .ibtn { width: 24px; height: 24px; font-size: 12px; }
+  .fold-body { display: flex; flex-direction: column; gap: 4px; padding-left: 12px; border-left: 2px solid var(--glass-border); margin-left: 6px; }
 </style>
 </head>
 <body>
@@ -824,8 +1087,24 @@
               <p class="hint">Then use the app in the browser window. In its toolbar: <b>🎯 Pick</b> adds checks, <b>⚓ Anchor</b> uses label-based locators.</p>
             </div>
 
+            <div class="card compact" id="tc-card">
+              <h3>📋 Test cases <span id="tc-badge" class="badge" style="display:none"></span></h3>
+              <div class="name-row" style="margin-bottom:8px">
+                <label class="btn btn-primary btn-sm" style="cursor:pointer" title="CSV with a header row. Columns recognised: ID, Title (or Name/Summary), Steps (or Description), Expected (or Expected result)">⬆ Upload CSV
+                  <input type="file" accept=".csv,text/csv" style="display:none" onchange="tcUpload(this)"></label>
+                <button class="btn btn-ghost btn-sm" id="tc-clear" onclick="tcClear()" style="display:none">Clear</button>
+              </div>
+              <div id="tc-list" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;max-height:260px;overflow-y:auto"><span style="color:var(--muted)">Upload a CSV, then record one case at a time.</span></div>
+              <div id="tc-detail" style="display:none"></div>
+              <p class="hint">▶ Record on a case adds a case header to the steps and everything you capture goes under it. Pick the next case when you are done.</p>
+            </div>
+
             <div class="card compact">
               <h3>💾 Saved recordings <span id="ui-editing-badge" class="badge" style="display:none"></span></h3>
+              <div class="name-row" style="margin-bottom:8px" title="Folders group saved step recordings, e.g. all weight flows under Health">
+                <select id="ui-save-folder" class="ux-input" style="flex:1;min-width:0" onchange="uiSaveFolder=this.value"><option value="">📂 Unfiled</option></select>
+                <button class="btn btn-ghost btn-sm" onclick="uiNewFolder()" title="Create a folder, e.g. Health">＋ Folder</button>
+              </div>
               <div class="name-row" style="margin-bottom:10px">
                 <input type="text" id="ui-save-name" class="ux-input" style="flex:1" placeholder="Name this recording">
                 <button class="btn btn-primary btn-sm" onclick="uiSaveRecording()" title="Saves under this name; overwrites a recording with the same name">Save</button>
@@ -854,7 +1133,7 @@
                 <button class="btn btn-danger" id="btn-explore-stop" onclick="stopExplore()" style="display:none">■ Stop</button>
               </div>
               <pre class="pw-log-box" id="explore-log-box" style="margin-top:10px;max-height:170px"></pre>
-              <div id="explore-report" style="display:none;margin-top:10px;background:rgba(124,106,255,0.08);border:1px solid #4c3f8a;border-radius:10px;padding:12px 14px">
+              <div id="explore-report" style="display:none;margin-top:10px;background:rgba(245,165,36,0.08);border:1px solid #7a4a2a;border-radius:10px;padding:12px 14px">
                 <div style="font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:#c4b5fd;margin-bottom:6px">Exploration report</div>
                 <pre id="explore-report-text" style="white-space:pre-wrap;font-size:12px;margin:0"></pre>
                 <div class="flex-row" id="explore-publish-row" style="margin-top:10px;display:none;flex-wrap:wrap">
@@ -1600,6 +1879,7 @@ function uiDescribeLocator(l) {
   const nth = l.nth != null ? ` #${l.nth + 1}` : '';
   if (l.kind === 'role') return `${l.role} "${l.name}"${nth}`;
   if (l.kind === 'css') return `css ${l.value}${nth}`;
+  if (l.kind === 'pattern') return `text like /${l.value}/${l.scope ? ' in ' + l.scope : ''}${l.nth === -1 ? ' (last)' : l.nth === 0 ? ' (first)' : ''}`;
   return `${l.kind} "${l.value}"${nth}`;
 }
 
@@ -1720,8 +2000,9 @@ function uiRowMenu(id, ev) {
 
 const UI_VERB = { goto: 'Go to', back: 'Go back', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
   press: 'Press', press_page: 'Press', assert_text: 'Assert text', assert_value: 'Assert value', assert_visible: 'Assert visible',
-  assert_attr: 'Assert attr', assert_js: 'Assert script', assert_url: 'Assert URL', capture: 'Capture', compare: 'Compare', hover: 'Hover', scroll_into_view: 'Scroll to', wait_for: 'Wait for', wait: 'Wait (ms)',
+  assert_attr: 'Assert attr', assert_js: 'Assert script', assert_url: 'Assert URL', capture: 'Capture', compare: 'Compare', assert_datetime: 'Assert date/time', hover: 'Hover', scroll_into_view: 'Scroll to', wait_for: 'Wait for', wait: 'Wait (ms)',
   scroll_page: 'Scroll page', note: 'Note' };
+const UI_DT_MODES = [['time_now', 'Time is now'], ['datetime_now', 'Date & time now'], ['date_today', 'Date is today']];
 const UI_EDITABLE = ['goto', 'fill', 'select', 'press', 'press_page', 'assert_text', 'assert_value', 'assert_attr', 'assert_js', 'assert_url', 'wait_for', 'wait', 'scroll_page'];
 const UI_CMP_OPS = [['equals', 'equals'], ['not_equals', 'does not equal'], ['contains', 'contains'], ['not_contains', 'does not contain']];
 function uiCaptureVars() { return Array.from(new Set(uiLastSteps.filter(s => s.type === 'capture' && s.var).map(s => s.var))); }
@@ -1808,9 +2089,17 @@ function renderUiSteps(steps) {
       val = `<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${sel('left', s.left)}<select class="ux-input" onchange="uiUpdateStep(${s.id}, this.value, 'op')">`
         + UI_CMP_OPS.map(([v, l]) => `<option value="${v}"${v === (s.op || 'equals') ? ' selected' : ''}>${l}</option>`).join('') + `</select>${sel('right', s.right)}</span>`;
     }
+    else if (s.type === 'assert_datetime') {
+      const pat = s.locator && s.locator.kind === 'pattern'
+        ? `<select class="ux-input" style="width:76px;padding:4px 6px" onchange="uiUpdateStep(${s.id}, this.value, 'which')" title="When several elements look like a date/time, use the newest (last on the page) or the first">`
+          + `<option value="last"${s.locator.nth !== 0 ? ' selected' : ''}>Last</option><option value="first"${s.locator.nth === 0 ? ' selected' : ''}>First</option></select>` : '';
+      val = `<span style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:flex-end">${pat}<select class="ux-input" style="width:132px;padding:4px 6px" onchange="uiUpdateStep(${s.id}, this.value, 'mode')" title="Time is now: just the time of day. Date &amp; time now: both. Date is today: just the date.">`
+        + UI_DT_MODES.map(([v, l]) => `<option value="${v}"${v === (s.mode || 'datetime_now') ? ' selected' : ''}>${l}</option>`).join('') + `</select>`
+        + ((s.mode || 'datetime_now') === 'date_today' ? '' : `<span class="hint" style="margin:0">±</span><input type="number" class="ux-input" min="0" max="1440" style="width:52px;padding:4px 6px" value="${s.tol != null ? s.tol : 2}" onchange="uiUpdateStep(${s.id}, this.value, 'tol')" title="Minutes of tolerance, either way">`) + `</span>`;
+    }
     else if (UI_EDITABLE.includes(s.type)) val = `<input type="text" class="ux-input" value="${escapeHtml(s.value)}" onchange="uiUpdateStep(${s.id}, this.value)">`;
     else if (s.type === 'note') val = `<span style="color:var(--muted)">${escapeHtml(s.value)}</span>`;
-    return `<div class="srow ${r && !r.ok ? 'bad' : ''}" data-id="${s.id}">`
+    return `<div class="srow ${r && !r.ok ? 'bad' : ''}${s.type === 'assert_datetime' ? ' dt' : ''}" data-id="${s.id}">`
       + (uiFilter ? '' : `<span class="grip" title="Drag to reorder">⋮⋮</span>`)
       + `<span>${mark}</span><span class="sr-num">${n}</span>`
       + `<span class="sr-verb ${uiVerbClass(s.type)}">${pill}${UI_VERB[s.type] || s.type}</span>`
@@ -1918,22 +2207,66 @@ function uiUpdateEditingBadge() {
   b.style.color = uiDirty() ? 'var(--yellow,#f59e0b)' : '';
 }
 
+let uiSaveFolder = '', uiFolderCollapsed = {}, uiSavedList = [];
+try { uiFolderCollapsed = JSON.parse(localStorage.getItem('ui-folder-collapsed') || '{}') || {}; } catch (e) {}
+function uiToggleFolder(f) { uiFolderCollapsed[f] = !uiFolderCollapsed[f]; try { localStorage.setItem('ui-folder-collapsed', JSON.stringify(uiFolderCollapsed)); } catch (e) {} uiRefreshSaved(); }
+async function uiNewFolder() {
+  const name = (prompt('New folder name (e.g. Health):') || '').trim();
+  if (!name) return;
+  const res = await fetch(BRIDGE_URL + '/api/ui-recording-folders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Could not create the folder', 'err'); return; }
+  uiSaveFolder = d.folder; await uiRefreshSaved(); toast(`Folder "${d.folder}" ready - Save puts the recording in it`);
+}
+async function uiMoveRecording(file, cur) {
+  const to = prompt('Move to folder (leave blank for Unfiled). A new name creates the folder:', cur || '');
+  if (to === null) return;
+  const res = await fetch(BRIDGE_URL + '/api/ui-recordings/move', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file, folder: to }) });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Move failed', 'err'); return; }
+  uiRefreshSaved(); toast(d.folder ? `Moved to ${d.folder}` : 'Moved to Unfiled');
+}
+async function uiDeleteFolder(f) {
+  const res = await fetch(BRIDGE_URL + '/api/ui-recording-folders/' + encodeURIComponent(f), { method: 'DELETE' });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Could not delete the folder', 'err'); return; }
+  if (uiSaveFolder === f) uiSaveFolder = '';
+  uiRefreshSaved();
+}
 async function uiRefreshSaved() {
   const box = document.getElementById('ui-saved-list');
   try {
     const r = await (await fetch(BRIDGE_URL + '/api/ui-recordings')).json();
-    const list = r.recordings || [];
-    if (!list.length) { box.innerHTML = '<span style="color:var(--muted)">No saved recordings yet.</span>'; return; }
-    box.innerHTML = list.map(x => {
+    const list = r.recordings || [], folders = r.folders || [];
+    uiSavedList = list;
+    const sel = document.getElementById('ui-save-folder');
+    if (sel) {
+      if (uiSaveFolder && !folders.includes(uiSaveFolder)) uiSaveFolder = '';
+      sel.innerHTML = '<option value="">📂 Unfiled</option>' + folders.map(f => `<option value="${escapeHtml(f)}">📁 ${escapeHtml(f)}</option>`).join('');
+      sel.value = uiSaveFolder;
+    }
+    if (!list.length && !folders.length) { box.innerHTML = '<span style="color:var(--muted)">No saved recordings yet.</span>'; return; }
+    const item = (x) => {
       const when = x.saved_at ? new Date(x.saved_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
       const cur = uiLoadedName === x.name;
-      const esc = escapeHtml(x.name);
+      const esc = escapeHtml(x.name), jf = escapeHtml(x.file);
       return `<div class="saved-item${cur ? ' current' : ''}">`
         + `<div class="si-main"><div class="si-name" title="${esc}">${cur ? '▶ ' : ''}${esc}</div>`
         + `<div class="si-meta">${x.steps} step${x.steps === 1 ? '' : 's'}${x.cases ? ` · ${x.cases} case${x.cases > 1 ? 's' : ''}` : ''}${when ? ` · ${escapeHtml(when)}` : ''}</div></div>`
-        + `<div class="si-actions"><button class="btn btn-ghost btn-sm" onclick="uiLoadRecording('${escapeHtml(x.file)}')" title="Load into the editor to edit it">✎ Edit</button>`
-        + `<button class="ibtn" onclick="uiDeleteRecording('${escapeHtml(x.file)}', '${esc.replace(/'/g, "\\'")}')" title="Delete this saved recording">🗑</button></div></div>`;
-    }).join('');
+        + `<div class="si-actions"><button class="btn btn-ghost btn-sm" onclick="uiLoadRecording('${jf}')" title="Load into the editor to edit it">✎ Edit</button>`
+        + `<button class="ibtn" onclick="uiMoveRecording('${jf}', '${escapeHtml(x.folder).replace(/'/g, "\\'")}')" title="Move to a folder">📁</button>`
+        + `<button class="ibtn" onclick="uiDeleteRecording('${jf}', '${esc.replace(/'/g, "\\'")}')" title="Delete this saved recording">🗑</button></div></div>`;
+    };
+    const section = (f, label) => {
+      const items = list.filter(x => x.folder === f);
+      if (f === '' && !folders.length) return items.map(item).join('');          // no folders yet: the plain list, as before
+      if (f === '' && !items.length) return '';
+      const closed = !!uiFolderCollapsed[f];
+      return `<div class="fold-head" onclick="uiToggleFolder('${escapeHtml(f).replace(/'/g, "\\'")}')"><span class="caret${closed ? ' shut' : ''}">▾</span><span class="fh-name">${label}</span><span class="fh-count">${items.length}</span>`
+        + (f && !items.length ? `<button class="ibtn" onclick="event.stopPropagation();uiDeleteFolder('${escapeHtml(f).replace(/'/g, "\\'")}')" title="Delete this empty folder">🗑</button>` : '') + `</div>`
+        + (closed ? '' : `<div class="fold-body">${items.map(item).join('') || '<span class="hint" style="margin:0 0 4px 22px">Empty - Save into this folder, or use 📁 on a recording to move one here.</span>'}</div>`);
+    };
+    box.innerHTML = folders.map(f => section(f, '📁 ' + escapeHtml(f))).join('') + section('', '📂 Unfiled');
   } catch (e) { box.innerHTML = '<span style="color:var(--red)">Could not reach the bridge.</span>'; }
 }
 
@@ -1941,13 +2274,13 @@ async function uiSaveRecording() {
   const name = (document.getElementById('ui-save-name').value || '').trim();
   if (!name) { toast('Give the recording a name', 'err'); return; }
   if (!uiLastSteps.length) { toast('Nothing to save yet', 'err'); return; }
-  const exists = Array.from(document.querySelectorAll('#ui-saved-list .si-name')).some(b => b.textContent.replace('▶ ', '') === name);
+  const exists = uiSavedList.some(x => x.name === name && x.folder === uiSaveFolder);
   if (exists && uiLoadedName !== name && !confirm(`A recording named "${name}" already exists. Overwrite it?`)) return;
   const settings = { timeout_s: uiTimeout(), shared_session: document.getElementById('ui-shared-session').checked,
                      test_name: document.getElementById('ui-test-name').value,
                      goal: document.getElementById('ui-test-goal').value, expected: document.getElementById('ui-test-expected').value };
   const res = await fetch(BRIDGE_URL + '/api/ui-recordings', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                                               body: JSON.stringify({ name, settings }) });
+                                                               body: JSON.stringify({ name, settings, folder: uiSaveFolder }) });
   const d = await res.json();
   if (!res.ok) { toast(d.error || 'Save failed', 'err'); return; }
   uiLoadedName = d.name; uiSnapshot = uiCanon(uiLastSteps);
@@ -1963,7 +2296,7 @@ async function uiLoadRecording(file) {
   const d = await res.json();
   if (!res.ok) { toast(d.error || 'Load failed', 'err'); return; }
   uiReplayResults = {}; uiCheckResults = {};
-  uiLoadedName = d.name; uiSnapshot = uiCanon(d.steps || []);
+  uiLoadedName = d.name; uiSnapshot = uiCanon(d.steps || []); uiSaveFolder = d.folder || '';
   document.getElementById('ui-save-name').value = d.name;
   const st = d.settings || {};
   if (st.test_name) document.getElementById('ui-test-name').value = st.test_name; else document.getElementById('ui-test-name').value = d.name;
@@ -1983,6 +2316,98 @@ async function uiDeleteRecording(file, name) {
   if (uiLoadedName === name) { uiLoadedName = null; uiSnapshot = null; }
   uiUpdateEditingBadge(); uiRefreshSaved();
   toast(`Deleted "${name}"`);
+}
+
+// ── uploaded test cases (CSV) → record case by case ──
+let tcCases = [], tcActive = null, tcPending = null;
+try { tcCases = JSON.parse(localStorage.getItem('ui-testcases') || '[]') || []; } catch (e) { tcCases = []; }
+function tcSave() { try { localStorage.setItem('ui-testcases', JSON.stringify(tcCases)); } catch (e) {} }
+function tcParseCsv(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+    else if (c === '"') q = true;
+    else if (c === ',') { row.push(cur); cur = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cur); cur = ''; if (row.some(x => x.trim())) rows.push(row); row = []; }
+    else cur += c;
+  }
+  row.push(cur); if (row.some(x => x.trim())) rows.push(row);
+  return rows;
+}
+function tcFromRows(rows) {
+  if (rows.length < 2) return [];
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const find = (...keys) => head.findIndex(h => keys.some(k => h === k || h.includes(k)));
+  let iId = find('test case id', 'testcase id', 'tc id', 'id', 'key');
+  let iTitle = find('title', 'summary', 'name', 'scenario');
+  const iSteps = find('steps', 'step', 'description', 'procedure');
+  const iExp = find('expected', 'result');
+  if (iTitle < 0) iTitle = head.findIndex((_, i) => i !== iId);
+  const get = (r, i) => (i >= 0 && r[i] != null ? String(r[i]).trim() : '');
+  return rows.slice(1).map((r, n) => ({
+    id: get(r, iId) || `TC-${n + 1}`, title: get(r, iTitle) || get(r, iSteps).slice(0, 80) || `Case ${n + 1}`,
+    steps: get(r, iSteps), expected: get(r, iExp),
+  })).filter(c => c.id || c.title);
+}
+function tcUpload(input) {
+  const f = input.files && input.files[0]; input.value = '';
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    const list = tcFromRows(tcParseCsv(String(rd.result)));
+    if (!list.length) { toast('No test cases found - the CSV needs a header row and at least one row', 'err'); return; }
+    tcCases = list; tcActive = null; tcSave(); tcRender();
+    toast(`Loaded ${list.length} test case${list.length > 1 ? 's' : ''}`);
+  };
+  rd.readAsText(f);
+}
+function tcClear() { if (!confirm('Remove the uploaded test cases? (Recorded steps are not touched.)')) return; tcCases = []; tcActive = null; tcSave(); tcRender(); }
+function tcLabel(c) { return `${c.id} — ${c.title}`; }
+function tcStatus(c) {   // null = no case header yet, else the number of steps recorded under it
+  const lab = tcLabel(c); let n = null, inside = false;
+  for (const s of uiLastSteps) {
+    if (s.type === 'case') { inside = s.value === lab; if (inside && n === null) n = 0; }
+    else if (inside) n++;
+  }
+  return n;
+}
+function tcRender() {
+  const box = document.getElementById('tc-list'); if (!box) return;
+  document.getElementById('tc-clear').style.display = tcCases.length ? '' : 'none';
+  const badge = document.getElementById('tc-badge');
+  badge.style.display = tcCases.length ? '' : 'none';
+  if (!tcCases.length) { badge.textContent = ''; box.innerHTML = '<span style="color:var(--muted)">Upload a CSV, then record one case at a time.</span>'; document.getElementById('tc-detail').style.display = 'none'; return; }
+  const done = tcCases.filter(c => tcStatus(c) > 0).length;
+  badge.textContent = `${done}/${tcCases.length} recorded`;
+  box.innerHTML = tcCases.map((c, i) => {
+    const n = tcStatus(c), isAct = tcActive === i;
+    const meta = n === null ? 'not recorded' : (n ? `✓ ${n} step${n > 1 ? 's' : ''}` : (uiRecording && isAct ? '● recording…' : 'no steps yet'));
+    return `<div class="tc-item${isAct ? ' active' : ''}"><div style="min-width:0"><div class="tc-title"><span class="tc-id">${escapeHtml(c.id)}</span> ${escapeHtml(c.title)}</div><div class="tc-meta">${meta}</div></div>
+      <button class="btn btn-ghost btn-sm" onclick="tcRecord(${i})" ${n !== null ? 'title="Already has a case header - delete its group in the steps list to record it again"' : ''}>${n !== null ? 'Show' : '▶ Record'}</button></div>`;
+  }).join('');
+  const a = tcCases[tcActive], d = document.getElementById('tc-detail');
+  d.style.display = a ? '' : 'none';
+  if (a) d.innerHTML = `<div class="tc-detail"><b>${escapeHtml(a.id)} · steps to cover</b>${escapeHtml(a.steps || '(none given)')}<b>Expected</b>${escapeHtml(a.expected || '(none given)')}</div>`;
+}
+function tcAddHeader(c) {
+  const last = uiLastSteps.length ? uiLastSteps[uiLastSteps.length - 1].id : null;
+  socket.emit('ui_step_insert', { after_id: last, step: { type: 'case', value: tcLabel(c) } });
+}
+function tcRecord(i) {
+  const c = tcCases[i]; if (!c) return;
+  tcActive = i;
+  if (tcStatus(c) !== null) {
+    const h = uiLastSteps.find(s => s.type === 'case' && s.value === tcLabel(c));
+    const el = h && document.querySelector(`[data-case-id="${h.id}"]`); if (el) el.scrollIntoView({ block: 'center' });
+    tcRender(); return;
+  }
+  if (uiRecording) { tcAddHeader(c); tcRender(); return; }
+  if (!browserOpen) { toast('Launch the browser first (▶ Launch in the bar above)', 'err'); return; }
+  tcPending = i;   // header is added as soon as the server confirms recording has started
+  socket.emit('ui_record_start', { portals: document.getElementById('ui-portal').value.split(','), keep_steps: uiLastSteps.length > 0 });
+  tcRender();
 }
 
 function uiSetRecording(on) {
@@ -2122,6 +2547,8 @@ socket.on('ui_replay_done', (d) => {
 socket.on('ui_steps', (d) => {
   uiSetRecording(d.recording);
   renderUiSteps(d.steps || []);
+  if (tcPending !== null && d.recording) { const c = tcCases[tcPending]; tcPending = null; if (c) { uiLastSteps = d.steps || []; tcAddHeader(c); } }
+  tcRender();
   const first = uiLoadedName === null && uiSnapshot === null;   // page just (re)loaded: adopt the server's state
   const prevLoaded = uiLoadedName;
   uiLoadedName = d.loaded_name || null;

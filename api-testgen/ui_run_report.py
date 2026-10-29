@@ -18,16 +18,23 @@ _VERBS = {
     "check": "check", "uncheck": "uncheck", "press": "press", "press_page": "press",
     "hover": "hover", "scroll_into_view": "scroll to", "wait_for": "wait for", "wait": "wait",
     "scroll_page": "scroll page", "assert_text": "assert text", "assert_value": "assert value",
-    "assert_visible": "assert visible", "assert_attr": "assert attribute", "assert_js": "assert script", "assert_url": "assert URL", "capture": "capture", "compare": "compare",
+    "assert_visible": "assert visible", "assert_attr": "assert attribute", "assert_js": "assert script", "assert_url": "assert URL", "capture": "capture", "compare": "compare", "assert_datetime": "assert date/time",
 }
-_ASSERTS = ("assert_text", "assert_value", "assert_visible", "assert_attr", "assert_js", "assert_url", "compare")
+_ASSERTS = ("assert_datetime", "assert_text", "assert_value", "assert_visible", "assert_attr", "assert_js", "assert_url", "compare")
 _SECRET_IN_TEXT = re.compile(r"(?i)\b(pass(?:word|wd)?|pwd|secret|token|api[_-]?key|otp|cvv)\b(\s*[=:]\s*)(\S+)")
+
+
+_DT_TEXT = {"time_now": "time is now", "datetime_now": "date and time are now", "date_today": "date is today"}
 
 
 def _target(s):
     loc = s.get("locator") or {}
     if loc.get("anchor"):
         return f'label "{loc["anchor"]}" → the control next to it'
+    if loc.get("kind") == "pattern":
+        where = " in " + loc["scope"] if loc.get("scope") else ""
+        which = "last" if loc.get("nth") == -1 else "first" if loc.get("nth") == 0 else "any"
+        return f'text like {loc.get("value")}{where} ({which} match)'
     return loc.get("py") or loc.get("value") or loc.get("name") or ""
 
 
@@ -67,6 +74,8 @@ def step_detail(s):
         return f'{s.get("source") or "text"} → {s.get("var", "")}'
     if t == "compare":
         return f'expected: {s.get("left", "")} {(s.get("op") or "equals").replace("_", " ")} {s.get("right", "")}'
+    if t == "assert_datetime":
+        return f'expected: {_DT_TEXT.get(s.get("mode"), _DT_TEXT["datetime_now"])} (±{s.get("tol", 2)} min)'
     if t == "assert_url":
         return f'expected URL to contain: "{s.get("value", "")}"'
     if t == "assert_visible":
@@ -83,31 +92,51 @@ def _fmt_ms(ms):
 
 
 _CSS = """
-:root{--bg:#f6f7fb;--card:#fff;--ink:#1c2230;--mute:#6b7385;--line:#e3e6ee;--ok:#15803d;--okbg:#e8f6ee;--bad:#b91c1c;--badbg:#fdeceb;--warn:#a16207;--warnbg:#fdf6e3;--accent:#4f46e5}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1220;--card:#171b2d;--ink:#e8ebf5;--mute:#9aa3b8;--line:#272d45;--ok:#4ade80;--okbg:#10291c;--bad:#f87171;--badbg:#2e1517;--warn:#fbbf24;--warnbg:#2b2410;--accent:#818cf8}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 -apple-system,Segoe UI,Roboto,sans-serif}
-.wrap{max-width:980px;margin:0 auto;padding:28px 20px 60px}
-h1{font-size:24px;margin:0 0 6px;letter-spacing:.2px}.status{display:inline-block;font-weight:700;padding:3px 12px;border-radius:99px;font-size:13px;margin-bottom:4px}
+:root{--bg:#e9ecf0;--card:#fff;--ink:#25122f;--mute:#6a5f78;--line:#d5d9e0;--ok:#0f8a65;--okbg:#dff5ec;--bad:#c42d42;--badbg:#fbe4e7;--warn:#a86a00;--warnbg:#fdf1d8;--accent:#e8920a;--accent-ink:#8a5000;--head:#1d0f2c;--head-ink:#ece8f1;--soft:rgba(37,18,47,.045)}
+@media (prefers-color-scheme:dark){:root{--bg:#12081c;--card:#1c0f2b;--ink:#ebe8f0;--mute:#a396b5;--line:#35224a;--ok:#6fd8b4;--okbg:#12302a;--bad:#ff7a8a;--badbg:#341522;--warn:#ffd27a;--warnbg:#33260f;--accent:#f5a524;--accent-ink:#ffc766;--head:#0d0614;--head-ink:#ece8f1;--soft:rgba(255,255,255,.05)}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.55 Inter,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.top{background:var(--head);color:var(--head-ink);border-bottom:3px solid var(--accent)}
+.top .in{max-width:1000px;margin:0 auto;padding:22px 20px 18px}
+h1{font-size:22px;margin:0 0 8px;letter-spacing:-.01em;font-weight:650}
+.status{display:inline-block;font-weight:700;padding:3px 13px;border-radius:99px;font-size:12.5px;letter-spacing:.04em;margin-right:10px}
 .status.pass{background:var(--okbg);color:var(--ok)}.status.fail{background:var(--badbg);color:var(--bad)}
-.meta{color:var(--mute);font-size:13px;margin-bottom:22px}
-h2{font-size:13px;text-transform:uppercase;letter-spacing:1.2px;color:var(--mute);margin:26px 0 8px}
+.meta{display:inline;color:#b6a9c6;font-size:13px}
+.wrap{max-width:1000px;margin:0 auto;padding:6px 20px 60px}
+h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--mute);margin:26px 0 8px;font-weight:650}
+h2.row{display:flex;align-items:center;gap:10px}
+.btns{margin-left:auto;display:flex;gap:6px}.btns button{font:600 11.5px Inter,sans-serif;text-transform:none;letter-spacing:0;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:7px;padding:4px 10px;cursor:pointer}
+.btns button:hover{border-color:var(--accent)}
 .box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 18px}
 .box ul{margin:0;padding-left:20px}.box li{margin:3px 0}
-.case{margin:20px 0 8px;font-weight:700;color:var(--accent)}
+details.tc{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:12px;margin:10px 0;overflow:hidden}
+details.tc.bad{border-left-color:var(--bad)}details.tc.skip{border-left-color:var(--line)}
+details.tc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:13px 16px;user-select:none}
+details.tc>summary::-webkit-details-marker{display:none}
+details.tc>summary:hover{background:var(--soft)}
+details.tc>summary .car{color:var(--accent-ink);transition:transform .15s;display:inline-block;width:14px}
+details.tc[open]>summary .car{transform:rotate(90deg)}
+details.tc>summary .nm{font-weight:650;flex:1;min-width:0;word-break:break-word}
+.pill{font-size:11.5px;font-weight:700;border-radius:99px;padding:2px 10px}
+.pill.pass{background:var(--okbg);color:var(--ok)}.pill.fail{background:var(--badbg);color:var(--bad)}.pill.skip{background:var(--soft);color:var(--mute)}
+.cm{color:var(--mute);font-size:12.5px;white-space:nowrap}
+.tcb{padding:2px 14px 12px;border-top:1px solid var(--line);background:var(--soft)}
+.case{margin:20px 0 8px;font-weight:700;color:var(--accent-ink)}
 .step{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:10px;padding:12px 16px;margin:8px 0;display:flex;gap:14px;justify-content:space-between}
 .step.bad{border-left-color:var(--bad)}.step.skip{border-left-color:var(--line);opacity:.6}
 .step .t{font-weight:600;word-break:break-word}.step .n{color:var(--mute);margin-right:6px}
-.chip{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:0 6px;color:var(--mute);margin-left:6px}
+.chip{font-size:11px;border:1px solid var(--line);border-radius:6px;padding:0 6px;color:var(--mute);margin-left:6px;font-weight:500}
 .sub{color:var(--mute);font-size:13px;margin-top:2px;word-break:break-word}
 .saw b,.err b{font-weight:700}.err{color:var(--bad);margin-top:6px;white-space:pre-wrap;word-break:break-word;font-size:13px}
 .shot{flex:0 0 auto}.shot img{width:190px;max-height:130px;object-fit:cover;object-position:top;border:1px solid var(--line);border-radius:8px;cursor:zoom-in;display:block}
 .final{display:flex;gap:16px;flex-wrap:wrap}.final figure{margin:0}.final img{max-width:460px;width:100%;border:1px solid var(--line);border-radius:10px;cursor:zoom-in}
 .final figcaption{color:var(--mute);font-size:12px;margin-top:4px}
-#lb{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}#lb img{max-width:96vw;max-height:94vh;border-radius:6px}
-@media (max-width:640px){.step{flex-direction:column}.shot img{width:100%;max-height:none}}
+#lb{position:fixed;inset:0;background:rgba(15,6,24,.88);display:none;align-items:center;justify-content:center;z-index:9;cursor:zoom-out}#lb img{max-width:96vw;max-height:94vh;border-radius:6px}
+@media (max-width:640px){.step{flex-direction:column}.shot img{width:100%;max-height:none}details.tc>summary{flex-wrap:wrap}}
+@media print{details.tc{break-inside:avoid}}
 """
 _JS = ("document.addEventListener('click',function(e){var i=e.target;var lb=document.getElementById('lb');"
-       "if(i.tagName==='IMG'&&i.dataset.zoom){lb.firstChild.src=i.src;lb.style.display='flex'}else if(lb.contains(i)||i===lb){lb.style.display='none'}});")
+       "if(i.tagName==='IMG'&&i.dataset.zoom){lb.firstChild.src=i.src;lb.style.display='flex'}else if(lb.contains(i)||i===lb){lb.style.display='none'}"
+       "var b=i.closest&&i.closest('[data-all]');if(b){var o=b.dataset.all==='open';document.querySelectorAll('details.tc').forEach(function(d){d.open=o})}});")
 
 
 def build_report(name, steps, rows, finals=None, started=None, total_ms=0, goal="", expected=""):
@@ -166,15 +195,10 @@ def build_report(name, steps, rows, finals=None, started=None, total_ms=0, goal=
             issues.append(f"Slow step ({_fmt_ms(r['ms'])}): {step_label(s)}")
     issues_html = "<ul>" + "".join(f"<li>{e(i)}</li>" for i in issues) + "</ul>" if issues else "None."
 
-    # Steps
-    out, n = [], 0
-    for s in steps:
-        if s.get("type") == "case":
-            out.append(f'<div class="case">📋 {e(s.get("value") or "Test case")}</div>')
-            continue
-        if s.get("type") == "note":
-            continue
-        n += 1
+    # Steps, grouped by test case: each case is a collapsible block (failed ones start open)
+    n = 0
+
+    def step_html(s, n):
         r = by_id.get(s["id"])
         cls = "skip" if r is None else ("" if r.get("ok") else "bad")
         icon = "–" if r is None else ("✓" if r.get("ok") else "✗")
@@ -198,21 +222,50 @@ def build_report(name, steps, rows, finals=None, started=None, total_ms=0, goal=
                 lines.append(f'<div class="err"><b>Error:</b> {e(r["error"])}</div>')
         shot = (f'<div class="shot"><img data-zoom="1" alt="step {n}" src="data:image/jpeg;base64,{r["shot"]}"></div>'
                 if r and r.get("shot") else "")
-        out.append(f'<div class="step {cls}"><div>{"".join(lines)}</div>{shot}</div>')
+        return f'<div class="step {cls}"><div>{"".join(lines)}</div>{shot}</div>'
+
+    groups = [{"name": None, "steps": []}]
+    for s in steps:
+        if s.get("type") == "case":
+            groups.append({"name": s.get("value") or "Test case", "steps": []})
+        elif s.get("type") != "note":
+            n += 1
+            groups[-1]["steps"].append((s, n))
+    out = []
+    for g in groups:
+        if not g["steps"] and g["name"] is None:
+            continue
+        html_steps = "".join(step_html(s, k) for s, k in g["steps"])
+        if g["name"] is None:                                   # steps before the first case header: shown plainly
+            out.append(html_steps)
+            continue
+        rs = [by_id.get(s["id"]) for s, _ in g["steps"]]
+        bad = any(r is not None and not r.get("ok") for r in rs)
+        notrun = any(r is None for r in rs)
+        state = "fail" if bad else ("skip" if notrun or not rs else "pass")
+        label = {"fail": "FAIL", "skip": "NOT RUN" if notrun else "EMPTY", "pass": "PASS"}[state]
+        ms = sum((r or {}).get("ms", 0) for r in rs)
+        out.append(f'<details class="tc {"bad" if bad else ("skip" if state == "skip" else "")}"{" open" if bad else ""}>'
+                   f'<summary><span class="car">▸</span><span class="nm">📋 {e(g["name"])}</span>'
+                   f'<span class="cm">{len(g["steps"])} step{"s" if len(g["steps"]) != 1 else ""} · {_fmt_ms(ms)}</span>'
+                   f'<span class="pill {state}">{label}</span></summary><div class="tcb">{html_steps}</div></details>')
+    has_cases = any(g["name"] is not None for g in groups)
+    steps_head = ('<h2 class="row">Test cases<span class="btns"><button data-all="open">Expand all</button>'
+                  '<button data-all="close">Collapse all</button></span></h2>') if has_cases else "<h2>Steps</h2>"
 
     fin = "".join(f'<figure><img data-zoom="1" alt="final screen" src="data:image/jpeg;base64,{b}">'
                   f'<figcaption>{"Portal " + e(p) if multi else "Final screen"}</figcaption></figure>'
                   for p, b in sorted((finals or {}).items()))
 
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{e(title)}</title><style>{_CSS}</style></head><body><div class="wrap">
-<h1>{e(title)}</h1><span class="status {'pass' if passed else 'fail'}">{status}</span>
-<div class="meta">{e(meta)}</div>
+<title>{e(title)}</title><style>{_CSS}</style></head><body>
+<div class="top"><div class="in"><h1>{e(title)}</h1><span class="status {'pass' if passed else 'fail'}">{status}</span><span class="meta">{e(meta)}</span></div></div>
+<div class="wrap">
 <h2>Goal</h2><div class="box" style="white-space:pre-wrap">{e(goal or (name or 'UI test').strip())}</div>
 <h2>Expected result</h2><div class="box">{exp}</div>
 <h2>Verdict</h2><div class="box">{e(verdict)}</div>
 <h2>Issues found</h2><div class="box">{issues_html}</div>
-<h2>Steps</h2>{''.join(out)}
+{steps_head}{''.join(out)}
 {'<h2>Final screen</h2><div class="final">' + fin + '</div>' if fin else ''}
 </div><div id="lb"><img alt=""></div><script>{_JS}</script></body></html>"""
 
