@@ -705,7 +705,7 @@ def playwright_worker():
                     pass
                 if st.get("type") == "assert_url":
                     row["saw"] = pg.url[:200]
-                elif st.get("type") in ("capture", "compare") and "__saw__" in replay_vars:
+                elif st.get("type") in ("capture", "compare", "assert_datetime") and "__saw__" in replay_vars:
                     row["saw"] = str(replay_vars["__saw__"])[:200]
                 elif st.get("type") in ("assert_text", "assert_value") and st.get("locator"):
                     try:   # the value actually observed, next to the one expected (most useful when the assertion failed)
@@ -744,7 +744,7 @@ def playwright_worker():
                                 pass
                         replay_step(rpage, s, pw_expect, replay_vars)
                         res = {"id": s["id"], "ok": True}
-                        if s.get("type") in ("capture", "compare"):
+                        if s.get("type") in ("capture", "compare", "assert_datetime"):
                             res["detail"] = replay_vars.get("__saw__", "")
                         if want_report:
                             report_rows.append(report_row(rpage, s, True, step_t0))
@@ -1097,12 +1097,42 @@ def ui_step_update(data):
     """Edit a step's text: its value by default, or `expr` (the script of an assert-script step)."""
     sid, value = (data or {}).get("id"), (data or {}).get("value")
     field = (data or {}).get("field") or "value"
-    if field not in ("value", "expr", "var", "left", "right", "op", "source"):
+    if field not in ("value", "expr", "var", "left", "right", "op", "source", "mode", "tol", "which", "pattern", "scope"):
         return
     if field == "var":   # a variable name: letters, digits, underscore
         value = re.sub(r"\W+", "_", str(value or "").strip()).strip("_")[:40]
     if field == "op" and value not in ("equals", "not_equals", "contains", "not_contains"):
         return
+    if field == "mode" and value not in ("time_now", "datetime_now", "date_today"):
+        return
+    if field in ("which", "pattern", "scope"):   # edits to a date/time step's pattern locator
+        value = str(value if value is not None else "").strip()
+        if field == "which" and value not in ("last", "first"):
+            return
+        if field == "pattern":
+            try:
+                re.compile(value)
+            except re.error:
+                emit("error", {"msg": "That is not a valid regular expression"}); return
+            if not value:
+                return
+        with ui_rec_lock:
+            for s in ui_rec["steps"]:
+                loc = s.get("locator") if s.get("id") == sid else None
+                if loc and loc.get("kind") == "pattern":
+                    if field == "which":
+                        loc["nth"] = -1 if value == "last" else 0
+                    elif field == "scope":
+                        loc["scope"] = value or None
+                    else:
+                        loc["value"] = value
+        _ui_emit_steps()
+        return
+    if field == "tol":
+        try:
+            value = max(0, min(1440, int(float(value))))
+        except (TypeError, ValueError):
+            return
     if field == "source" and value not in ("text", "value", "tooltip", "attr"):
         return
     with ui_rec_lock:
@@ -1131,7 +1161,7 @@ def ui_step_insert(data):
         if step["type"] == "case":
             n_cases = sum(1 for s in steps if s.get("type") == "case")
             # The first split also names the leading case, so every step belongs to a named case.
-            if n_cases == 0 and not (steps and steps[0].get("type") == "case"):
+            if n_cases == 0 and steps and steps[0].get("type") != "case":
                 steps.insert(0, new_step({"type": "case", "value": "Test case 1"}))
                 idx += 1
                 n_cases = 1
@@ -1261,43 +1291,116 @@ def ui_replay(data):
     threading.Thread(target=run, daemon=True).start()
 
 
-def _rec_file(name):
+def _folder_name(raw):
+    """A user-defined folder under ui_recordings/ (e.g. 'Health'). '' = the root ('Unfiled'). One level only."""
+    f = re.sub(r"[^\w .-]", "", str(raw or "")).strip(" .")[:40]
+    return f
+
+
+def _rec_dir(folder):
+    base = os.path.realpath(UI_RECORDINGS_DIR)
+    path = os.path.realpath(os.path.join(base, folder)) if folder else base
+    return path if path == base or os.path.dirname(path) == base else None
+
+
+def _rec_file(name, folder=""):
+    """Resolves a recording to its json path. `name` may also be 'Folder/slug' (how the list refers to files)."""
+    if "/" in str(name or ""):
+        folder, name = str(name).split("/", 1)
+    folder = _folder_name(folder)
     slug = slugify(name)
-    path = os.path.realpath(os.path.join(UI_RECORDINGS_DIR, slug + ".json"))
-    if os.path.dirname(path) != os.path.realpath(UI_RECORDINGS_DIR):
+    d = _rec_dir(folder)
+    if d is None or folder.startswith("."):
+        return None, slug
+    path = os.path.realpath(os.path.join(d, slug + ".json"))
+    if os.path.dirname(path) != d:
         return None, slug
     return path, slug
+
+
+def _rec_folders():
+    try:
+        return sorted(n for n in os.listdir(UI_RECORDINGS_DIR)
+                      if not n.startswith(".") and os.path.isdir(os.path.join(UI_RECORDINGS_DIR, n)))
+    except FileNotFoundError:
+        return []
 
 
 @app.route("/api/ui-recordings", methods=["GET"])
 def list_ui_recordings():
     out = []
-    try:
-        names = [n for n in os.listdir(UI_RECORDINGS_DIR) if n.endswith(".json") and not n.startswith(".")]
-    except FileNotFoundError:
-        names = []
-    for fn in names:
+    folders = _rec_folders()
+    for folder in [""] + folders:
+        d = os.path.join(UI_RECORDINGS_DIR, folder) if folder else UI_RECORDINGS_DIR
         try:
-            with open(os.path.join(UI_RECORDINGS_DIR, fn), encoding="utf-8") as f:
-                d = json.load(f)
-            steps = d.get("steps") or []
-            out.append({"file": fn[:-5], "name": d.get("name") or fn[:-5], "saved_at": d.get("saved_at"),
-                        "steps": sum(1 for x in steps if x.get("type") != "case"),
-                        "cases": sum(1 for x in steps if x.get("type") == "case")})
-        except Exception:
-            continue   # skip unreadable files rather than break the list
+            names = [n for n in os.listdir(d) if n.endswith(".json") and not n.startswith(".")]
+        except FileNotFoundError:
+            names = []
+        for fn in names:
+            try:
+                with open(os.path.join(d, fn), encoding="utf-8") as f:
+                    rec = json.load(f)
+                steps = rec.get("steps") or []
+                out.append({"file": (folder + "/" if folder else "") + fn[:-5], "folder": folder,
+                            "name": rec.get("name") or fn[:-5], "saved_at": rec.get("saved_at"),
+                            "steps": sum(1 for x in steps if x.get("type") != "case"),
+                            "cases": sum(1 for x in steps if x.get("type") == "case")})
+            except Exception:
+                continue   # skip unreadable files rather than break the list
     out.sort(key=lambda r: r.get("saved_at") or "", reverse=True)
-    return jsonify({"recordings": out, "loaded_name": ui_rec.get("loaded_name")})
+    return jsonify({"recordings": out, "folders": folders, "loaded_name": ui_rec.get("loaded_name")})
+
+
+@app.route("/api/ui-recording-folders", methods=["POST"])
+def create_ui_recording_folder():
+    folder = _folder_name((request.get_json(silent=True) or {}).get("name"))
+    if not folder:
+        return jsonify({"error": "Give the folder a name (letters, numbers, spaces, - _ .)"}), 400
+    os.makedirs(os.path.join(UI_RECORDINGS_DIR, folder), exist_ok=True)
+    return jsonify({"ok": True, "folder": folder})
+
+
+@app.route("/api/ui-recording-folders/<folder>", methods=["DELETE"])
+def delete_ui_recording_folder(folder):
+    folder = _folder_name(folder)
+    d = _rec_dir(folder)
+    if not folder or d is None or not os.path.isdir(d):
+        return jsonify({"error": "Folder not found"}), 404
+    if os.listdir(d):
+        return jsonify({"error": "The folder still has recordings - move or delete them first"}), 409
+    os.rmdir(d)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/ui-recordings/move", methods=["POST"])
+def move_ui_recording():
+    body = request.get_json(silent=True) or {}
+    src, _ = _rec_file(body.get("file"))
+    dest_folder = _folder_name(body.get("folder"))
+    if not src or not os.path.isfile(src):
+        return jsonify({"error": "Recording not found"}), 404
+    dest_dir = _rec_dir(dest_folder)
+    if dest_dir is None:
+        return jsonify({"error": "Invalid folder"}), 400
+    os.makedirs(dest_dir, exist_ok=True)
+    dest = os.path.join(dest_dir, os.path.basename(src))
+    if os.path.abspath(dest) == os.path.abspath(src):
+        return jsonify({"ok": True, "folder": dest_folder})
+    if os.path.exists(dest):
+        return jsonify({"error": "A recording with that name already exists in the target folder"}), 409
+    os.replace(src, dest)
+    return jsonify({"ok": True, "folder": dest_folder})
 
 
 @app.route("/api/ui-recordings", methods=["POST"])
 def save_ui_recording():
-    """Saves the editor's current steps under `name` (overwrites a recording of the same name)."""
+    """Saves the editor's current steps under `name` (overwrites a recording of the same name in that folder)."""
     body = request.get_json(silent=True) or {}
     name = (body.get("name") or "").strip()
     if not name:
         return jsonify({"error": "Give the recording a name"}), 400
-    path, slug = _rec_file(name)
+    folder = _folder_name(body.get("folder"))
+    path, slug = _rec_file(name, folder)
     if not path:
         return jsonify({"error": "Invalid name"}), 400
     with ui_rec_lock:
@@ -1307,16 +1410,17 @@ def save_ui_recording():
         if not steps:
             return jsonify({"error": "Nothing recorded yet"}), 400
         ui_rec["loaded_name"] = name
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     _write_private_json(path, {"name": name, "saved_at": datetime.now().isoformat(timespec="seconds"),
                                "settings": body.get("settings") or {}, "steps": steps})
     _ui_emit_steps()
-    return jsonify({"ok": True, "name": name, "file": slug, "steps": len(steps)})
+    return jsonify({"ok": True, "name": name, "file": (folder + "/" if folder else "") + slug, "folder": folder, "steps": len(steps)})
 
 
-@app.route("/api/ui-recordings/<slug>", methods=["GET"])
+@app.route("/api/ui-recordings/<path:slug>", methods=["GET"])
 def load_ui_recording(slug):
     """Loads a saved recording into the editor (replacing what's there) so it can be edited."""
-    path, _ = _rec_file(slug)
+    path, slug = _rec_file(slug)
     if not path or not os.path.isfile(path):
         return jsonify({"error": "Recording not found"}), 404
     with ui_rec_lock:
@@ -1333,12 +1437,13 @@ def load_ui_recording(slug):
         ui_rec["next_id"] = max((x.get("id", 0) for x in steps), default=0) + 1
         ui_rec["loaded_name"] = d.get("name") or slug
     _ui_emit_steps()
-    return jsonify({"ok": True, "name": ui_rec["loaded_name"], "settings": d.get("settings") or {}, "steps": steps})
+    folder = os.path.basename(os.path.dirname(path)) if os.path.dirname(path) != os.path.realpath(UI_RECORDINGS_DIR) else ""
+    return jsonify({"ok": True, "name": ui_rec["loaded_name"], "folder": folder, "settings": d.get("settings") or {}, "steps": steps})
 
 
-@app.route("/api/ui-recordings/<slug>", methods=["DELETE"])
+@app.route("/api/ui-recordings/<path:slug>", methods=["DELETE"])
 def delete_ui_recording(slug):
-    path, _ = _rec_file(slug)
+    path, slug = _rec_file(slug)
     if not path or not os.path.isfile(path):
         return jsonify({"error": "Recording not found"}), 404
     try:

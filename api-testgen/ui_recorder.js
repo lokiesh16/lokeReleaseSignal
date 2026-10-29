@@ -47,6 +47,13 @@
       if (holdOn) e.stopImmediatePropagation();
     }, true);
   });
+  // While our prompt is open, keep the page from hearing focus/keyboard traffic aimed at it. Modal dialogs
+  // (focus traps) otherwise yank focus back out of the input, so typing and clearing silently do nothing.
+  ['focusin', 'focusout', 'blur', 'keydown', 'keypress', 'keyup', 'beforeinput', 'input'].forEach(function (t) {
+    window.addEventListener(t, function (e) {
+      if (asking && isOurs(e)) e.stopImmediatePropagation();
+    }, true);
+  });
   // Keyboard shortcuts work while the pointer is parked on the widget you want to keep open:
   // Alt+H = hold, Alt+P = pick, Esc leaves pick.
   window.addEventListener('keydown', function (e) {
@@ -529,6 +536,7 @@
     if (loc.anchor) return '\u2693 label "' + loc.anchor + '"';
     if (loc.kind === 'pw') return loc.py;
     var d = loc.kind === 'role' ? loc.role + ' "' + loc.name + '"' : loc.kind + ' ' + JSON.stringify(loc.value);
+    if (loc.kind === 'pattern') return 'text like /' + loc.value + '/' + (loc.scope ? ' in ' + loc.scope : '') + (loc.nth === -1 ? ' (last)' : loc.nth === 0 ? ' (first)' : '');
     return loc.nth != null ? d + ' #' + (loc.nth + 1) : d;
   }
 
@@ -581,6 +589,12 @@
     if (isField && !isToggle && tag !== 'select') ops.splice(1, 0, ['Clear field', 'clear']);
     if (isField && !isToggle && type !== 'password') ops.push(['Assert value: "' + trunc(String(el.value || ''), 40) + '"', 'assert_value']);
     var canText = !isField && text && text.length <= 200;
+    var dtText = isField ? String(el.value || '') : text;
+    if (/\b\d{1,2}:\d{2}\b|\b(today|yesterday)\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{4}\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? \d{1,2}/i.test(dtText) && dtText.length <= 200 && type !== 'password') {
+      ops.push(['🕒 Assert time is now (just the time, ±2 min)', 'dt_time_now']);
+      ops.push(['🕒 Assert date & time are now (±2 min)', 'dt_datetime_now']);
+      ops.push(['📅 Assert date is today (just the date)', 'dt_date_today']);
+    }
     if (canText) ops.push(['Capture text as variable…', 'capture_text']);
     if (isField && !isToggle && type !== 'password') ops.push(['Capture value as variable…', 'capture_value']);
     ops.push(['Capture tooltip (hover) as variable…', 'capture_tooltip']);
@@ -631,6 +645,39 @@
     menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - mw - 8)) + 'px';
   }
 
+  // Text-shape locator for a date/time element: digits become \\d+, month names and AM/PM become classes.
+  var DT_FIND = /(?:(?:[A-Za-z]{3,9}\.? \d{1,2},? \d{4}|\d{1,2} [A-Za-z]{3,9}\.?,? \d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4}|[Tt]oday|[Yy]esterday)[ ,]*(?:at )?)?(?:\d{1,2}:\d{2}(?::\d{2})? ?(?:[AaPp]\.?[Mm]\.?)?)?/g;
+  function shapeOf(t) {
+    return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\d+/g, '\\d+')
+            .replace(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b/g, '[A-Za-z]+')
+            .replace(/\b[AaPp]\\?\.?[Mm]\\?\.?\b/g, '[AaPp][Mm]').replace(/ +/g, '\\s+');
+  }
+  function stableScope(el) {
+    for (var n = el.parentElement; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
+      var id = n.getAttribute('id'), tid = n.getAttribute('data-testid') || n.getAttribute('data-test') || n.getAttribute('data-qa');
+      var lab = n.getAttribute('aria-label'), role = n.getAttribute('role');
+      var sel = tid ? '[data-testid=' + JSON.stringify(tid) + ']' : null;
+      if (!sel && id && !/\d{3,}|^:|^react|^radix|^mui|^headlessui/i.test(id)) sel = '#' + (window.CSS && CSS.escape ? CSS.escape(id) : id);
+      if (!sel && lab && (role || /dialog|chat|panel|modal/i.test(lab))) sel = '[aria-label=' + JSON.stringify(lab) + ']';
+      if (!sel && (role === 'dialog' || n.getAttribute('aria-modal') === 'true' || n.tagName === 'DIALOG')) sel = role === 'dialog' ? '[role="dialog"]' : n.tagName === 'DIALOG' ? 'dialog' : '[aria-modal="true"]';
+      if (sel && countCss(sel) === 1) return sel;
+    }
+    return null;
+  }
+  function shapeLocator(el) {
+    var t = norm(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ? el.value : el.textContent);
+    if (!t) return null;
+    var anchored = t.length <= 40;
+    if (!anchored) {
+      var best = '', m; DT_FIND.lastIndex = 0;
+      while ((m = DT_FIND.exec(t)) !== null) { if (m[0].length > best.length) best = m[0]; if (m.index === DT_FIND.lastIndex) DT_FIND.lastIndex++; }
+      if (best.length < 4) return null;
+      t = best.trim();
+    }
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return null;      // inputs have no text node to match: keep the normal locator
+    return { kind: 'pattern', value: (anchored ? '^' : '') + shapeOf(t) + (anchored ? '$' : ''), scope: stableScope(el), nth: -1 };
+  }
+
   function applyOp(op, el) {
     var loc = buildLocator(el), tag = el.tagName.toLowerCase();
     var label = { hover_at: 'hover', assert_chart: 'assert chart data', click: 'click', clear: 'clear', hover: 'hover', scroll_into_view: 'scroll', wait_for: 'wait for element',
@@ -674,6 +721,11 @@
       send({ type: 'assert_text', locator: loc, value: norm(el.textContent) });
     } else if (op === 'assert_value') {
       send({ type: 'assert_value', locator: loc, value: String(el.value || '') });
+    } else if (/^dt_/.test(op)) {
+      // A time like "2:08 AM" changes on every run, so locate it by its SHAPE (digits:digits AM) and take the newest
+      // one, not by its current text or a position-based xpath. Scoped to the nearest recognisable container.
+      send({ type: 'assert_datetime', locator: shapeLocator(el) || loc, mode: op.slice(3), tol: 2 });
+      label = { dt_time_now: 'assert time is now', dt_datetime_now: 'assert date & time are now', dt_date_today: 'assert date is today' }[op];
     } else if (/^capture_/.test(op)) {
       var source = op.slice(8);
       ui.menu.style.display = 'none';
