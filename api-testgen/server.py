@@ -2083,10 +2083,84 @@ def _take_screenshot(portal):
     return shot.get("b64") if shot.get("ok") else None
 
 
-def _format_case_plan_prompt(goal, max_cases):
+_JIRA_KEY_RE = re.compile(r"[A-Z][A-Z0-9_]+-\d+")
+JIRA_FIELD_LIMIT = 12000   # chars kept per description / all comments, so a huge ticket can't blow up the prompt
+
+
+def _jira_keys(text):
+    """Ticket keys from a mix of keys and browse URLs: 'ABC-12, https://x.atlassian.net/browse/ABC-13'."""
+    seen = []
+    for k in _JIRA_KEY_RE.findall((text or "").upper()):
+        if k not in seen:
+            seen.append(k)
+    return seen
+
+
+def _jira_settings():
+    """(base_url, email, token) from .env - re-read on every call so adding them needs no restart.
+    Values never leave this process: they are not logged or sent to the model."""
+    load_dotenv(os.path.join(BASE_DIR, ".env"), override=True)
+    base = (os.environ.get("JIRA_BASE_URL") or "").strip().rstrip("/")
+    if base and not base.startswith("http"):
+        base = "https://" + base
+    return base, (os.environ.get("JIRA_EMAIL") or "").strip(), (os.environ.get("JIRA_API_TOKEN") or "").strip()
+
+
+def fetch_jira_context(keys_text):
+    """Description + comments of the given Jira tickets as one text block for the model.
+    Returns (context_text, [summary line per ticket]); raises ValueError with a user-readable message."""
+    import requests
+    keys = _jira_keys(keys_text)
+    if not keys:
+        raise ValueError("Enter a Jira ticket key, e.g. ABC-123")
+    base, email, token = _jira_settings()
+    missing = [n for n, v in (("JIRA_BASE_URL", base), ("JIRA_EMAIL", email), ("JIRA_API_TOKEN", token)) if not v]
+    if missing:
+        raise ValueError("Add " + ", ".join(missing) + " to the .env file next to the app, then try again")
+    blocks, lines = [], []
+    for key in keys[:5]:
+        try:
+            # API v2 returns description/comments as plain Jira text (v3 would be nested ADF JSON).
+            r = requests.get(f"{base}/rest/api/2/issue/{key}", auth=(email, token), timeout=20,
+                             params={"fields": "summary,description,comment,issuetype,status,labels"},
+                             headers={"Accept": "application/json"})
+        except requests.RequestException as e:
+            raise ValueError(f"Could not reach Jira ({type(e).__name__}) - check JIRA_BASE_URL")
+        if r.status_code in (401, 403):
+            raise ValueError("Jira rejected the credentials - check JIRA_EMAIL and JIRA_API_TOKEN")
+        if r.status_code == 404:
+            raise ValueError(f"Jira ticket {key} not found (or this account can't see it)")
+        if not r.ok:
+            raise ValueError(f"Jira returned HTTP {r.status_code} for {key}")
+        f = (r.json() or {}).get("fields") or {}
+        comments = [c for c in ((f.get("comment") or {}).get("comments") or []) if (c.get("body") or "").strip()]
+        desc = (f.get("description") or "").strip()
+        comment_text = "\n\n".join(f"- {(c.get('author') or {}).get('displayName', 'someone')}: {c['body'].strip()}"
+                                    for c in comments)
+        blocks.append(
+            f"=== JIRA {key} ({(f.get('issuetype') or {}).get('name', 'issue')}): {f.get('summary', '')} ===\n"
+            f"DESCRIPTION (requirements, acceptance criteria, test data):\n{desc[:JIRA_FIELD_LIMIT] or '(empty)'}\n\n"
+            f"COMMENTS (may hold extra test data or clarifications):\n{comment_text[:JIRA_FIELD_LIMIT] or '(none)'}")
+        lines.append(f"{key} \"{(f.get('summary') or '')[:70]}\" - description {len(desc):,} chars, {len(comments)} comment(s)")
+    return "\n\n".join(blocks), lines
+
+
+def _format_case_plan_prompt(goal, max_cases, jira_context=""):
+    if jira_context:
+        source = f"""The requirement source is the Jira ticket text below (description = requirements and acceptance
+criteria, comments = clarifications and test data). Derive the test cases from it: at least one case per
+acceptance criterion, plus the negative/boundary cases it implies. Use the test data it gives (exact usernames,
+values, URLs); only invent values where the ticket gives none, and make them obviously fake. If it names the app
+URL and the browser is probably elsewhere, the first case should navigate there.
+
+{jira_context}
+
+EXTRA INSTRUCTIONS FROM THE USER (may be empty; takes priority over the ticket): {goal or "(none)"}"""
+    else:
+        source = f"CONTEXT / GOAL (one line, from the user): {goal}"
     return f"""You are an expert QA engineer planning a browser-based UI test session.
 
-CONTEXT / GOAL (one line, from the user): {goal}
+{source}
 
 Break this into a focused set of up to {max_cases} concrete, independently checkable UI test cases that give
 good breadth of coverage for what's described - happy path plus the edge cases, validation/negative cases, and
@@ -2230,8 +2304,11 @@ def _run_case(emit_log, state, instruction, portal, provider, api_key, model, ol
     return outcome, finding, history
 
 
-def run_explore_loop(run_id, goal, portal, provider, api_key, model, ollama_url, max_steps, max_cases, record_steps=False, screenshots=False, broaden=False):
+def run_explore_loop(run_id, goal, portal, provider, api_key, model, ollama_url, max_steps, max_cases, record_steps=False, screenshots=False, broaden=False, jira_context=""):
     state = explore_runs[run_id]
+    if jira_context:
+        broaden = True   # a ticket is turned into a set of cases, not run as one instruction
+        goal = goal or "Test the Jira ticket's acceptance criteria"
 
     def emit_log(msg, kind="info"):
         with app.app_context():
@@ -2239,8 +2316,8 @@ def run_explore_loop(run_id, goal, portal, provider, api_key, model, ollama_url,
 
     if broaden:
         emit_log(f"Planning test cases for: {_redact_secrets(goal)}")
-        plan_prompt = _format_case_plan_prompt(goal, max_cases)
-        plan_result, _ = call_llm(provider, plan_prompt, max_tokens=2000, api_key=api_key, model=model, ollama_url=ollama_url)
+        plan_prompt = _format_case_plan_prompt(goal, max_cases, jira_context)
+        plan_result, _ = call_llm(provider, plan_prompt, max_tokens=4000 if jira_context else 2000, api_key=api_key, model=model, ollama_url=ollama_url)
         _count_tokens(state, emit_log, plan_result, "[plan] ")
         plan_text = "".join(b.get("text", "") for b in plan_result.get("content", [])) if isinstance(plan_result, dict) else ""
         cases_plan = _parse_case_plan(plan_text, goal)[:max_cases]
@@ -2334,7 +2411,8 @@ def explore_start(data):
     data   = data or {}
     goal   = (data.get("goal") or "").strip()
     portal = data.get("portal", "A")
-    if not goal:
+    jira_keys = (data.get("jira_keys") or "").strip() if data.get("use_jira") else ""
+    if not goal and not data.get("use_jira"):
         emit("error", {"msg": "Enter a goal to explore"}); return
     if portal not in pw["pages"]:
         emit("error", {"msg": "Launch the browser first"}); return
@@ -2347,15 +2425,25 @@ def explore_start(data):
     max_steps = max(1, min(int(data.get("max_steps") or 10), 40))
     max_cases = max(1, min(int(data.get("max_cases") or 6), 12))
 
+    jira_context, jira_lines = "", []
+    if data.get("use_jira"):
+        try:
+            jira_context, jira_lines = fetch_jira_context(jira_keys)
+        except ValueError as e:
+            emit("error", {"msg": str(e)}); emit("explore_done", {"run_id": "", "outcome": "error", "summary": "Jira failed",
+                                                                  "feedback": str(e), "cases": []}); return
+
     run_id = f"explore-{int(time.time())}"
     explore_runs[run_id] = {"stop": False}
     threading.Thread(
         target=run_explore_loop,
         args=(run_id, goal, portal, provider, api_key, data.get("model", ""), data.get("ollama_url", ""),
-              max_steps, max_cases, bool(data.get("record_steps")), bool(data.get("screenshots")), bool(data.get("broaden"))),
+              max_steps, max_cases, bool(data.get("record_steps")), bool(data.get("screenshots")), bool(data.get("broaden")), jira_context),
         daemon=True,
     ).start()
     emit("explore_started", {"run_id": run_id})
+    for line in jira_lines:
+        socketio.emit("explore_log", {"run_id": run_id, "msg": "🎫 Jira " + line, "kind": "info"})
 
 
 @socketio.on("explore_stop")

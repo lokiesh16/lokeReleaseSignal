@@ -1223,6 +1223,16 @@
 
             <div class="card compact" id="ai-card" data-fold="ai">
               <h3><svg class="ic"><use href="#i-sparkles"/></svg> Let AI do it <span id="explore-status-badge" class="badge">idle</span></h3>
+              <div class="psum"><span>Source:</span>
+                <select id="explore-source" class="ux-input" style="padding:3px 8px" onchange="exploreSourceChanged()">
+                  <option value="goal" selected>My description</option>
+                  <option value="jira">Jira ticket (description + comments)</option>
+                </select>
+              </div>
+              <div class="field tight" id="explore-jira-row" style="display:none">
+                <input type="text" id="explore-jira-keys" class="ux-input" placeholder="Ticket key or link, e.g. HAB-123 (several: comma separated)">
+                <p class="hint" style="margin:4px 0 0">Reads requirements, acceptance criteria and test data from the ticket, plans the cases, and runs them. Needs JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN in .env.</p>
+              </div>
               <div class="field tight"><textarea id="explore-goal" placeholder="Describe what to test, e.g. Log in with qa@example.com / password and check the dashboard loads" style="min-height:62px"></textarea></div>
               <div class="psum"><span>AI:</span> <b class="provider-summary-text">Claude</b> <button class="btn btn-ghost btn-sm" onclick="openProviderDialog()">Change</button></div>
               <details class="fold">
@@ -2924,10 +2934,24 @@ function exploreLog(msg, kind = 'info') {
   box.scrollTop = box.scrollHeight;
 }
 
+function exploreSourceChanged() {
+  const jira = document.getElementById('explore-source').value === 'jira';
+  document.getElementById('explore-jira-row').style.display = jira ? '' : 'none';
+  document.getElementById('explore-goal').placeholder = jira
+    ? 'Optional extra notes, e.g. the app URL, which login to use, or what to skip'
+    : 'Describe what to test, e.g. Log in with qa@example.com / password and check the dashboard loads';
+  const broaden = document.getElementById('explore-broaden');
+  broaden.disabled = jira;
+  document.getElementById('explore-max-cases').disabled = jira ? false : !broaden.checked;
+}
+
 function startExplore() {
   uiFoldOpen('ai');
+  const useJira = document.getElementById('explore-source').value === 'jira';
+  const jiraKeys = document.getElementById('explore-jira-keys').value.trim();
   const goal = document.getElementById('explore-goal').value.trim();
-  if (!goal) { toast('Describe a goal first', 'err'); return; }
+  if (useJira && !jiraKeys) { toast('Enter a Jira ticket key first', 'err'); return; }
+  if (!useJira && !goal) { toast('Describe a goal first', 'err'); return; }
   if (!browserOpen) { toast('Launch the browser first (▶ Launch in the bar above)', 'err'); return; }
   const providerFields = getProviderFields();
   if (!providerFields) return;
@@ -2943,7 +2967,7 @@ function startExplore() {
   document.getElementById('btn-explore-stop').style.display = 'inline-flex';
   document.getElementById('explore-status-badge').textContent = 'planning...';
 
-  socket.emit('explore_start', { ...providerFields, goal, portal, max_steps: maxSteps, max_cases: maxCases,
+  socket.emit('explore_start', { ...providerFields, goal, use_jira: useJira, jira_keys: jiraKeys, portal, max_steps: maxSteps, max_cases: maxCases,
                                  record_steps: document.getElementById('explore-record-steps').checked,
                                  screenshots: document.getElementById('explore-screenshots').checked,
                                  broaden: document.getElementById('explore-broaden').checked });
@@ -2963,6 +2987,13 @@ socket.on('explore_log', (d) => exploreLog(d.msg, d.kind));
 
 socket.on('explore_done', (d) => {
   currentExploreRunId = null;
+  if (!d.run_id) {   // failed before a run began (e.g. Jira unreachable) - nothing to report or publish
+    document.getElementById('btn-explore-start').style.display = 'inline-flex';
+    document.getElementById('btn-explore-stop').style.display = 'none';
+    document.getElementById('explore-status-badge').textContent = 'idle';
+    exploreLog(d.feedback || d.summary, 'err');
+    return;
+  }
   lastExploreRunId = d.run_id;
   document.getElementById('btn-explore-start').style.display = 'inline-flex';
   document.getElementById('btn-explore-stop').style.display = 'none';
