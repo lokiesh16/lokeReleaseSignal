@@ -31,12 +31,29 @@ import base64
 import urllib.request
 import urllib.error
 from datetime import datetime
+
+if len(sys.argv) > 1 and sys.argv[1] == "--run-script":
+    # Script-runner mode: this same program runs ONE script and exits (no web server). The packaged app is not a Python
+    # interpreter, so a "Run script" step starts the app again with this flag - the script then runs on the app's own
+    # built-in Python with its bundled libraries (pymongo, requests...), and nothing has to be installed on the machine.
+    _here = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
+    try:
+        from dotenv import load_dotenv as _load_dotenv
+        _load_dotenv(os.path.join(_here, ".env"))
+    except Exception:
+        pass
+    from ui_test_generator import SCRIPT_RUNNER_SRC as _RUNNER_SRC
+    _runner_ns = {"__name__": "_script_runner"}
+    exec(compile(_RUNNER_SRC, "_runner.py", "exec"), _runner_ns)
+    _runner_ns["main"](["_runner.py"] + sys.argv[2:])
+    sys.exit(0)
+
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 
 from api_chain_analyzer import detect_api_chains
-from ui_test_generator import generate_ui_test, slugify, replay_step, resolve_locator, describe_failure
+from ui_test_generator import generate_ui_test, slugify, replay_step, resolve_locator, describe_failure, script_names, describe_script, SCRIPT_RUNNER_SRC
 from ui_run_report import build_report
 from ui_pom_generator import generate_ui_pom
 
@@ -325,6 +342,10 @@ ui_rec_lock = threading.Lock()
 UI_RECORDINGS_DIR = os.environ.get("UI_RECORDINGS_DIR") or os.path.join(BASE_DIR, "ui_recordings")
 UI_AUTOSAVE_FILE = os.path.join(UI_RECORDINGS_DIR, ".autosave.json")
 UI_REPORTS_DIR = os.environ.get("UI_REPORTS_DIR") or os.path.join(BASE_DIR, "ui_reports")
+# "Run script" steps run the scripts kept in generated_scripts/tests/ - in exactly two folders: "API scripts" (calls to the app's API,
+# including what the API capture generates) and "DB scripts" (database clean-up / set-up). New scripts are saved there too.
+UI_SCRIPTS_DIR = os.environ.get("UI_SCRIPTS_DIR") or os.path.join(OUTPUT_DIR, "tests")
+SCRIPT_FOLDERS = ("API scripts", "DB scripts")
 ui_rec["loaded_name"] = None   # name of the saved recording being edited, if any
 
 
@@ -363,6 +384,7 @@ def _ui_restore_autosave():
 
 
 def _ui_emit_steps():
+    _migrate_script_names(ui_rec["steps"])
     with app.app_context():
         socketio.emit("ui_steps", {"steps": list(ui_rec["steps"]), "recording": ui_rec["recording"],
                                    "loaded_name": ui_rec.get("loaded_name")})
@@ -687,6 +709,8 @@ def playwright_worker():
             if not pw["browsers"]:
                 _put_result(cmd, {"ok": False, "error": "No browser open"}); continue
             from playwright.sync_api import expect as pw_expect
+            import ui_test_generator as _utg
+            _utg.SCRIPTS_DIR, _utg.SCRIPT_COMMAND = UI_SCRIPTS_DIR, _script_command()
             steps, slow = cmd.get("steps", []), int(cmd.get("slow_mo") or 0)
             timeout_ms = max(1000, int(float(cmd.get("timeout_s") or 15) * 1000))
             pw_expect.set_options(timeout=timeout_ms)
@@ -757,7 +781,7 @@ def playwright_worker():
                                 pass
                         replay_step(rpage, s, pw_expect, replay_vars)
                         res = {"id": s["id"], "ok": True}
-                        if s.get("type") in ("capture", "compare", "assert_datetime"):
+                        if s.get("type") in ("capture", "compare", "assert_datetime", "script"):
                             res["detail"] = replay_vars.get("__saw__", "")
                         if want_report:
                             report_rows.append(report_row(rpage, s, True, step_t0))
@@ -1122,7 +1146,30 @@ def ui_step_update(data):
     """Edit a step's text: its value by default, or `expr` (the script of an assert-script step)."""
     sid, value = (data or {}).get("id"), (data or {}).get("value")
     field = (data or {}).get("field") or "value"
-    if field not in ("value", "expr", "var", "left", "right", "op", "source", "mode", "tol", "which", "pattern", "scope"):
+    if field not in ("value", "expr", "var", "left", "right", "op", "source", "mode", "tol", "which", "pattern", "scope",
+                     "script", "args", "timeout", "continue"):
+        return
+    if field in ("script", "args", "timeout", "continue"):   # a Run-script step's own settings
+        if field == "script":
+            value, path = _script_file(value)
+            if not path or not os.path.isfile(path):
+                emit("error", {"msg": "That script does not exist"}); return
+        elif field == "args":
+            value = str(value or "").strip()[:300]
+        elif field == "timeout":
+            try:
+                value = max(1, min(1800, int(float(value))))
+            except (TypeError, ValueError):
+                return
+        else:
+            value = bool(value)
+        with ui_rec_lock:
+            for s in ui_rec["steps"]:
+                if s.get("id") == sid and s.get("type") == "script":
+                    s[field] = value
+                    if field == "script":
+                        s["value"] = value
+        _ui_emit_steps()
         return
     if field == "var":   # a variable name: letters, digits, underscore
         value = re.sub(r"\W+", "_", str(value or "").strip()).strip("_")[:40]
@@ -1173,7 +1220,7 @@ def ui_step_insert(data):
     waits and for splitting the list into test cases ('case' markers)."""
     data = data or {}
     after_id, step = data.get("after_id"), dict(data.get("step") or {})
-    if step.get("type") not in ("wait", "case", "goto", "assert_js", "compare"):
+    if step.get("type") not in ("wait", "case", "goto", "assert_js", "compare", "script"):
         emit("error", {"msg": "Unsupported step type"}); return
     with ui_rec_lock:
         steps = ui_rec["steps"]
@@ -1202,6 +1249,16 @@ def ui_step_insert(data):
                 emit("error", {"msg": "Pick the two captured values to compare"}); return
             step.update(left=left, right=right, value="",
                         op=step.get("op") if step.get("op") in ("equals", "not_equals", "contains", "not_contains") else "equals")
+        elif step["type"] == "script":
+            name, path = _script_file(step.get("script"))
+            if not path or not os.path.isfile(path):
+                emit("error", {"msg": "Pick a saved script"}); return
+            try:
+                tmo = max(1, min(1800, int(float(step.get("timeout") or 120))))
+            except (TypeError, ValueError):
+                tmo = 120
+            step.update(script=name, value=name, args=str(step.get("args") or "").strip()[:300], timeout=tmo,
+                        **{"continue": bool(step.get("continue"))})
         elif step["type"] == "assert_js":
             expr = (step.get("expr") or "").strip()
             if not expr:
@@ -1276,7 +1333,7 @@ def ui_replay(data):
     with ui_rec_lock:
         if ui_rec["recording"]:
             emit("error", {"msg": "Stop recording before replaying"}); return
-        steps = [dict(s) for s in ui_rec["steps"]]
+        steps = _migrate_script_names([dict(s) for s in ui_rec["steps"]])
     upto = data.get("upto_id")
     if upto is not None:   # "Run to here": everything from the start through that step
         idx = next((i for i, s in enumerate(steps) if s.get("id") == upto), None)
@@ -1349,6 +1406,257 @@ def _rec_folders():
                       if not n.startswith(".") and os.path.isdir(os.path.join(UI_RECORDINGS_DIR, n)))
     except FileNotFoundError:
         return []
+
+
+# ── Scripts: Python files (cleanup, data setup, MongoDB...) that a "Run script" step runs inside the flow ────────
+SCRIPT_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,60}$")     # one segment: a folder name or a script name
+
+SCRIPT_TEMPLATES = [
+    {"id": "blank", "folder": "API scripts", "label": "Blank script", "code": r'''"""One-line description of the script (shown in the list).
+
+How it works: write one function. Its parameters are filled from the step's Arguments box (--name value), and whatever
+it returns is printed. Return False or raise an error to fail the step. These are ready to use without importing:
+db (MongoDB: the MONGO_URI / MONGODB_URI and DB_NAME from your .env file), client, env("NAME") (any value from .env), ObjectId, os, json, re,
+datetime, DRY_RUN.
+"""
+# pyright: reportUndefinedVariable=false     (db, env, ObjectId, DRY_RUN... are provided when the script runs)
+
+
+def my_script(name="world"):
+    print("hello", name)
+'''},
+    {"id": "mongo_delete", "folder": "DB scripts", "label": "MongoDB: delete documents", "code": r'''"""Delete a partner's courses and course documents (MongoDB).
+
+Arguments box:  --partner_id 6a5df793a4a55e4d489b2e86      add --dry-run to only count what would be deleted.
+"""
+# pyright: reportUndefinedVariable=false     (db, env, ObjectId, DRY_RUN... are provided when the script runs)
+
+
+def delete_courses(partner_id: ObjectId):
+    query = {"partner_id": partner_id}
+    if DRY_RUN:
+        return {"courses": db.courses.count_documents(query), "course_documents": db.course_documents.count_documents(query)}
+    return {
+        "courses": db.courses.delete_many(query).deleted_count,
+        "course_documents": db.course_documents.delete_many(query).deleted_count,
+    }
+'''},
+    {"id": "mongo_find", "folder": "DB scripts", "label": "MongoDB: find a document", "code": r'''"""Find a user by email address (MongoDB, read-only).
+
+Arguments box:  --email someone@habitnu.com
+"""
+# pyright: reportUndefinedVariable=false     (db, env, ObjectId, DRY_RUN... are provided when the script runs)
+
+
+def find_user(email):
+    users = list(db.users.find({"emails.address": email}, {"preferred_name": 1, "emails": 1, "partner_name": 1}).limit(5))
+    assert len(users) == 1, f"expected 1 user, found {len(users)}"      # a failed assert fails the step
+    return users[0]
+'''},
+    {"id": "mongo_update", "folder": "DB scripts", "label": "MongoDB: update documents", "code": r'''"""Switch a user's approval flag (MongoDB).
+
+Arguments box:  --email someone@habitnu.com --approved false
+"""
+# pyright: reportUndefinedVariable=false     (db, env, ObjectId, DRY_RUN... are provided when the script runs)
+
+
+def set_approved(email, approved: bool = True):
+    result = db.users.update_one({"emails.address": email}, {"$set": {"is_approved": approved}})
+    return {"matched": result.matched_count, "modified": result.modified_count}
+'''},
+    {"id": "api", "folder": "API scripts", "label": "API call (requests)", "code": r'''"""Call an API as a cleanup / setup step (needs API_BASE_URL and API_TOKEN in .env).
+
+Arguments box (optional):  --path /api/test-data/cleanup
+"""
+# pyright: reportUndefinedVariable=false     (db, env, ObjectId, DRY_RUN... are provided when the script runs)
+import requests
+
+
+def call_api(path="/api/test-data/cleanup"):
+    resp = requests.delete(env("API_BASE_URL").rstrip("/") + path,
+                           headers={"Authorization": "Bearer " + env("API_TOKEN", "")}, timeout=30)
+    assert resp.ok, f"{resp.status_code}: {resp.text[:300]}"
+    return {"status": resp.status_code}
+'''},
+]
+
+
+def _script_runner_path():
+    # Kept out of the tests tree (a hidden folder), unless a test points UI_SCRIPTS_DIR somewhere private.
+    return os.path.join(UI_SCRIPTS_DIR if os.environ.get("UI_SCRIPTS_DIR") else os.path.join(OUTPUT_DIR, ".script_runner"), "_runner.py")
+
+
+def _ensure_script_runner():
+    """Keeps _runner.py (the program that runs a script: arguments, db, printing) up to date."""
+    path = _script_runner_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        with open(path, encoding="utf-8") as f:
+            if f.read() == SCRIPT_RUNNER_SRC:
+                return path
+    except OSError:
+        pass
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(SCRIPT_RUNNER_SRC)
+    return path
+
+
+def _script_python():
+    """A Python for scripts when the user names one (SCRIPTS_PYTHON in .env, e.g. to run pytest files), else None = the built-in one."""
+    return (os.environ.get("SCRIPTS_PYTHON") or "").strip() or None
+
+
+def _script_command():
+    """The command that runs one script (the script path is appended). By default the app itself: the packaged build re-launches itself
+    with --run-script, from source the running Python runs the runner file - either way with pymongo and requests available."""
+    custom = _script_python()
+    if custom:
+        return [custom, _ensure_script_runner()]
+    if getattr(sys, "frozen", False):
+        return [sys.executable, "--run-script"]
+    return [sys.executable, _ensure_script_runner()]
+
+
+def _script_file(name):
+    """'API scripts/name' (or 'DB scripts/name', optionally with .py) -> (clean name, absolute .py path), else (None, None).
+    A name from before the two-folder layout ('habitnu/find_user', 'find_user') resolves to whichever folder holds that script now."""
+    name = (name or "").strip().replace("\\", "/").strip("/")
+    if name.endswith(".py"):
+        name = name[:-3]
+    parts = [x.strip() for x in name.split("/")]
+    if not 1 <= len(parts) <= 3 or not all(parts) or not SCRIPT_NAME_RE.match(parts[-1]):
+        return None, None
+    root = os.path.realpath(UI_SCRIPTS_DIR)
+    if len(parts) == 2 and parts[0] in SCRIPT_FOLDERS:
+        folder = parts[0]
+    else:
+        found = [f for f in SCRIPT_FOLDERS if os.path.isfile(os.path.join(root, f, parts[-1] + ".py"))]
+        if not found:
+            return None, None
+        folder = found[0]
+    path = os.path.realpath(os.path.join(root, folder, parts[-1] + ".py"))
+    if not path.startswith(root + os.sep):
+        return None, None
+    return f"{folder}/{parts[-1]}", path
+
+
+def _script_save_target(name):
+    """Where a NEW script goes: must say which of the two folders ('API scripts/name' or 'DB scripts/name')."""
+    name = (name or "").strip().replace("\\", "/").strip("/")
+    if name.endswith(".py"):
+        name = name[:-3]
+    parts = [x.strip() for x in name.split("/")]
+    if len(parts) != 2 or parts[0] not in SCRIPT_FOLDERS or not SCRIPT_NAME_RE.match(parts[1]):
+        return None, None
+    return f"{parts[0]}/{parts[1]}", os.path.join(os.path.realpath(UI_SCRIPTS_DIR), parts[0], parts[1] + ".py")
+
+
+def _migrate_script_names(steps):
+    """Steps saved before the two-folder layout name their script 'habitnu/find_user'; point them at where it lives now."""
+    for st in steps:
+        if st.get("type") == "script" and st.get("script"):
+            new = _script_file(st["script"])[0]
+            if new and new != st["script"]:
+                st["script"] = st["value"] = new
+    return steps
+
+
+def _script_info(path):
+    """What the list shows for a script: first line of its description, and the function (with parameters) a step will call."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            info = describe_script(f.read())
+    except (OSError, ValueError):
+        return {"summary": "", "style": "plain", "entry": None, "params": []}
+    doc = (info.get("doc") or "").strip()
+    return {"summary": doc.splitlines()[0][:120] if doc else "", "style": info["style"], "entry": info.get("entry"), "params": info["params"]}
+
+
+_SCRIPT_SKIP = {"_runner", "conftest", "__init__"}
+
+
+@app.route("/api/ui-scripts", methods=["GET"])
+def ui_scripts_list():
+    rows, root = [], os.path.realpath(UI_SCRIPTS_DIR)
+    for folder in SCRIPT_FOLDERS:
+        os.makedirs(os.path.join(root, folder), exist_ok=True)
+        for fn in sorted(os.listdir(os.path.join(root, folder))):
+            base = fn[:-3]
+            if not fn.endswith(".py") or base in _SCRIPT_SKIP or not SCRIPT_NAME_RE.match(base):
+                continue
+            full = os.path.join(root, folder, fn)
+            rows.append({"name": f"{folder}/{base}", "folder": folder, "size": os.path.getsize(full),
+                         "modified": int(os.path.getmtime(full)), **_script_info(full)})
+    try:
+        shown = os.path.relpath(root, BASE_DIR)
+    except ValueError:
+        shown = root
+    return jsonify({"scripts": rows, "folders": list(SCRIPT_FOLDERS), "root": shown, "templates": SCRIPT_TEMPLATES,
+                    "python": _script_python() or ("the app's built-in Python" if getattr(sys, "frozen", False) else sys.executable),
+                    "python_custom": bool(_script_python()), "builtin": not _script_python(), "frozen": bool(getattr(sys, "frozen", False))})
+
+
+@app.route("/api/ui-scripts/<path:name>", methods=["GET"])
+def ui_script_get(name):
+    name, path = _script_file(name)
+    if not path or not os.path.isfile(path):
+        return jsonify({"error": "Script not found"}), 404
+    with open(path, encoding="utf-8") as f:
+        return jsonify({"name": name, "code": f.read()})
+
+
+@app.route("/api/ui-scripts", methods=["POST"])
+def ui_script_save():
+    data = request.json or {}
+    name, path = _script_save_target(data.get("name"))
+    if not path:
+        return jsonify({"error": "Pick the folder ('API scripts' or 'DB scripts') and a name: letters, digits, - or _ (max 60)"}), 400
+    code = data.get("code")
+    if not isinstance(code, str) or len(code) > 200_000:
+        return jsonify({"error": "Script is empty or too large"}), 400
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(code if code.endswith("\n") else code + "\n")
+    try:
+        ast.parse(code)
+        warn = None
+    except SyntaxError as e:
+        warn = f"Saved, but line {e.lineno} has a syntax error: {e.msg}"
+    return jsonify({"ok": True, "name": name, "warning": warn})
+
+
+@app.route("/api/ui-scripts/<path:name>", methods=["DELETE"])
+def ui_script_delete(name):
+    name, path = _script_file(name)
+    if not path or not os.path.isfile(path):
+        return jsonify({"error": "Script not found"}), 404
+    os.remove(path)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/ui-scripts/<path:name>/run", methods=["POST"])
+def ui_script_run(name):
+    """Runs one script now (the console's Run button). Same trust model as /api/scripts/run: a localhost, single-user dev tool."""
+    name, path = _script_file(name)
+    if not path or not os.path.isfile(path):
+        return jsonify({"error": "Script not found"}), 404
+    data = request.json or {}
+    try:
+        timeout = max(1, min(1800, int(float(data.get("timeout") or 120))))
+        args = shlex.split(str(data.get("args") or ""))
+    except ValueError as e:
+        return jsonify({"error": f"Arguments: {e}"}), 400
+    t0 = time.time()
+    try:
+        proc = subprocess.run([*_script_command(), path, *args], cwd=UI_SCRIPTS_DIR, env=dict(os.environ),
+                              capture_output=True, text=True, timeout=timeout)
+        out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+        return jsonify({"ok": proc.returncode == 0, "returncode": proc.returncode, "output": out[-20000:],
+                        "seconds": round(time.time() - t0, 1)})
+    except subprocess.TimeoutExpired:
+        return jsonify({"ok": False, "returncode": None, "output": f"Timed out after {timeout}s", "seconds": timeout})
+    except OSError as e:
+        return jsonify({"ok": False, "returncode": None, "output": f"Could not start Python: {e}", "seconds": 0})
 
 
 @app.route("/api/ui-recordings", methods=["GET"])
@@ -1547,7 +1855,7 @@ def ui_generate(data):
     if not name:
         emit("error", {"msg": "Give the scenario a name first"}); return
     with ui_rec_lock:
-        steps = [dict(s) for s in ui_rec["steps"]]
+        steps = _migrate_script_names([dict(s) for s in ui_rec["steps"]])
     if not steps:
         emit("error", {"msg": "Nothing recorded yet"}); return
 
@@ -1567,6 +1875,16 @@ def ui_generate(data):
         code, secrets = generate_ui_test(name, steps, timeout_s=timeout_s, shared_session=shared)
     with open(os.path.join(OUTPUT_DIR, rel), "w", encoding="utf-8") as f:
         f.write(code)
+    used = script_names(steps)
+    if used:     # the generated test runs scripts/<name>.py next to itself, so it keeps working outside this tool
+        dest = os.path.join(UI_TESTS_DIR, "scripts")
+        os.makedirs(dest, exist_ok=True)
+        shutil.copyfile(_ensure_script_runner(), os.path.join(dest, "_runner.py"))
+        for nm in used:
+            src = _script_file(nm)[1]
+            if src and os.path.isfile(src):
+                os.makedirs(os.path.dirname(os.path.join(dest, nm + ".py")), exist_ok=True)
+                shutil.copyfile(src, os.path.join(dest, nm + ".py"))
     env_path = os.path.join(UI_TESTS_DIR, f".{slug}.env")
     if secrets:
         # Recorded password-like values live here (owner-only), not in the script.
@@ -3143,9 +3461,9 @@ into the next request precisely as described above, then validate the end state 
 actually works — not just status codes, but that the returned data reflects the expected mutation/behavior.
 
 Output EXACTLY one file, using the FILE OUTPUT, STEP STRUCTURE, and REPORT OUTPUT FORMAT rules above:
-# FILE: tests/APITests/<Portal>/test_<scenario>.py — a single, self-contained plain script.
+# FILE: tests/API scripts/test_<scenario>.py — a single, self-contained plain script.
 No pytest, no classes, no project imports — only requests/os/stdlib. It must be directly runnable with
-`python tests/APITests/<Portal>/test_<scenario>.py` and produce a non-zero exit code if any check fails.
+`python tests/API scripts/test_<scenario>.py` and produce a non-zero exit code if any check fails.
 """
 
 

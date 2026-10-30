@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import copy_metadata
+from PyInstaller.utils.hooks import copy_metadata, collect_submodules
 
 datas = []
 datas += copy_metadata('Flask')
@@ -26,7 +26,10 @@ a = Analysis(
     # server.py) - PyInstaller's static import analysis can't see that
     # dynamic import, so it has to be listed explicitly or the frozen build
     # fails at Socket.IO connection time, not at build time.
-    hiddenimports=['flask_cors', 'engineio.async_drivers.threading'],
+    # Libraries that "Run script" steps (DB / API scripts) use. The packaged app runs scripts on its own built-in Python, so they must be in
+    # the build: nothing is imported statically from server.py, hence listed here. dns = dnspython, needed for mongodb+srv:// addresses.
+    hiddenimports=['flask_cors', 'engineio.async_drivers.threading', 'pymongo', 'bson', 'gridfs', 'requests', 'certifi', 'dns.resolver',
+                   *collect_submodules('pymongo'), *collect_submodules('dns')],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
