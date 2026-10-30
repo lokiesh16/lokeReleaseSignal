@@ -143,6 +143,300 @@ CHARTPOINT_HELPER_SRC = '''def chart_point(page, chart, tag="circle", col=0, row
 exec(CHARTPOINT_HELPER_SRC)   # defines chart_point() for the live replay
 
 
+# "Run script" steps: a Python file (cleanup, test-data setup, a MongoDB query...) that runs at that point of the flow. It is run as its own
+# process, so it can use any package; exit code 0 = fine, anything else fails the step with the script's output. The generated test
+# finds the file in scripts/ next to itself and a .env above it (MONGO_URI and the like), so secrets never live in the script.
+SCRIPT_HELPER_SRC = '''def run_script(name, args="", timeout=120, check=True):
+    """Runs scripts/<name>.py and returns what it printed. Fails the test if it exits non-zero (unless check=False)."""
+    import os
+    import shlex
+    import subprocess
+    import sys
+    from pathlib import Path
+    folder = Path(globals().get("SCRIPTS_DIR") or (Path(__file__).resolve().parent / "scripts"))
+    path = folder / f"{name}.py"
+    assert path.is_file(), f"script {name!r} not found at {path}"
+    env = dict(os.environ)
+    for d in [path.resolve().parent, *path.resolve().parents]:     # a .env found above the scripts supplies MONGO_URI etc.
+        envfile = d / ".env"
+        if envfile.is_file():
+            for line in envfile.read_text().splitlines():
+                k, sep, v = line.partition("=")
+                if sep and k.strip() and not k.lstrip().startswith("#"):
+                    env.setdefault(k.strip().removeprefix("export ").strip(), v.strip().strip("\\"'"))
+            break
+    py = globals().get("SCRIPT_PYTHON") or env.get("SCRIPTS_PYTHON") or sys.executable     # SCRIPTS_PYTHON (in .env): e.g. the test project\'s venv
+    runner = Path(globals().get("SCRIPT_RUNNER") or (folder / "_runner.py"))      # maps arguments to a function's parameters and connects `db`; plain scripts run as they are
+    builtin = globals().get("SCRIPT_COMMAND")        # the packaged app runs scripts with its own built-in Python
+    cmd = [*builtin, str(path)] if builtin else ([py, str(runner), str(path)] if runner.is_file() else [py, str(path)])
+    r = subprocess.run([*cmd, *shlex.split(args or "")], capture_output=True, text=True, timeout=int(timeout), env=env, cwd=str(path.parent))
+    out = ((r.stdout or "") + (r.stderr or "")).strip()
+    print(f"[script {name}] exit {r.returncode}" + (f"\\n{out}" if out else ""))
+    if check:
+        assert r.returncode == 0, f"script {name!r} failed (exit {r.returncode}):\\n{out[-2000:]}"
+    return f"exit {r.returncode}" + (f": {out[-600:]}" if out else "")'''
+# The runner that sits next to the scripts (as _runner.py) and runs them: connects `db`, maps arguments to a function's parameters,
+# prints what it returns. Stdlib only, so it works with whichever Python SCRIPTS_PYTHON names. Also imported here for describe().
+SCRIPT_RUNNER_SRC = r'''"""Runs a script file for a "Run script" step:   python _runner.py <script.py> [arguments...]
+
+A script is either plain Python (top-level code runs as written) or "function style": only imports, constants and defs.
+Function style: the last def (or the one named run) is called, its parameters are filled from the arguments
+(--partner_id 6a5d...  /  partner_id=6a5d...  /  by position), and what it returns is printed.
+Ready to use without importing: db, client, env, ObjectId, os, json, re, datetime, timedelta, DRY_RUN.
+The database is the one named by MONGO_URI (or MONGODB_URI) and DB_NAME in the .env file (nothing else is read).
+"""
+import ast
+import datetime
+import inspect
+import json
+import os
+import re
+import runpy
+import sys
+import traceback
+import warnings
+
+warnings.filterwarnings("ignore", message=r".*urllib3 v2 only supports OpenSSL.*")   # noise from Pythons built with LibreSSL
+
+
+def _fail_short(error, path):
+    """End the step with just the script's own lines and the error, not the runner's or a library's call stack."""
+    mine = os.path.basename(path)
+    for fr in [f for f in traceback.extract_tb(error.__traceback__) if os.path.basename(f.filename) == mine][-3:]:
+        print(f"  in {mine} line {fr.lineno}: {fr.line}", file=sys.stderr)
+    sys.exit(f"{type(error).__name__}: {error}")
+
+
+class Lazy:
+    """Stands in for something that is only created when a script first touches it (so scripts that never use the database never connect)."""
+
+    def __init__(self, make, what):
+        self.__dict__.update(_make=make, _what=what, _obj=None)
+
+    def _real(self):
+        if self.__dict__["_obj"] is None:
+            self.__dict__["_obj"] = self.__dict__["_make"]()
+        return self.__dict__["_obj"]
+
+    def __getattr__(self, name):
+        if name.startswith("__"):
+            raise AttributeError(name)
+        return getattr(self._real(), name)
+
+    def __getitem__(self, key):
+        return self._real()[key]
+
+    def __repr__(self):
+        return f"<{self.__dict__['_what']}: connects when first used>"
+
+
+def env(name, default=None):
+    """A value from the .env file (or the environment). Stops with a clear message when it is missing and has no default."""
+    value = os.getenv(name)
+    if value:
+        return value
+    if default is not None:
+        return default
+    raise RuntimeError(f"{name} is not set - add it to the .env file")
+
+
+def _make_client():
+    uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URI")          # both spellings are in common use
+    if not uri:
+        raise RuntimeError("MONGO_URI (or MONGODB_URI) is not set - add it to the .env file")
+    if "prod" in uri.lower():
+        raise RuntimeError("Refusing to connect: the MongoDB URI looks like production")
+    try:
+        from pymongo import MongoClient
+    except ImportError:
+        raise RuntimeError("pymongo is not available in this Python (the packaged app includes it; from source: pip install pymongo)")
+    return MongoClient(uri, serverSelectionTimeoutMS=8000)
+
+
+def _make_db():
+    name = env("DB_NAME")
+    if "prod" in name.lower():
+        raise RuntimeError("Refusing to use a database that looks like production")
+    return client.get_database(name)
+
+
+try:
+    from bson import ObjectId
+except ImportError:
+    def ObjectId(*_a, **_k):
+        raise RuntimeError("pymongo is not available in this Python (the packaged app includes it; from source: pip install pymongo)")
+
+client = Lazy(_make_client, "MongoDB client")
+db = Lazy(_make_db, "MongoDB database")
+
+
+def _is_declaration(node):
+    if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Assign, ast.AnnAssign)):
+        return True
+    return isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)   # a docstring
+
+
+def describe(src):
+    """What the console shows for a script: its style, the function a step will call and that function's parameters."""
+    try:
+        tree = ast.parse(src)
+    except SyntaxError as e:
+        return {"style": "error", "entry": None, "params": [], "doc": "", "error": f"line {e.lineno}: {e.msg}"}
+    funcs = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    doc = (ast.get_docstring(tree) or "").strip()
+    has_main_guard = any(isinstance(n, ast.If) and isinstance(n.test, ast.Compare) and isinstance(n.test.left, ast.Name)
+                         and n.test.left.id == "__name__" for n in tree.body)
+    if not has_main_guard and (any(f.name.startswith("test") for f in funcs)
+                               or any(isinstance(n, ast.ClassDef) and n.name.startswith("Test") for n in tree.body)):
+        return {"style": "pytest", "entry": None, "params": [], "doc": doc}      # a generated pytest file: run with pytest
+    if not funcs or not all(_is_declaration(n) for n in tree.body):
+        return {"style": "plain", "entry": None, "params": [], "doc": doc}
+    named = [f for f in funcs if f.name == "run"]
+    entry = named[0] if named else ([f for f in funcs if not f.name.startswith("_")] or funcs)[-1]
+    a = entry.args
+    positional = a.posonlyargs + a.args
+    defaults = [None] * (len(positional) - len(a.defaults)) + list(a.defaults)
+    rows = [(p, d, d is not None) for p, d in zip(positional, defaults)] + [(p, d, d is not None) for p, d in zip(a.kwonlyargs, a.kw_defaults)]
+
+    def text(node):
+        try:
+            return ast.unparse(node)
+        except Exception:
+            return ""
+    params = [{"name": p.arg, "required": not has, "default": text(d) if has else None, "type": text(p.annotation) if p.annotation else ""}
+              for p, d, has in rows]
+    return {"style": "function", "entry": entry.name, "params": params,
+            "doc": doc or (ast.get_docstring(entry) or "").strip()}
+
+
+def _parse_args(tokens):
+    named, positional, i = {}, [], 0
+    while i < len(tokens):
+        t = tokens[i]
+        if t.startswith("--") and len(t) > 2:
+            key = t[2:]
+            if "=" in key:
+                k, v = key.split("=", 1)
+                named[k.replace("-", "_")] = v
+            elif i + 1 < len(tokens) and not tokens[i + 1].startswith("--"):
+                named[key.replace("-", "_")] = tokens[i + 1]
+                i += 1
+            else:
+                named[key.replace("-", "_")] = True
+        elif re.match(r"^[A-Za-z_]\w*=", t):
+            k, v = t.split("=", 1)
+            named[k] = v
+        else:
+            positional.append(t)
+        i += 1
+    return named, positional
+
+
+def _convert(value, annotation, name):
+    if value is True or annotation in (inspect.Parameter.empty, None, "", "str", str):
+        return value
+    kind = annotation if isinstance(annotation, str) else getattr(annotation, "__name__", str(annotation))
+    try:
+        if kind == "ObjectId":
+            return ObjectId(value)
+        if kind == "int":
+            return int(value)
+        if kind == "float":
+            return float(value)
+        if kind == "bool":
+            return str(value).lower() in ("1", "true", "yes", "y", "on")
+        if kind in ("list", "dict"):
+            return json.loads(value)
+    except Exception:
+        sys.exit(f"Argument {name}: cannot read {value!r} as {kind}")
+    return value
+
+
+def main(argv):
+    if len(argv) < 2:
+        sys.exit("usage: _runner.py <script.py> [arguments...]")
+    path, tokens = argv[1], argv[2:]
+    sys.argv = [path] + tokens                       # plain scripts read sys.argv as usual
+    dry = "--dry-run" in tokens
+    tokens = [t for t in tokens if t != "--dry-run"]
+    with open(path, encoding="utf-8") as f:
+        info = describe(f.read())
+    if info["style"] == "error":
+        sys.exit(f"Syntax error in the script, {info['error']}")
+    injected = {"db": db, "client": client, "env": env, "ObjectId": ObjectId, "os": os, "json": json, "re": re,
+                "datetime": datetime.datetime, "timedelta": datetime.timedelta, "DRY_RUN": dry}
+    if info["style"] == "pytest":
+        try:
+            import pytest
+        except ImportError:
+            sys.exit("This is a pytest file and pytest is not available here - set SCRIPTS_PYTHON in .env to a Python that has pytest")
+        sys.exit(int(pytest.main([path, "-q", "-s", "--tb=short", "-p", "no:cacheprovider", *tokens])))
+    if info["style"] == "plain":
+        try:
+            runpy.run_path(path, init_globals=injected, run_name="__main__")
+        except SystemExit:
+            raise
+        except Exception as e:
+            _fail_short(e, path)
+        return
+    fn = runpy.run_path(path, init_globals=injected, run_name="script")[info["entry"]]
+    named, positional = _parse_args(tokens)
+    kwargs, missing = {}, []
+    for p in inspect.signature(fn).parameters.values():
+        if p.kind in (p.VAR_POSITIONAL, p.VAR_KEYWORD):
+            continue
+        if p.name in named:
+            value = named.pop(p.name)
+        elif positional:
+            value = positional.pop(0)
+        elif p.default is not p.empty:
+            continue
+        else:
+            missing.append(p.name)
+            continue
+        kwargs[p.name] = _convert(value, p.annotation, p.name)
+    if missing:
+        sys.exit(f"{info['entry']}() needs: " + ", ".join(f"--{m} VALUE" for m in missing) + "   (type them in the step's Arguments box)")
+    print(f"run {info['entry']}({', '.join(f'{k}={v!r}' for k, v in kwargs.items())})" + ("   [dry run]" if dry else ""))
+    try:
+        result = fn(**kwargs)
+        if inspect.iscoroutine(result):
+            import asyncio
+            result = asyncio.run(result)
+    except SystemExit:
+        raise
+    except Exception as e:
+        _fail_short(e, path)
+    if result is False:
+        sys.exit(f"{info['entry']}() returned False")
+    if isinstance(result, (dict, list, tuple)):
+        print("result:", json.dumps(result, default=str, indent=2))
+    elif result is not None:
+        print("result:", result)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
+'''
+_runner_ns = {"__name__": "_script_runner"}
+exec(compile(SCRIPT_RUNNER_SRC, "_runner.py", "exec"), _runner_ns)
+describe_script = _runner_ns["describe"]     # (source) -> {"style": "function"|"plain"|"error", "entry", "params", "doc"}
+
+SCRIPTS_DIR = None       # the bridge points these at its own folder / interpreter / runner for the live replay
+SCRIPT_PYTHON = None
+SCRIPT_RUNNER = None
+SCRIPT_COMMAND = None
+exec(SCRIPT_HELPER_SRC)  # defines run_script() for the live replay
+
+
+def uses_script(steps):
+    return any(s.get("type") == "script" for s in steps)
+
+
+def script_names(steps):
+    return sorted({s.get("script") for s in steps if s.get("type") == "script" and s.get("script")})
+
+
 def uses_chartpoint(steps):
     return any((s.get("locator") or {}).get("kind") == "chartpoint" for s in steps)
 
@@ -189,6 +483,13 @@ def with_capture_support(funcs):
 def _position(step):
     pos = step.get("position") or {}
     return f'position={{"x": {int(pos.get("x", 0))}, "y": {int(pos.get("y", 0))}}}' if pos else ""
+
+
+def _script_timeout(step):
+    try:
+        return max(1, min(1800, int(float(step.get("timeout", 120)))))
+    except (TypeError, ValueError):
+        return 120
 
 
 def _force(loc):
@@ -309,6 +610,9 @@ def _render_step_page(s, secrets, locfn=None):
         return "page.go_back()"
     if t == "reload":
         return "page.reload()"
+    if t == "script":
+        extra = (f", args={_s(s.get('args'))}" if s.get("args") else "") + (", check=False" if s.get("continue") else "")
+        return f"run_script({_s(s.get('script'))}{extra}, timeout={_script_timeout(s)})"
     if t == "click":
         return f"{_locator_expr(loc)}.click({'force=True' if _force(loc) else ''})"
     if t == "fill":
@@ -477,6 +781,7 @@ def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
         "",
         *((CAPTURE_HELPER_SRC.splitlines() + ["", ""]) if uses_capture(steps) else []),
         *((DATETIME_HELPER_SRC.splitlines() + ["", ""]) if uses_datetime(steps) else []),
+        *((SCRIPT_HELPER_SRC.splitlines() + ["", ""]) if uses_script(steps) else []),
         *((CHARTPOINT_HELPER_SRC.splitlines() + ["", ""]) if uses_chartpoint(steps) else []),
         '@pytest.fixture(scope="session")',
         "def browser():",
@@ -560,6 +865,10 @@ def replay_step(page, step, expect, captured=None):
         page.go_back(wait_until="domcontentloaded")
     elif t == "reload":
         page.reload(wait_until="domcontentloaded")
+    elif t == "script":
+        out = run_script(step.get("script") or "", step.get("args") or "", _script_timeout(step), not step.get("continue"))
+        if captured is not None:
+            captured["__saw__"] = out
     elif t == "click":
         resolve_locator(page, loc).click(force=_force(loc))
     elif t == "fill":
@@ -624,6 +933,8 @@ def replay_step(page, step, expect, captured=None):
 def describe_failure(page, step, exc):
     """First line of the error, plus how many elements the locator matched -
     'matched 0' means a wrong locator, not a slow page."""
+    if step.get("type") == "script":      # the script's own output is the useful part: keep it
+        return " | ".join(l.strip() for l in str(exc).strip().splitlines() if l.strip())[:600]
     msg = str(exc).strip().splitlines()[0][:300]
     loc = step.get("locator")
     if loc:

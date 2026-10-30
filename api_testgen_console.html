@@ -651,7 +651,6 @@
   #rec-card .field.tight { margin-bottom: 8px; }
   #rec-card > .hint { display: none; }                 /* the how-to lives in "How it works & tips" */
   .rec-big { padding: 10px 16px; }
-  #ui-saved-list { max-height: 150px !important; }
   .tc-item { padding: 9px 12px; }
   .tc-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
@@ -761,7 +760,7 @@
   /* recording folders */
   .fold-head { display: flex; align-items: center; gap: 8px; padding: 6px 4px 4px; margin-top: 6px; cursor: pointer; user-select: none; font-weight: 650; font-size: 12.5px; }
   .fold-head:first-child { margin-top: 0; }
-  .fold-head .caret { width: 14px; color: var(--muted); transition: transform .15s; } .fold-head .caret.shut { transform: rotate(-90deg); }
+  .fold-head .caret { width: 14px; display: inline-grid; place-items: center; color: var(--muted); transition: transform .15s; } .fold-head .caret.shut { transform: rotate(-90deg); }
   .fold-head .fh-count { margin-left: auto; font: 600 10.5px var(--sans); color: var(--muted); background: rgba(37,18,47,.07); border-radius: 99px; padding: 1px 8px; }
   .fold-head .ibtn { width: 24px; height: 24px; font-size: 12px; }
   .fold-body { display: flex; flex-direction: column; gap: 4px; padding-left: 12px; border-left: 2px solid var(--glass-border); margin-left: 6px; }
@@ -771,9 +770,70 @@
     color: var(--text); font-family: var(--mono); font-size: 12.5px; min-width: 0; width: 100%; }
   .bb-field select:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,0.08); }
   .bb-field select option, .bb-field select optgroup { background: #fff; color: #25122f; }
+  /* ── Saved recordings panel ── */
+  .saved-wrap { max-width: 900px; display: flex; flex-direction: column; gap: 14px; }
+  .saved-save-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .saved-save-row input { flex: 2 1 240px; min-width: 0; } .saved-save-row select { flex: 1 1 150px; min-width: 0; }
+  .saved-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; } .saved-head h3 { margin: 0; }
+  .saved-head input { margin-left: auto; width: 220px; max-width: 50%; }
+  .saved-list { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+  /* ── Right-hand cards that fold to their title ── */
+  .card[data-fold] > h3 { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px; }
+  .card[data-fold] > h3::after { content: '▾'; margin-left: auto; color: var(--muted); font-size: 13px; transition: transform .15s; }
+  .card[data-fold].folded > h3::after { transform: rotate(-90deg); }
+  .card[data-fold].folded > :not(h3) { display: none !important; }
+  .card[data-fold].folded > h3 { margin-bottom: 0; }
+  ul.mini { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.55; } ul.mini li { margin: 2px 0; }
+  /* a folded card is just its title - even the Test cases card, which otherwise stretches to fill the column */
+  .ui-side > .card[data-fold].folded { flex: none !important; min-height: 0 !important; height: auto !important; }
+  .steps-bar .steps-search { min-width: 70px !important; flex: 1 1 70px !important; }
+  /* cards size to their content now that they fold (the old rules stretched Test cases to fill the column) */
+  .ui-side > #tc-card { flex: none !important; min-height: 0 !important; }
+  #tc-card #tc-list { flex: none !important; min-height: 0 !important; max-height: 240px !important; }
+  #scripts-list { max-height: 340px !important; }
+  /* ── Icons: one SVG sprite (see <symbol id="i-…"> at the top of <body>), drawn in the current text colour ── */
+  svg.ic { width: 1.1em; height: 1.1em; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.17em; }
+  .card > h3 > svg.ic:first-child { color: var(--accent2); margin-right: 1px; }
+  .step-num { color: var(--muted); } .step-num svg.ic { width: 14px; height: 14px; stroke-width: 1.9; }
+  .ibtn svg.ic { width: 15px; height: 15px; } .btn svg.ic { width: 14px; height: 14px; margin-right: 1px; }
+  .btn-sm svg.ic { width: 13px; height: 13px; }
+  .fold-head .caret svg.ic { width: 14px; height: 14px; vertical-align: middle; }
+  .fold-head .fh-name { display: inline-flex; align-items: center; gap: 7px; } .fold-head .fh-name svg.ic { color: var(--accent2); width: 16px; height: 16px; }
+  .rowmenu button > span svg.ic { width: 15px; height: 15px; }
+  .ibtn.run svg.ic { fill: currentColor; stroke-width: 1.4; }
+  /* Saved recordings: the cards must not shrink to the window - the panel scrolls instead (19+ recordings used to spill out of their card) */
+  .saved-wrap { flex: none; } .saved-wrap > .card { flex: none; }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M10 2v7.527a2 2 0 0 1-.211.896L4.72 20.55a1 1 0 0 0 .9 1.45h12.76a1 1 0 0 0 .9-1.45l-5.069-10.127A2 2 0 0 1 14 9.527V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+<symbol id="i-filetext" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+<symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></symbol>
+<symbol id="i-clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><path d="m7 11 2-2-2-2"/><path d="M11 13h4"/><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/></symbol>
+<symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+<symbol id="i-folderopen" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
+<symbol id="i-folderplus" viewBox="0 0 24 24"><path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+<symbol id="i-folderinput" viewBox="0 0 24 24"><path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/><path d="M2 13h10"/><path d="m9 16 3-3-3-3"/></symbol>
+<symbol id="i-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+<symbol id="i-plug" viewBox="0 0 24 24"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/></symbol>
+<symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></symbol>
+<symbol id="i-uptoline" viewBox="0 0 24 24"><path d="M5 3h14"/><path d="m18 13-6-6-6 6"/><path d="M12 7v14"/></symbol>
+<symbol id="i-downtoline" viewBox="0 0 24 24"><path d="M12 17V3"/><path d="m6 11 6 6 6-6"/><path d="M19 21H5"/></symbol>
+<symbol id="i-chevdown" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+</defs></svg>
 <div class="shell">
 
   <header class="topbar">
@@ -792,13 +852,16 @@
         <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Collapse sidebar">‹</button>
       </div>
       <div class="step active" id="step-3" onclick="showPanel('ui')" title="UI Tests">
-        <div class="step-num">🧪</div><div class="step-label">UI Tests</div>
+        <div class="step-num"><svg class="ic"><use href="#i-flask"/></svg></div><div class="step-label">UI Tests</div>
+      </div>
+      <div class="step" id="step-4" onclick="showPanel('saved')" title="Saved recordings">
+        <div class="step-num"><svg class="ic"><use href="#i-archive"/></svg></div><div class="step-label">Saved recordings</div>
       </div>
       <div class="step" id="step-1" onclick="showPanel('capture')" title="API Capture">
-        <div class="step-num">🌐</div><div class="step-label">API Capture</div>
+        <div class="step-num"><svg class="ic"><use href="#i-globe"/></svg></div><div class="step-label">API Capture</div>
       </div>
       <div class="step" id="step-2" onclick="showPanel('preview')" title="Generated files">
-        <div class="step-num">📄</div><div class="step-label">Generated files</div>
+        <div class="step-num"><svg class="ic"><use href="#i-filetext"/></svg></div><div class="step-label">Generated files</div>
       </div>
     </div>
     <div class="sidebar-footer">
@@ -1046,6 +1109,7 @@
             <li><b>Two portals?</b> Launch both, record in <b>Both A + B</b>: steps are tagged A/B and replay in two separate windows (separate logins).</li>
             <li><b>Edit steps:</b> the <b>⋯</b> menu on a step checks or edits its locator and inserts a wait / go-to / test-case split. <b>▶</b> replays everything up to that step.</li>
             <li><b>Verify:</b> <b>Replay all</b> runs the whole flow in fresh windows (tick <b>Report</b> for an HTML report with screenshots).</li>
+            <li><b>Saved recordings</b> are in the left menu; <b>💾 Save</b> in the Steps bar saves in one click. <b>Scripts</b> (data clean-up, API / DB calls) can be added as steps.</li>
             <li><b>Generate:</b> name the test and click Generate for a page file + test class. Passwords are kept in owner-only local files, never in the generated code.</li>
           </ul>
         </details>
@@ -1067,6 +1131,7 @@
                 <input type="search" id="ui-filter" class="ux-input steps-search" placeholder="Filter steps…" oninput="uiSetFilter(this.value)">
                 <div class="spacer"></div>
                 <button class="btn btn-primary btn-sm" id="btn-ui-newflow" onclick="uiNewFlow()" title="Start a fresh flow: clears the steps, name, goal and expected result, then starts recording if the browser is open">＋ New flow</button>
+                <button class="btn btn-ghost btn-sm" id="btn-ui-save" onclick="uiQuickSave()" title="Save these steps (find them under Saved recordings)" aria-label="Save these steps"><svg class="ic"><use href="#i-save"/></svg></button>
                 <button class="btn btn-ghost btn-sm" id="btn-ui-collapse" onclick="uiCollapseAll()" title="Collapse / expand all test cases">⇕ Cases</button>
                 <label class="chk" title="Takes a screenshot after every step during Replay and builds a shareable HTML report (goal, expected result, verdict, issues, steps with screenshots, final screen). Makes the replay a little slower."><input type="checkbox" id="ui-report"> 📄 Report</label>
                 <button class="btn btn-ghost btn-sm" id="btn-ui-replay" onclick="uiReplay()" title="Run every step in fresh browser windows and mark each ✓ / ✗">▶ Replay all</button>
@@ -1076,7 +1141,7 @@
                 <label>Test goal<textarea id="ui-test-goal" class="ux-input" rows="2" placeholder="What this test checks, e.g. A coach can log in and open the client list"></textarea></label>
                 <label>Expected result<textarea id="ui-test-expected" class="ux-input" rows="2" placeholder="What should be true when it works, e.g. Client list opens and shows at least one client"></textarea></label>
               </div>
-              <div class="steps-status"><span id="ui-replay-status" class="pw-run-status"></span><span id="ui-report-row" style="display:none;font-size:12px"></span></div>
+              <div class="steps-status"><span class="badge ui-editing-badge" style="display:none"></span><span id="ui-replay-status" class="pw-run-status"></span><span id="ui-report-row" style="display:none;font-size:12px"></span></div>
               <div id="ui-steps" class="steps-list"></div>
             </div>
 
@@ -1095,8 +1160,8 @@
           <!-- ═════ side column: always within reach ═════ -->
           <aside class="ui-side">
 
-            <div class="card compact" id="rec-card">
-              <h3>⏺ Record <span id="ui-rec-badge" class="badge">idle</span></h3>
+            <div class="card compact" id="rec-card" data-fold="rec">
+              <h3><svg class="ic"><use href="#i-record"/></svg> Record <span id="ui-rec-badge" class="badge">idle</span></h3>
               <div class="field tight"><label for="ui-portal">Record in</label>
                 <select id="ui-portal">
                   <option value="A" selected>Portal A</option>
@@ -1106,37 +1171,58 @@
               </div>
               <button class="btn btn-primary rec-big" id="btn-ui-rec" onclick="uiToggleRecord()">⏺ Start recording</button>
               <button class="btn btn-ghost btn-sm" id="btn-ui-rec-append" onclick="uiToggleRecord(true)" style="display:none;width:100%;justify-content:center;margin-top:8px" title="Keep the steps and add new ones at the end, from the browser's current page">⏺ Record more (append)</button>
-              <p class="hint">Then use the app in the browser window. In its toolbar: <b>🎯 Pick</b> adds checks, <b>⚓ Anchor</b> uses label-based locators.</p>
             </div>
 
-            <div class="card compact" id="tc-card">
-              <h3>📋 Test cases <span id="tc-badge" class="badge" style="display:none"></span></h3>
+            <div class="card compact" id="tc-card" data-fold="tc">
+              <h3><svg class="ic"><use href="#i-clipboard"/></svg> Test cases <span id="tc-badge" class="badge" style="display:none"></span></h3>
               <div class="name-row" style="margin-bottom:8px">
                 <label class="btn btn-primary btn-sm" style="cursor:pointer" title="CSV with a header row. Columns recognised: ID, Title (or Name/Summary), Steps (or Description), Expected (or Expected result)">⬆ Upload CSV
                   <input type="file" accept=".csv,text/csv" style="display:none" onchange="tcUpload(this)"></label>
                 <button class="btn btn-ghost btn-sm" id="tc-clear" onclick="tcClear()" style="display:none">Clear</button>
               </div>
-              <div id="tc-list" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;max-height:260px;overflow-y:auto"><span style="color:var(--muted)">Upload a CSV, then record one case at a time.</span></div>
+              <div id="tc-list" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;max-height:260px;overflow-y:auto"><span style="color:var(--muted)">Upload a CSV to record case by case.</span></div>
               <div id="tc-detail" style="display:none"></div>
-              <p class="hint">▶ Record on a case adds a case header to the steps and everything you capture goes under it. Pick the next case when you are done.</p>
+              <p class="hint">▶ on a case adds its header and records under it.</p>
             </div>
 
-            <div class="card compact">
-              <h3>💾 Saved recordings <span id="ui-editing-badge" class="badge" style="display:none"></span></h3>
-              <div class="name-row" style="margin-bottom:8px" title="Folders group saved step recordings, e.g. all weight flows under Health">
-                <select id="ui-save-folder" class="ux-input" style="flex:1;min-width:0" onchange="uiSaveFolder=this.value"><option value="">📂 Unfiled</option></select>
-                <button class="btn btn-ghost btn-sm" onclick="uiNewFolder()" title="Create a folder, e.g. Health">＋ Folder</button>
+            <div class="card compact" id="scripts-card" data-fold="scripts">
+              <h3><svg class="ic"><use href="#i-terminal"/></svg> Scripts <span id="scripts-badge" class="badge" style="display:none"></span></h3>
+              <div class="name-row" style="margin-bottom:8px">
+                <select class="ux-input" id="script-tpl" title="Start a new script from a template" style="flex:1;min-width:0"></select>
+                <button class="btn btn-primary btn-sm" onclick="uiScriptNew()"><svg class="ic"><use href="#i-plus"/></svg> New script</button>
               </div>
-              <div class="name-row" style="margin-bottom:10px">
-                <input type="text" id="ui-save-name" class="ux-input" style="flex:1" placeholder="Name this recording">
-                <button class="btn btn-primary btn-sm" onclick="uiSaveRecording()" title="Saves under this name; overwrites a recording with the same name">Save</button>
+              <div id="scripts-list" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;max-height:220px;overflow-y:auto"><span style="color:var(--muted)">No scripts yet.</span></div>
+              <div id="script-editor" style="display:none;margin-top:8px">
+                <div class="name-row" style="margin-bottom:6px">
+                  <select class="ux-input" id="script-folder" onchange="uiScriptPickFolder(this.value)" title="Folder under the scripts path" style="max-width:150px"></select>
+                  <input type="text" class="ux-input" id="script-name" placeholder="script_name" style="flex:1;min-width:0">
+                  <button class="btn btn-primary btn-sm" onclick="uiScriptSave()">Save</button>
+                  <button class="btn btn-ghost btn-sm" onclick="uiScriptClose()">Close</button>
+                </div>
+                <textarea id="script-code" spellcheck="false" onkeydown="uiScriptTab(event)" style="width:100%;min-height:230px;resize:vertical;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:12px;line-height:1.5;tab-size:4;white-space:pre"></textarea>
+                <div class="name-row" style="margin-top:6px">
+                  <input type="text" class="ux-input" id="script-args" placeholder="Arguments for a test run, e.g. --dry-run" style="flex:1;min-width:0">
+                  <button class="btn btn-ghost btn-sm" onclick="uiScriptRunEditor()" title="Saves, then runs it once on this computer"><svg class="ic"><use href="#i-play"/></svg> Save &amp; run</button>
+                </div>
               </div>
-              <div id="ui-saved-list" style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;max-height:210px;overflow-y:auto"><span style="color:var(--muted)">No saved recordings yet.</span></div>
-              <p class="hint">Steps are also autosaved. Saved files contain recorded values (including passwords) and stay owner-only in <code>ui_recordings/</code>.</p>
+              <pre id="script-out" style="display:none;margin:8px 0 0;max-height:200px;overflow:auto;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:11.5px;white-space:pre-wrap"></pre>
+              <details class="fold" id="scripts-help">
+                <summary>How scripts work</summary>
+                <div class="fold-body">
+                  <ul class="mini">
+                    <li>Write <b>one function</b>. Its parameters are the step's <b>Arguments</b>, e.g. <code>--owner 6a5d…</code>.</li>
+                    <li><code>db</code>, <code>env("NAME")</code>, <code>ObjectId</code> are ready to use. Secrets stay in <code>.env</code>.</li>
+                    <li>Return a value to print it. Raise an error or <code>return False</code> to fail the step.</li>
+                    <li>Add one with <b>⤒ / ⤓</b> (first / last step) or <b>⋯ → Insert → 🧰 Run script</b>.</li>
+                    <li><b>API scripts</b> and <b>DB scripts</b> live in <code>generated_scripts/tests</code>.</li>
+                  </ul>
+                  <p class="hint" id="scripts-python" style="margin:6px 0 0"></p>
+                </div>
+              </details>
             </div>
 
-            <div class="card compact" id="ai-card">
-              <h3>🤖 Let AI do it <span id="explore-status-badge" class="badge">idle</span></h3>
+            <div class="card compact" id="ai-card" data-fold="ai">
+              <h3><svg class="ic"><use href="#i-sparkles"/></svg> Let AI do it <span id="explore-status-badge" class="badge">idle</span></h3>
               <div class="field tight"><textarea id="explore-goal" placeholder="Describe what to test, e.g. Log in with qa@example.com / password and check the dashboard loads" style="min-height:62px"></textarea></div>
               <div class="psum"><span>AI:</span> <b class="provider-summary-text">Claude</b> <button class="btn btn-ghost btn-sm" onclick="openProviderDialog()">Change</button></div>
               <details class="fold">
@@ -1165,8 +1251,8 @@
               </div>
             </div>
 
-            <div class="card compact">
-              <h3>🧪 Generate &amp; run</h3>
+            <div class="card compact" id="gen-card" data-fold="gen">
+              <h3><svg class="ic"><use href="#i-zap"/></svg> Generate &amp; run</h3>
               <div class="name-row" style="margin-bottom:10px">
                 <input type="text" id="ui-test-name" class="ux-input" style="flex:1" placeholder="Test name, e.g. login and create order">
                 <button class="btn btn-primary btn-sm" onclick="uiGenerate()" title="Writes the page file + test class into generated_scripts/ui_tests/">Generate</button>
@@ -1191,6 +1277,38 @@
             </div>
 
           </aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel: Saved recordings -->
+    <div class="panel" id="panel-saved">
+      <div class="panel-header ph-row">
+        <div style="flex:1;min-width:0">
+          <h2>Saved recordings</h2>
+          <p>Reopen a saved flow to edit it, or save the steps you have now.</p>
+        </div>
+        <span class="badge ui-editing-badge" style="display:none"></span>
+      </div>
+      <div class="panel-body">
+        <div class="saved-wrap">
+          <div class="card saved-save">
+            <h3><svg class="ic"><use href="#i-save"/></svg> Save the current steps</h3>
+            <div class="saved-save-row">
+              <input type="text" id="ui-save-name" class="ux-input" placeholder="Recording name">
+              <select id="ui-save-folder" class="ux-input" onchange="uiSaveFolder=this.value" title="Folder to save into"><option value="">Unfiled</option></select>
+              <button class="btn btn-ghost btn-sm" onclick="uiNewFolder()" title="Create a folder, e.g. Health"><svg class="ic"><use href="#i-folderplus"/></svg> Folder</button>
+              <button class="btn btn-primary btn-sm" onclick="uiSaveRecording()" title="Replaces a recording with the same name">Save</button>
+            </div>
+          </div>
+          <div class="card saved-listing">
+            <div class="saved-head">
+              <h3>Recordings <span class="badge" id="ui-saved-count">0</span></h3>
+              <input type="search" id="ui-saved-filter" class="ux-input" placeholder="Filter…" oninput="uiSavedFilter=this.value; uiRefreshSaved()">
+            </div>
+            <div id="ui-saved-list" class="saved-list"><span style="color:var(--muted)">No saved recordings yet.</span></div>
+            <p class="hint">Also autosaved. Files stay on this computer and include typed values.</p>
+          </div>
         </div>
       </div>
     </div>
@@ -1960,6 +2078,177 @@ function uiInsertCase(afterId) {
   uiDraft.name = ''; uiInsertOpen = null;
 }
 
+// ── Right-hand cards fold to their title; the choice is remembered. Record and Generate start open, the others folded. ──
+const UI_FOLD_DEFAULT = { rec: false, tc: true, scripts: true, ai: true, gen: false };      // true = folded
+let uiFold = {}; try { uiFold = JSON.parse(localStorage.getItem('ui-card-fold') || '{}') || {}; } catch (e) {}
+function uiApplyFolds() {
+  document.querySelectorAll('.card[data-fold]').forEach(c => { const k = c.dataset.fold; c.classList.toggle('folded', k in uiFold ? !!uiFold[k] : !!UI_FOLD_DEFAULT[k]); });
+}
+function uiFoldSet(k, folded) { uiFold[k] = folded; try { localStorage.setItem('ui-card-fold', JSON.stringify(uiFold)); } catch (e) {} uiApplyFolds(); }
+function uiFoldOpen(k) { uiFoldSet(k, false); }
+document.querySelectorAll('.card[data-fold] > h3').forEach(h => h.addEventListener('click', (e) => {
+  if (e.target.closest('button, a, input, select, label')) return;
+  const c = h.parentElement; uiFoldSet(c.dataset.fold, !c.classList.contains('folded'));
+}));
+uiApplyFolds();
+
+// ── Scripts: Python files that a "Run script" step runs inside the flow ──
+let uiScripts = [], uiScriptTemplates = [], uiScriptFolders = [], uiScriptRoot = '', uiScriptEditing = null, uiScriptFolder = '';     // editing: {name, isNew}
+const uiScriptUrl = (name) => BRIDGE_URL + '/api/ui-scripts/' + String(name).split('/').map(encodeURIComponent).join('/');
+async function uiScriptsRefresh() {
+  try {
+    const r = await (await fetch(BRIDGE_URL + '/api/ui-scripts')).json();
+    uiScripts = r.scripts || []; uiScriptTemplates = r.templates || []; uiScriptFolders = r.folders || []; uiScriptRoot = r.root || '';
+    const py = document.getElementById('scripts-python');
+    if (py) py.innerHTML = r.python_custom ? `Runs with <code>${escapeHtml(r.python)}</code> (SCRIPTS_PYTHON).`
+      : `Runs on ${r.frozen ? "the app's built-in Python" : "this app's Python"}. Database: <code>MONGO_URI</code> + <code>DB_NAME</code> in <code>.env</code>.`;
+  } catch (e) { return; }
+  const tpl = document.getElementById('script-tpl');
+  if (tpl && !tpl.options.length) tpl.innerHTML = uiScriptTemplates.map(t => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`).join('');
+  const badge = document.getElementById('scripts-badge');
+  if (badge) { badge.style.display = uiScripts.length ? '' : 'none'; badge.textContent = uiScripts.length; }
+  const box = document.getElementById('scripts-list');
+  const row = (sc) => `<div style="display:flex;align-items:center;gap:6px;padding:4px 6px;border:1px solid var(--border);border-radius:6px${uiScriptEditing && uiScriptEditing.name === sc.name ? ';background:var(--bg3)' : ''}">`
+    + `<div style="flex:1;min-width:0"><div style="font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(sc.name)}">${escapeHtml(sc.name.split('/').pop())}${sc.style === 'pytest' ? ' <span class="pill" title="A pytest file: runs with pytest">pytest</span>' : ''}</div>`
+    + (sc.summary ? `<div class="hint" style="margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(sc.summary)}">${escapeHtml(sc.summary)}</div>` : '')
+    + (uiScriptHint(sc.name) ? `<div class="hint" style="margin:0;font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Type these in the step's Arguments box">${escapeHtml(sc.entry)}: ${escapeHtml(uiScriptHint(sc.name))}</div>` : '') + `</div>`
+    + `<button class="btn btn-ghost btn-sm" onclick="uiScriptAddStep('${sc.name}', 'first')" title="Add it as the FIRST step of the flow (e.g. clean up data before the test)">${ic('uptoline')}</button>`
+    + `<button class="btn btn-ghost btn-sm" onclick="uiScriptAddStep('${sc.name}', 'last')" title="Add it as the LAST step of the flow">${ic('downtoline')}</button>`
+    + `<button class="btn btn-ghost btn-sm" onclick="uiScriptRunList('${sc.name}')" title="Run it once now, on this computer">${ic('play')}</button>`
+    + `<button class="btn btn-ghost btn-sm" onclick="uiScriptEdit('${sc.name}')" title="Edit">${ic('pencil')}</button>`
+    + `<button class="btn btn-ghost btn-sm" onclick="uiScriptDelete('${sc.name}')" title="Delete">${ic('trash')}</button></div>`;
+  if (box) {
+    const names = [...new Set(['', ...uiScriptFolders.filter(f => !f.includes('/')), ...uiScripts.map(x => x.folder)])];
+    const groups = names.map(f => ({ f, items: uiScripts.filter(x => x.folder === f) })).filter(g => g.items.length || g.f);
+    const group = (g) => {
+      if (!g.f) return g.items.map(row).join('');
+      const shut = !!uiScriptFold[g.f], jf = escapeHtml(g.f);
+      return `<div class="fold-head" onclick="uiScriptFolderToggle('${jf}')"><span class="caret${shut ? ' shut' : ''}">${ic('chevdown')}</span><span class="fh-name">${uiScriptIcon(g.f)} ${jf}</span><span class="fh-count">${g.items.length}</span></div>`
+        + (shut ? '' : `<div class="fold-body">${g.items.map(row).join('') || '<span class="hint" style="margin:0">Empty - pick a template and press ＋ New script.</span>'}</div>`);
+    };
+    box.innerHTML = uiScripts.length || uiScriptFolders.length
+      ? groups.map(group).join('')
+      : '<span style="color:var(--muted)">No scripts yet. Pick a template and press ＋ New script.</span>';
+  }
+  const fsel = document.getElementById('script-folder');
+  if (fsel) {
+    const cur = fsel.value || uiScriptFolder, opts = uiScriptFolders.slice();
+    fsel.innerHTML = opts.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+    fsel.value = opts.includes(cur) ? cur : (opts[0] || '');
+  }
+  const where = document.getElementById('scripts-where'); if (where) where.textContent = uiScriptRoot || 'generated_scripts/tests';
+  if (typeof uiLastSteps !== 'undefined' && uiInsertOpen != null) renderUiSteps(uiLastSteps);   // the insert panel lists these
+}
+// What to type in a step's Arguments box for this script: the parameters of the function it runs.
+const UI_SCRIPT_ICON = { 'API scripts': 'plug', 'DB scripts': 'database' };
+const uiScriptIcon = (f) => ic(UI_SCRIPT_ICON[f] || 'folder');
+let uiScriptFold = {}; try { uiScriptFold = JSON.parse(localStorage.getItem('ui-script-fold') || '{}') || {}; } catch (e) {}
+function uiScriptFolderToggle(f) {
+  uiScriptFold[f] = !uiScriptFold[f];
+  try { localStorage.setItem('ui-script-fold', JSON.stringify(uiScriptFold)); } catch (e) {}
+  uiScriptsRefresh();
+}
+function uiScriptHint(name) {
+  const sc = uiScripts.find(x => x.name === name);
+  if (!sc || sc.style !== 'function' || !(sc.params || []).length) return '';
+  return sc.params.map(p => p.required ? `--${p.name} VALUE` : `[--${p.name} ${p.default}]`).join(' ');
+}
+async function uiScriptRunList(name) {
+  const sc = uiScripts.find(x => x.name === name), need = sc && sc.style === 'function' ? sc.params.filter(p => p.required) : [];
+  let args = '';
+  if (need.length) {
+    args = prompt(`"${name}" needs arguments:\n${uiScriptHint(name)}\n\nType them here (they can also go in the step's Arguments box):`, need.map(p => `--${p.name} `).join(''));
+    if (args === null) return;
+  }
+  uiScriptRunNamed(name, args);
+}
+function uiScriptShow(name, code, isNew) {
+  uiScriptEditing = { name, isNew };
+  const fo = name.includes('/') ? name.slice(0, name.lastIndexOf('/')) : uiScriptFolder;
+  if (fo && uiScriptFold[fo]) { uiScriptFold[fo] = false; try { localStorage.setItem('ui-script-fold', JSON.stringify(uiScriptFold)); } catch (e) {} }
+  document.getElementById('script-editor').style.display = '';
+  const folder = name.includes('/') ? name.slice(0, name.lastIndexOf('/')) : (isNew ? uiScriptFolder : '');
+  const n = document.getElementById('script-name'); n.value = name.split('/').pop(); n.readOnly = !isNew;
+  uiScriptFolder = folder; const fsel = document.getElementById('script-folder'); fsel.value = folder; fsel.disabled = !isNew;
+  document.getElementById('script-code').value = code;
+  const ai = document.getElementById('script-args'); if (ai) ai.placeholder = (uiScriptHint(name) || 'Arguments for a test run, e.g. --dry-run');
+  uiScriptsRefresh();
+}
+function uiScriptPickFolder(v) { uiScriptFolder = v; }
+function uiScriptNew() {
+  const id = document.getElementById('script-tpl').value, t = uiScriptTemplates.find(x => x.id === id) || uiScriptTemplates[0];
+  if (t && t.folder) uiScriptFolder = t.folder;
+  uiScriptShow('', t ? t.code : '', true);
+  document.getElementById('script-name').focus();
+}
+async function uiScriptEdit(name) {
+  const res = await fetch(uiScriptUrl(name)), d = await res.json();
+  if (!res.ok) { toast(d.error || 'Could not open the script', 'err'); return; }
+  uiScriptShow(d.name, d.code, false);
+}
+function uiScriptClose() { uiScriptEditing = null; document.getElementById('script-editor').style.display = 'none'; uiScriptsRefresh(); }
+function uiScriptTab(e) {     // Tab indents instead of leaving the box
+  if (e.key !== 'Tab') return;
+  e.preventDefault();
+  const t = e.target, a = t.selectionStart;
+  t.value = t.value.slice(0, a) + '    ' + t.value.slice(t.selectionEnd);
+  t.selectionStart = t.selectionEnd = a + 4;
+}
+async function uiScriptSave() {
+  const base = document.getElementById('script-name').value.trim(), code = document.getElementById('script-code').value;
+  if (!base) { toast('Give the script a name', 'err'); return false; }
+  const folder = document.getElementById('script-folder').value, name = folder ? `${folder}/${base}` : base;
+  if (uiScriptEditing && uiScriptEditing.isNew && uiScripts.some(x => x.name === name.replace(/\.py$/, '')) && !confirm(`A script named "${name}" already exists. Replace it?`)) return false;
+  const res = await fetch(BRIDGE_URL + '/api/ui-scripts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, code }) });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Could not save', 'err'); return false; }
+  uiScriptEditing = { name: d.name, isNew: false };
+  document.getElementById('script-name').value = d.name.split('/').pop(); document.getElementById('script-name').readOnly = true; document.getElementById('script-folder').disabled = true;
+  await uiScriptsRefresh();
+  const ai = document.getElementById('script-args'); if (ai) ai.placeholder = uiScriptHint(d.name) || 'Arguments for a test run, e.g. --dry-run';
+  toast(d.warning || `Saved ${d.name}`, d.warning ? 'err' : 'ok');
+  return true;
+}
+async function uiScriptRunNamed(name, args) {
+  if (!confirm(`Run "${name}" now?\n\nIt runs on this computer with the settings from your .env file (for example MONGO_URI) and can change real data.`)) return;
+  const out = document.getElementById('script-out');
+  out.style.display = ''; out.style.color = 'var(--muted)'; out.textContent = `Running ${name}…`;
+  try {
+    const d = await (await fetch(uiScriptUrl(name) + '/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ args: args || '' }) })).json();
+    out.style.color = d.ok ? 'var(--green)' : 'var(--red)';
+    out.textContent = (d.error ? d.error : `${d.ok ? '✓ exit 0' : '✗ exit ' + d.returncode} in ${d.seconds}s\n\n${d.output || '(no output)'}`);
+  } catch (e) { out.style.color = 'var(--red)'; out.textContent = 'Could not reach the bridge: ' + e.message; }
+}
+async function uiScriptRunEditor() {
+  if (await uiScriptSave()) uiScriptRunNamed(uiScriptEditing.name, document.getElementById('script-args').value);
+}
+async function uiScriptDelete(name) {
+  if (!confirm(`Delete the script "${name}"? Steps that use it will fail until you pick another.`)) return;
+  const res = await fetch(uiScriptUrl(name), { method: 'DELETE' });
+  if (!res.ok) { toast((await res.json()).error || 'Could not delete', 'err'); return; }
+  if (uiScriptEditing && uiScriptEditing.name === name) uiScriptClose();
+  uiScriptsRefresh();
+}
+// Pull a script into the flow without opening a step's menu: as the first step (clean up before the test) or the last one.
+function uiScriptAddStep(name, where) {
+  const sc = uiScripts.find(x => x.name === name), need = sc && sc.style === 'function' ? sc.params.filter(p => p.required) : [];
+  let args = '';
+  if (need.length) {
+    args = prompt(`"${name}" needs arguments:\n${uiScriptHint(name)}\n\nType them here (you can also change them later on the step):`, need.map(p => `--${p.name} `).join(''));
+    if (args === null) return;
+  }
+  const steps = (typeof uiLastSteps !== 'undefined' && uiLastSteps) || [];
+  const afterId = where === 'first' ? null : (steps.length ? steps[steps.length - 1].id : null);
+  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'script', script: name, args: (args || '').trim() } });
+  toast(`Added ${name} as the ${where === 'first' ? 'first' : 'last'} step`);
+}
+function uiInsertRunScript(afterId) {
+  const name = uiDraft.script || (uiScripts[0] && uiScripts[0].name);
+  if (!name) { toast('Create a script in the Scripts card first', 'err'); return; }
+  socket.emit('ui_step_insert', { after_id: afterId, step: { type: 'script', script: name, args: (uiDraft.scriptArgs || '').trim() } });
+  uiDraft.scriptArgs = ''; uiInsertOpen = null;
+}
+
 // ── UX: filter, collapsible cases, row menu, stepper, output tabs ──
 let uiFilter = '', uiCollapsed = {}, uiReplayOkSnapshot = null, uiLastReplayFull = true;
 function uiSetFilter(v) { uiFilter = (v || '').trim().toLowerCase(); renderUiSteps(uiLastSteps); }
@@ -2007,14 +2296,14 @@ function uiRowMenu(id, ev) {
   const m = document.createElement('div');
   m.className = 'rowmenu'; m.id = 'row-menu'; m.dataset.id = id;
   m.innerHTML = items.map(([i, t, fn]) => `<button onclick="${fn}"><span>${i}</span>${t}</button>`).join('')
-    + `<hr><button class="danger" onclick="socket.emit('ui_step_delete',{id:${id}})"><span>🗑</span>Delete this step</button>`;
+    + `<hr><button class="danger" onclick="socket.emit('ui_step_delete',{id:${id}})"><span>${ic('trash')}</span>Delete this step</button>`;
   document.body.appendChild(m);
   const r = ev.currentTarget.getBoundingClientRect();
   m.style.top = Math.max(8, Math.min(r.bottom + 4, innerHeight - m.offsetHeight - 8)) + 'px';
   m.style.left = Math.max(8, r.right - m.offsetWidth) + 'px';
 }
 
-const UI_VERB = { goto: 'Go to', back: 'Go back', reload: 'Reload', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
+const UI_VERB = { goto: 'Go to', back: 'Go back', reload: 'Reload', script: 'Run script', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
   press: 'Press', press_page: 'Press', assert_text: 'Assert text', assert_value: 'Assert value', assert_visible: 'Assert visible',
   assert_attr: 'Assert attr', assert_js: 'Assert script', assert_url: 'Assert URL', capture: 'Capture', compare: 'Compare', assert_datetime: 'Assert date/time', hover: 'Hover', scroll_into_view: 'Scroll to', wait_for: 'Wait for', wait: 'Wait (ms)',
   scroll_page: 'Scroll page', note: 'Note' };
@@ -2065,10 +2354,15 @@ function uiStepDetail(s, n, r) {
           + `<select class="ux-input" onchange="uiDraft.cmpRight=this.value">${uiCaptureVars().map(v => `<option${v === (uiDraft.cmpRight || uiCaptureVars()[1]) ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('')}</select>`
           + `<button class="btn btn-ghost btn-sm" onclick="uiInsertCompare(${s.id})" title="Adds a check comparing two captured values">Add</button>`
         : `<span class="hint" style="margin:0">capture two values first (Pick → Capture…)</span>`)
+      + `<span style="color:var(--muted)">│</span><span><b>🧰 Run script</b></span>` + (uiScripts.length
+        ? `<select class="ux-input" onchange="uiDraft.script=this.value; uiDraft.scriptArgs=''; renderUiSteps(uiLastSteps)">${uiScripts.map(x => `<option${x.name === (uiDraft.script || uiScripts[0].name) ? ' selected' : ''}>${escapeHtml(x.name)}</option>`).join('')}</select>`
+          + `<input type="text" class="ux-input" placeholder="${escapeHtml(uiScriptHint(uiDraft.script || uiScripts[0].name) || 'arguments (optional)')}" value="${escapeHtml(uiDraft.scriptArgs || '')}" oninput="uiDraft.scriptArgs=this.value" style="width:210px">`
+          + `<button class="btn btn-ghost btn-sm" onclick="uiInsertRunScript(${s.id})" title="Runs a Python script (clean up data, call an API, query MongoDB) at this point of the flow">Add</button>`
+        : `<span class="hint" style="margin:0">create one in the Scripts card first</span>`)
       + `<span style="color:var(--muted)">│</span><span><b>📋 New test case</b></span><input type="text" class="ux-input" placeholder="name (optional)" value="${escapeHtml(uiDraft.name)}" oninput="uiDraft.name=this.value" style="width:170px">`
       + `<button class="btn btn-ghost btn-sm" onclick="uiInsertCase(${s.id})" title="Steps after this one start a new test case">Split after this step</button></div>`);
   }
-  if (r && r.ok && r.detail) parts.push(`<div class="sr-note hint">${s.type === 'capture' ? 'Captured: ' : 'Compared: '}${escapeHtml(r.detail)}</div>`);
+  if (r && r.ok && r.detail) parts.push(`<div class="sr-note hint">${s.type === 'capture' ? 'Captured: ' : s.type === 'script' ? 'Script: ' : 'Compared: '}${escapeHtml(r.detail)}</div>`);
   if (r && !r.ok) {
     parts.push(`<div class="sr-note err">${escapeHtml(r.error)}${r.screenshot ? `<img src="data:image/jpeg;base64,${r.screenshot}" alt="page at the failure">` : ''}</div>`);
     if (/matched 0/.test(r.error || '')) parts.push('<div class="sr-note hint">The locator finds nothing on the page at this point. Use <b>⋯ → Edit or swap the locator</b> to try a better selector (a data-testid, an id or a CSS path), then <b>Check</b> it.</div>');
@@ -2102,6 +2396,12 @@ function renderUiSteps(steps) {
     let val = '';
     if (s.type === 'fill' && s.secret) val = '<span class="pill">🔒 secret → env var</span>';
     else if (s.type === 'capture') val = `<span class="pill">${escapeHtml(s.source === 'attr' ? (s.attr || 'attribute') : (s.source || 'text'))}</span> → <input type="text" class="ux-input" style="width:160px" title="Variable name" value="${escapeHtml(s.var || '')}" onchange="uiUpdateStep(${s.id}, this.value, 'var')">`;
+    else if (s.type === 'script') {
+      const names = uiScripts.map(x => x.name); if (s.script && !names.includes(s.script)) names.push(s.script);
+      val = `<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><span title="The script this step runs">🧰</span><select class="ux-input" style="max-width:190px" onchange="uiUpdateStep(${s.id}, this.value, 'script')">${names.map(v => `<option${v === s.script ? ' selected' : ''}${uiScripts.some(x => x.name === v) ? '' : ' style="color:var(--red)"'}>${escapeHtml(v)}${uiScripts.some(x => x.name === v) ? '' : ' (missing)'}</option>`).join('')}</select><input type="text" class="ux-input" style="width:210px" placeholder="${escapeHtml(uiScriptHint(s.script) || 'arguments')}" title="Arguments for the script's function, e.g. --partner_id 6a5d..." value="${escapeHtml(s.args || '')}" onchange="uiUpdateStep(${s.id}, this.value, 'args')">`
+        + `<input type="number" class="ux-input" min="1" max="1800" style="width:62px;padding:4px 6px" title="Seconds before the script is stopped" value="${s.timeout || 120}" onchange="uiUpdateStep(${s.id}, this.value, 'timeout')"><span class="hint" style="margin:0">s</span>`
+        + `<label class="hint" style="margin:0;display:flex;gap:4px;align-items:center;cursor:pointer" title="Carry on with the next step even if this script exits with an error"><input type="checkbox"${s.continue ? ' checked' : ''} onchange="uiUpdateStep(${s.id}, this.checked, 'continue')">keep going if it fails</label></span>`;
+    }
     else if (s.type === 'compare') {
       const names = uiCaptureVars(); if (s.left && !names.includes(s.left)) names.push(s.left); if (s.right && !names.includes(s.right)) names.push(s.right);
       const sel = (field, cur) => `<select class="ux-input" onchange="uiUpdateStep(${s.id}, this.value, '${field}')">${names.map(v => `<option${v === cur ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('')}</select>`;
@@ -2125,9 +2425,9 @@ function renderUiSteps(steps) {
       + (s.type === 'assert_js' ? `<span class="sr-val"><input type="text" class="ux-input" title="JavaScript evaluated in the page" value="${escapeHtml(s.expr)}" onchange="uiUpdateStep(${s.id}, this.value, 'expr')"></span>`
         : (target || !val ? `<span class="sr-target${val ? '' : ' span2'}" title="${escapeHtml(target)}">${escapeHtml(target)}${chk}</span>` : ''))
       + (val ? `<span class="sr-val${target ? '' : ' span2'}">${val}</span>` : '')
-      + `<span class="sr-actions"><button class="ibtn run" title="Run to here: replay steps 1–${n} in fresh windows and outline this step's element" onclick="uiRunTo(${s.id})">▶</button>`
-      + `<button class="ibtn" title="More: check or edit the locator, insert a wait, delete…" onclick="uiRowMenu(${s.id}, event)">⋯</button>`
-      + `<button class="ibtn del" title="Delete this step" onclick="socket.emit('ui_step_delete',{id:${s.id}})">🗑</button></span></div>`
+      + `<span class="sr-actions"><button class="ibtn run" title="Run to here: replay steps 1–${n} in fresh windows and outline this step's element" onclick="uiRunTo(${s.id})">${ic('play')}</button>`
+      + `<button class="ibtn" title="More: check or edit the locator, insert a wait, delete…" onclick="uiRowMenu(${s.id}, event)">${ic('more')}</button>`
+      + `<button class="ibtn del" title="Delete this step" onclick="socket.emit('ui_step_delete',{id:${s.id}})">${ic('trash')}</button></span></div>`
       + uiStepDetail(s, n, r);
   };
   const textOf = ({ s }) => [UI_VERB[s.type] || s.type, s.locator ? uiDescribeLocator(s.locator) : '', s.value || '', s.attr || ''].join(' ').toLowerCase();
@@ -2219,14 +2519,14 @@ function uiCanon(v) {
 }
 function uiDirty() { return uiLoadedName != null && uiSnapshot !== uiCanon(uiLastSteps); }
 function uiUpdateEditingBadge() {
-  const b = document.getElementById('ui-editing-badge');
-  if (!b) return;
-  b.style.display = uiLoadedName ? '' : 'none';
-  b.textContent = uiLoadedName ? `editing: ${uiLoadedName}${uiDirty() ? '  ● unsaved changes' : ''}` : '';
-  b.style.color = uiDirty() ? 'var(--yellow,#f59e0b)' : '';
+  document.querySelectorAll('.ui-editing-badge').forEach(b => {
+    b.style.display = uiLoadedName ? '' : 'none';
+    b.textContent = uiLoadedName ? `editing: ${uiLoadedName}${uiDirty() ? '  ● unsaved changes' : ''}` : '';
+    b.style.color = uiDirty() ? 'var(--yellow,#f59e0b)' : '';
+  });
 }
 
-let uiSaveFolder = '', uiFolderCollapsed = {}, uiSavedList = [];
+let uiSaveFolder = '', uiFolderCollapsed = {}, uiSavedList = [], uiSavedFilter = '';
 try { uiFolderCollapsed = JSON.parse(localStorage.getItem('ui-folder-collapsed') || '{}') || {}; } catch (e) {}
 function uiToggleFolder(f) { uiFolderCollapsed[f] = !uiFolderCollapsed[f]; try { localStorage.setItem('ui-folder-collapsed', JSON.stringify(uiFolderCollapsed)); } catch (e) {} uiRefreshSaved(); }
 async function uiNewFolder() {
@@ -2261,10 +2561,13 @@ async function uiRefreshSaved() {
     const sel = document.getElementById('ui-save-folder');
     if (sel) {
       if (uiSaveFolder && !folders.includes(uiSaveFolder)) uiSaveFolder = '';
-      sel.innerHTML = '<option value="">📂 Unfiled</option>' + folders.map(f => `<option value="${escapeHtml(f)}">📁 ${escapeHtml(f)}</option>`).join('');
+      sel.innerHTML = '<option value="">Unfiled</option>' + folders.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
       sel.value = uiSaveFolder;
     }
+    const q = (uiSavedFilter || '').trim().toLowerCase(), shown = q ? list.filter(x => x.name.toLowerCase().includes(q)) : list;
+    const cnt = document.getElementById('ui-saved-count'); if (cnt) cnt.textContent = q ? `${shown.length} / ${list.length}` : list.length;
     if (!list.length && !folders.length) { box.innerHTML = '<span style="color:var(--muted)">No saved recordings yet.</span>'; return; }
+    if (q && !shown.length) { box.innerHTML = '<span style="color:var(--muted)">Nothing matches.</span>'; return; }
     const item = (x) => {
       const when = x.saved_at ? new Date(x.saved_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
       const cur = uiLoadedName === x.name;
@@ -2272,23 +2575,34 @@ async function uiRefreshSaved() {
       return `<div class="saved-item${cur ? ' current' : ''}">`
         + `<div class="si-main"><div class="si-name" title="${esc}">${cur ? '▶ ' : ''}${esc}</div>`
         + `<div class="si-meta">${x.steps} step${x.steps === 1 ? '' : 's'}${x.cases ? ` · ${x.cases} case${x.cases > 1 ? 's' : ''}` : ''}${when ? ` · ${escapeHtml(when)}` : ''}</div></div>`
-        + `<div class="si-actions"><button class="btn btn-ghost btn-sm" onclick="uiLoadRecording('${jf}')" title="Load into the editor to edit it">✎ Edit</button>`
-        + `<button class="ibtn" onclick="uiMoveRecording('${jf}', '${escapeHtml(x.folder).replace(/'/g, "\\'")}')" title="Move to a folder">📁</button>`
-        + `<button class="ibtn" onclick="uiDeleteRecording('${jf}', '${esc.replace(/'/g, "\\'")}')" title="Delete this saved recording">🗑</button></div></div>`;
+        + `<div class="si-actions"><button class="btn btn-ghost btn-sm" onclick="uiLoadRecording('${jf}')" title="Load into the editor to edit it">${ic('pencil')} Edit</button>`
+        + `<button class="ibtn" onclick="uiMoveRecording('${jf}', '${escapeHtml(x.folder).replace(/'/g, "\\'")}')" title="Move to a folder">${ic('folderinput')}</button>`
+        + `<button class="ibtn" onclick="uiDeleteRecording('${jf}', '${esc.replace(/'/g, "\\'")}')" title="Delete this saved recording">${ic('trash')}</button></div></div>`;
     };
     const section = (f, label) => {
-      const items = list.filter(x => x.folder === f);
+      const items = shown.filter(x => x.folder === f);
       if (f === '' && !folders.length) return items.map(item).join('');          // no folders yet: the plain list, as before
       if (f === '' && !items.length) return '';
+      if (q && !items.length) return '';                                          // while filtering, hide folders with no match
       const closed = !!uiFolderCollapsed[f];
-      return `<div class="fold-head" onclick="uiToggleFolder('${escapeHtml(f).replace(/'/g, "\\'")}')"><span class="caret${closed ? ' shut' : ''}">▾</span><span class="fh-name">${label}</span><span class="fh-count">${items.length}</span>`
+      return `<div class="fold-head" onclick="uiToggleFolder('${escapeHtml(f).replace(/'/g, "\\'")}')"><span class="caret${closed ? ' shut' : ''}">${ic('chevdown')}</span><span class="fh-name">${label}</span><span class="fh-count">${items.length}</span>`
         + (f && !items.length ? `<button class="ibtn" onclick="event.stopPropagation();uiDeleteFolder('${escapeHtml(f).replace(/'/g, "\\'")}')" title="Delete this empty folder">🗑</button>` : '') + `</div>`
         + (closed ? '' : `<div class="fold-body">${items.map(item).join('') || '<span class="hint" style="margin:0 0 4px 22px">Empty - Save into this folder, or use 📁 on a recording to move one here.</span>'}</div>`);
     };
-    box.innerHTML = folders.map(f => section(f, '📁 ' + escapeHtml(f))).join('') + section('', '📂 Unfiled');
+    box.innerHTML = folders.map(f => section(f, ic(uiFolderCollapsed[f] ? 'folder' : 'folderopen') + ' ' + escapeHtml(f))).join('') + section('', ic('inbox') + ' Unfiled');
   } catch (e) { box.innerHTML = '<span style="color:var(--red)">Could not reach the bridge.</span>'; }
 }
 
+// 💾 Save in the Steps toolbar: keeps the current recording's name (or asks once), so saving is one click.
+async function uiQuickSave() {
+  const inp = document.getElementById('ui-save-name');
+  if (!(inp.value || '').trim()) {
+    const n = (prompt('Name this recording:', '') || '').trim();
+    if (!n) return;
+    inp.value = n;
+  }
+  await uiSaveRecording();
+}
 async function uiSaveRecording() {
   const name = (document.getElementById('ui-save-name').value || '').trim();
   if (!name) { toast('Give the recording a name', 'err'); return; }
@@ -2324,7 +2638,8 @@ async function uiLoadRecording(file) {
   if (st.timeout_s) document.getElementById('ui-timeout').value = st.timeout_s;
   if (st.shared_session != null) document.getElementById('ui-shared-session').checked = !!st.shared_session;
   uiUpdateEditingBadge(); uiRefreshSaved();
-  toast(`Loaded "${d.name}" - edit the steps, then Save`);
+  showPanel('ui');                                  // back to the steps you just opened
+  toast(`Loaded "${d.name}" - edit the steps, then 💾 Save`);
 }
 
 async function uiDeleteRecording(file, name) {
@@ -2377,7 +2692,7 @@ function tcUpload(input) {
   rd.onload = () => {
     const list = tcFromRows(tcParseCsv(String(rd.result)));
     if (!list.length) { toast('No test cases found - the CSV needs a header row and at least one row', 'err'); return; }
-    tcCases = list; tcActive = null; tcSave(); tcRender();
+    tcCases = list; tcActive = null; tcSave(); tcRender(); uiFoldOpen('tc');
     toast(`Loaded ${list.length} test case${list.length > 1 ? 's' : ''}`);
   };
   rd.readAsText(f);
@@ -2565,6 +2880,7 @@ socket.on('ui_steps', (d) => {
   uiUpdateEditingBadge();
 });
 uiRefreshSaved();
+uiScriptsRefresh();
 socket.on('ui_generated', (d) => {
   uiGeneratedFile = d.file;
   const box = document.getElementById('ui-code-box');
@@ -2609,6 +2925,7 @@ function exploreLog(msg, kind = 'info') {
 }
 
 function startExplore() {
+  uiFoldOpen('ai');
   const goal = document.getElementById('explore-goal').value.trim();
   if (!goal) { toast('Describe a goal first', 'err'); return; }
   if (!browserOpen) { toast('Launch the browser first (▶ Launch in the bar above)', 'err'); return; }
@@ -2782,7 +3099,7 @@ function setProgress(p, msg) {
 
 function parseScripts(text) {
   const files = [];
-  const re = /# FILE:\s*(\S+\.py)([\s\S]*?)(?=# FILE:|$)/g;
+  const re = /# FILE:[ \t]*([^\n]*?\.py)([\s\S]*?)(?=# FILE:|$)/g;
   let m;
   while ((m = re.exec(text)) !== null) {
     let content = m[2].trim().replace(/^```(?:python)?\n?/,'').replace(/\n?```$/,'').trim();
@@ -2938,7 +3255,7 @@ function uxSave() {
     const prov = localStorage.getItem('apitestgen.provider');
     if (prov && ['anthropic', 'openrouter', 'ollama'].includes(prov)) setProvider(prov);
     const panel = localStorage.getItem('apitestgen.panel');
-    if (panel && ['ui', 'capture', 'preview'].includes(panel) && panel !== 'ui') showPanel(panel);
+    if (panel && ['ui', 'capture', 'preview', 'saved'].includes(panel) && panel !== 'ui') showPanel(panel);
   } catch (e) {}
   ['change', 'input'].forEach(ev => document.addEventListener(ev, (e) => {
     if (e.target && (UX_VALUES.includes(e.target.id) || UX_CHECKS.includes(e.target.id))) uxSave();
@@ -3278,13 +3595,16 @@ function toggleSidebar() {
 
 function showPanel(n) {
   if (n === 'config') { openConfig(); return; }
-  ['capture','preview','ui'].forEach(p => document.getElementById('panel-'+p).classList.toggle('active', p===n));
+  ['capture','preview','ui','saved'].forEach(p => document.getElementById('panel-'+p).classList.toggle('active', p===n));
+  document.getElementById('step-4').classList.toggle('active', n==='saved');
+  if (n === 'saved') uiRefreshSaved();
   document.getElementById('step-1').classList.toggle('active', n==='capture');
   document.getElementById('step-2').classList.toggle('active', n==='preview');
   document.getElementById('step-3').classList.toggle('active', n==='ui');
   try { localStorage.setItem('apitestgen.panel', n); } catch (e) {}
 }
 
+const ic = (name, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 function escapeHtml(str) {
   if (!str) return '';
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

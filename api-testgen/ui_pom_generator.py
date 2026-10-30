@@ -16,7 +16,7 @@ from datetime import datetime
 
 from ui_test_generator import (
     CAPTURE_HELPER_SRC, _ROLES, _SCROLL_JS, _locator, _py_label, _render_step_page, _s, slugify, split_cases,
-    uses_capture, with_capture_support, uses_datetime, DATETIME_HELPER_SRC, CHARTPOINT_HELPER_SRC,
+    uses_capture, with_capture_support, uses_datetime, DATETIME_HELPER_SRC, CHARTPOINT_HELPER_SRC, uses_script, SCRIPT_HELPER_SRC,
 )
 
 _ROLE_SUFFIX = {"button": "button", "link": "link", "textbox": "input", "searchbox": "search_input",
@@ -277,6 +277,7 @@ def generate_ui_pom(name, steps, timeout_s=15, shared_session=True):
         "",
         *((CAPTURE_HELPER_SRC.splitlines() + ["", ""]) if uses_capture(steps) else []),
         *((DATETIME_HELPER_SRC.splitlines() + ["", ""]) if uses_datetime(steps) else []),
+        *((SCRIPT_HELPER_SRC.splitlines() + ["", ""]) if uses_script(steps) else []),
         '@pytest.fixture(scope="session")',
         "def browser():",
         "    with sync_playwright() as p:",

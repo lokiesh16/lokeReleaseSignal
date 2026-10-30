@@ -18,7 +18,7 @@ _VERBS = {
     "check": "check", "uncheck": "uncheck", "press": "press", "press_page": "press",
     "hover": "hover", "scroll_into_view": "scroll to", "wait_for": "wait for", "wait": "wait",
     "scroll_page": "scroll page", "assert_text": "assert text", "assert_value": "assert value",
-    "assert_visible": "assert visible", "assert_attr": "assert attribute", "assert_js": "assert script", "assert_url": "assert URL", "capture": "capture", "compare": "compare", "assert_datetime": "assert date/time",
+    "assert_visible": "assert visible", "assert_attr": "assert attribute", "assert_js": "assert script", "assert_url": "assert URL", "capture": "capture", "compare": "compare", "assert_datetime": "assert date/time", "script": "run script",
 }
 _ASSERTS = ("assert_datetime", "assert_text", "assert_value", "assert_visible", "assert_attr", "assert_js", "assert_url", "compare")
 _SECRET_IN_TEXT = re.compile(r"(?i)\b(pass(?:word|wd)?|pwd|secret|token|api[_-]?key|otp|cvv)\b(\s*[=:]\s*)(\S+)")
@@ -45,6 +45,8 @@ def step_label(s):
     verb = _VERBS.get(t, t or "step")
     if t == "goto":
         return f'{verb} {s.get("value") or s.get("url") or ""}'
+    if t == "script":
+        return f'{verb} {s.get("script") or s.get("value") or ""}'.strip()
     if t == "wait":
         return f'{verb} {s.get("value")} ms'
     if t == "scroll_page":
@@ -84,6 +86,9 @@ def step_detail(s):
         return "expected: visible"
     if t == "assert_js":
         return f'expected result: {s.get("value", "")}'
+    if t == "script":
+        bits = ([f'arguments: {s["args"]}'] if s.get("args") else []) + (["continues even if it fails"] if s.get("continue") else [])
+        return "; ".join(bits)
     if t == "wait_for":
         return f'until: {s.get("value") or "visible"}'
     return ""
