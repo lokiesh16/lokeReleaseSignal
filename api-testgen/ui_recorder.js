@@ -512,6 +512,89 @@
     return loc;
   }
 
+
+  // ── tables: found by their heading, read by their headers, never by position ──────────────────────────────────────────
+  var TABLE_KIND = 'table,[role="table"],[role="grid"],[role="treegrid"]';
+  function tableRootOf(el) { return el && el.closest ? el.closest(TABLE_KIND) : null; }
+  // Keep identical to the reader inside assert_table() (ui_test_generator.py): the snapshot taken here must equal what replay reads.
+  function readTable(root) {
+    var t = root;
+    if (!t.matches(TABLE_KIND)) { var inner = t.querySelector(TABLE_KIND); if (inner) t = inner; }
+    var shown = function (e) { return e.getClientRects().length > 0; };
+    var cellsOf = function (r) { return Array.prototype.filter.call(r.children, function (c) { return /^(TD|TH)$/.test(c.tagName) || /^(cell|gridcell|rowheader|columnheader)$/.test(c.getAttribute('role') || ''); }); };
+    var isHead = function (c) { return c.getAttribute('role') === 'columnheader' || (c.tagName === 'TH' && c.getAttribute('scope') !== 'row' && c.getAttribute('role') !== 'rowheader'); };
+    var headers = [], rows = [], body = false, empty = '';
+    Array.prototype.filter.call(t.querySelectorAll('tr,[role="row"]'), function (r) { return r.closest(TABLE_KIND) === t && shown(r); }).forEach(function (r) {
+      var cs = cellsOf(r);
+      if (!cs.length) return;
+      if (!body && cs.every(isHead)) { headers = cs.map(function (c) { return norm(c.innerText); }); return; }
+      body = true;
+      if (cs.length === 1 && cs[0].colSpan > 1) { empty = norm(cs[0].innerText); return; }
+      rows.push(cs.map(function (c) { return norm(c.innerText); }));
+    });
+    return { headers: headers, rows: rows, empty: empty };
+  }
+  function tableLocator(root) {
+    var all = Array.prototype.slice.call(document.querySelectorAll(TABLE_KIND));
+    var mk = function (sel, name, stable, warn) {
+      var loc = { kind: 'pw', selector: sel, py: 'locator(' + JSON.stringify(sel) + ')', desc: name, matches: 1 };
+      if (warn) loc.warn = warn; else loc.stable = true;
+      return loc;
+    };
+    // 1. an attribute the developers put there on purpose
+    var attrs = ['data-testid', 'data-test', 'data-cy', 'aria-label'];
+    for (var i = 0; i < attrs.length; i++) {
+      var v = root.getAttribute(attrs[i]);
+      if (v && !/["\\]/.test(v) && !fragileText(v, null)) { var sel = '[' + attrs[i] + '=' + JSON.stringify(v) + ']'; if (countCss(sel) === 1) return mk(sel, 'the table ' + attrs[i] + '="' + v + '"'); }
+    }
+    if (stableId(root.id) && countCss('#' + (window.CSS && CSS.escape ? CSS.escape(root.id) : root.id)) === 1) return mk('#' + root.id, 'the table #' + root.id);
+    // 2. the heading above it: "the table under the heading 'Referral Manager'"
+    var heads = Array.prototype.slice.call(document.querySelectorAll(HEAD_SEL));
+    for (var a = root.parentElement; a && a !== document.body; a = a.parentElement) {
+      var inside = heads.filter(function (h) { return a.contains(h) && !h.contains(root); });
+      if (!inside.length) continue;
+      var h = inside[0], hc = h.cloneNode(true);
+      Array.prototype.forEach.call(hc.querySelectorAll('button,svg,img,i,[role="button"]'), function (n) { n.remove(); });
+      var title = norm(hc.textContent);
+      if (title.length < 3 || title.length > 60 || /["\\]/.test(title) || fragileText(title, null)) break;
+      if (heads.filter(function (x) { return norm(x.textContent).indexOf(title) >= 0; }).length !== 1) break;
+      var anc = h.parentElement;                                     // what the replay selector will reach: the heading's nearest ancestor holding a table
+      while (anc && !anc.querySelector(TABLE_KIND)) anc = anc.parentElement;
+      var found = anc ? anc.querySelectorAll(TABLE_KIND) : [];
+      if (found.length !== 1 || found[0] !== root) break;
+      var hs = ':is(' + HEAD_SEL + '):has-text(' + JSON.stringify(title) + ')';
+      var xp = 'xpath=ancestor::*[.//table or .//*[@role="table" or @role="grid" or @role="treegrid"]][1]';
+      var inner = 'table,[role="table"],[role="grid"],[role="treegrid"]';
+      var sel2 = hs + ' >> ' + xp + ' >> ' + inner;
+      return { kind: 'pw', selector: sel2, py: 'locator(' + JSON.stringify(hs) + ').locator(' + JSON.stringify(xp) + ').locator(' + JSON.stringify(inner) + ')',
+               desc: 'the table under the heading "' + title + '"', matches: 1, stable: true };
+    }
+    // 3. its order among the page's tables
+    var k = all.indexOf(root);
+    return mk(all.length > 1 ? 'table,[role="table"],[role="grid"],[role="treegrid"] >> nth=' + k : 'table,[role="table"],[role="grid"],[role="treegrid"]',
+              all.length > 1 ? 'table #' + (k + 1) + ' of ' + all.length + ' on the page' : 'the only table on the page', false,
+              all.length > 1 ? 'the table has no id or heading of its own, so this relies on its order on the page' : 'it is the only table now, but a second one would change what this finds');
+  }
+  // The element holding a number that must equal a table's row count is found by its LABEL, never by the number itself (which
+  // changes as data does): "1 In Review" -> /^\d+\s*In\s+Review$/ . A bare number is widened to the box that also holds its label.
+  function refLocator(el) {
+    var node = el, t = norm(el.textContent);
+    for (var up = 0; up < 3 && /^[\d,.\s%]+$/.test(t) && node.parentElement && node.parentElement !== document.body; up++) { node = node.parentElement; t = norm(node.textContent); }
+    if (!/[A-Za-z]/.test(t) || t.length > 80) return null;
+    var rx = '^' + shapeOf(t).replace(/(\\d\+)(\\s\+)/g, '$1\\s*') + '$', re;
+    try { re = new RegExp(rx); } catch (e) { return null; }
+    var hits = Array.prototype.filter.call(document.body.querySelectorAll('*'), function (e) {
+      return re.test(norm(e.textContent)) && !Array.prototype.some.call(e.children, function (c) { return re.test(norm(c.textContent)); });
+    }).length;
+    var loc = { kind: 'pattern', value: rx, scope: stableScope(node), matches: hits };
+    if (hits === 1) loc.stable = true; else loc.warn = hits + ' elements on the page look like "' + trunc(t, 30) + '"';
+    return { loc: loc, text: t };
+  }
+  function tableSnapshot(td) {
+    return { headers: td.headers.slice(0, 14).map(function (h) { return trunc(h, 60); }),
+             rows: td.rows.slice(0, 30).map(function (r) { return r.slice(0, 14).map(function (c) { return trunc(c, 80); }); }), total: td.rows.length };
+  }
+
   function buildLocator(el) {
     var shape = null;
     try { shape = svgShapeLocator(el); } catch (e) {}
@@ -918,6 +1001,9 @@
       ops.push(['🕒 Assert date & time are now (±2 min)', 'dt_datetime_now']);
       ops.push(['📅 Assert date is today (just the date)', 'dt_date_today']);
     }
+    var tRoot = tableRootOf(el);
+    if (tRoot) ops.push(['▦ Assert table (rows, columns, data)', 'assert_table']);
+    if (!isField && text && text.length <= 120 && /\d/.test(text)) ops.push(['▦ Use this number as a table reference (must equal its row count)', 'table_ref']);
     if (canText) ops.push(['Capture text as variable…', 'capture_text']);
     if (isField && !isToggle && type !== 'password') ops.push(['Capture value as variable…', 'capture_value']);
     ops.push(['Capture tooltip (hover) as variable…', 'capture_tooltip']);
@@ -1019,7 +1105,7 @@
     var loc = buildLocator(el), tag = el.tagName.toLowerCase();
     var label = { hover_at: 'hover', assert_chart: 'assert chart data', click: 'click', clear: 'clear', fill: 'fill', hover: 'hover', scroll_into_view: 'scroll', wait_for: 'wait for element',
                   assert_visible: 'assert visible', assert_text: 'assert text', assert_value: 'assert value', assert_attr: 'assert href',
-                  capture_text: 'capture text', capture_value: 'capture value', capture_tooltip: 'capture tooltip' }[op];
+                  capture_text: 'capture text', capture_value: 'capture value', capture_tooltip: 'capture tooltip', assert_table: 'assert table', table_ref: 'table reference' }[op];
     var isToggle = tag === 'input' && /^(checkbox|radio)$/i.test(el.getAttribute('type') || '');
     drawBox(el, '#22c55e');
     if (pickCtx && pickCtx.ghost && pickCtx.under && op !== 'hover') {
@@ -1070,6 +1156,16 @@
       send({ type: 'assert_text', locator: loc, value: norm(el.textContent) });
     } else if (op === 'assert_value') {
       send({ type: 'assert_value', locator: loc, value: String(el.value || '') });
+    } else if (op === 'assert_table') {
+      var troot = tableRootOf(el), td = readTable(troot);
+      drawBox(troot, '#22c55e');
+      send({ type: 'assert_table', locator: tableLocator(troot), headers: td.headers.filter(Boolean), ordered: false, cols: null,
+             rows_mode: 'exact', rows_n: td.rows.length, cells: [], refs: [], snapshot: tableSnapshot(td) });
+      label = 'assert table (' + td.rows.length + ' row(s), ' + td.headers.length + ' column(s))';
+    } else if (op === 'table_ref') {
+      var rl = refLocator(el), rtext = rl ? rl.text : norm(el.textContent);
+      send({ type: 'table_ref', ref: { locator: rl ? rl.loc : loc, text: trunc(rtext, 80), pick: /\bof\s+[\d,]+\W*$/i.test(rtext) ? 'last' : 'first', op: '==' } });
+      label = 'table reference';
     } else if (/^dt_/.test(op)) {
       // A time like "2:08 AM" changes on every run, so locate it by its SHAPE (digits:digits AM) and take the newest
       // one, not by its current text or a position-based xpath. Scoped to the nearest recognisable container.

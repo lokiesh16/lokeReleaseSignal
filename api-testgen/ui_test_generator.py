@@ -124,6 +124,103 @@ DATETIME_HELPER_SRC = '''def assert_datetime(locator, mode="datetime_now", tol=2
 exec(DATETIME_HELPER_SRC)   # defines assert_datetime() for the live replay
 
 
+# "Assert table" steps check a table by what it SAYS, never by position: how many rows, which column headers, single cells
+# (the row is found by a key cell, the column by its header text) and numbers elsewhere on the page that must equal the row
+# count (e.g. a card saying "1 In Review"). It re-reads the table for `timeout` seconds so a table that is still loading is
+# not judged half-filled. The generated test embeds this exact source, and the live replay execs it.
+TABLE_CELL_OPS = {"equals": "equals", "contains": "contains", "pattern": "matches pattern", "exists": "exists"}
+TABLE_HELPER_SRC = r'''def assert_table(table, rows=None, cols=None, headers=(), ordered=False, cells=(), refs=(), timeout=10):
+    """Checks a table / grid by its content. rows=("exact"|"min"|"max", n); cols=n header cells; headers=[...] must be present
+    (in that order when ordered); cells=[(key_col, key, col, op, value)]: the row whose `key_col` cell contains `key`, then its
+    `col` cell must equal / contain / match / (just exist). refs=[(locator, "first"|"last", "=="|">="|"<=")]: the number in that
+    element's text is compared with the number of rows. Returns a one-line summary of what it saw."""
+    import re, time
+    read = """
+    (root) => {
+      const norm = s => (s || '').replace(/\\s+/g, ' ').trim();
+      const KIND = 'table,[role="table"],[role="grid"],[role="treegrid"]';
+      let t = root;
+      if (!t.matches(KIND)) { const inner = t.querySelector(KIND); if (inner) t = inner; }
+      const shown = e => e.getClientRects().length > 0;
+      const cellsOf = r => Array.from(r.children).filter(c => /^(TD|TH)$/.test(c.tagName) || /^(cell|gridcell|rowheader|columnheader)$/.test(c.getAttribute('role') || ''));
+      const isHead = c => c.getAttribute('role') === 'columnheader' || (c.tagName === 'TH' && c.getAttribute('scope') !== 'row' && c.getAttribute('role') !== 'rowheader');
+      let headers = [], rows = [], body = false, empty = '';
+      Array.from(t.querySelectorAll('tr,[role="row"]')).filter(r => r.closest(KIND) === t && shown(r)).forEach(r => {
+        const cs = cellsOf(r);
+        if (!cs.length) return;
+        if (!body && cs.every(isHead)) { headers = cs.map(c => norm(c.innerText)); return; }
+        body = true;
+        if (cs.length === 1 && cs[0].colSpan > 1) { empty = norm(cs[0].innerText); return; }
+        rows.push(cs.map(c => norm(c.innerText)));
+      });
+      return { headers: headers, rows: rows, empty: empty };
+    }"""
+
+    def norm(x):
+        return " ".join((x or "").split())
+
+    def column(hs, name):
+        want = norm(name).lower()
+        for i, h in enumerate(hs):
+            if h.lower() == want:
+                return i
+        raise AssertionError(f"no column headed {name!r} (columns: {[h or '(blank)' for h in hs]})")
+
+    def check():
+        d = table.evaluate(read)
+        hs, rs = d["headers"], d["rows"]
+        n = len(rs)
+        saw = [f"{n} row(s)", f"{len(hs)} column(s)"]
+        if rows:
+            mode, want = rows[0], int(rows[1])
+            ok = {"exact": n == want, "min": n >= want, "max": n <= want}[mode]
+            assert ok, f"table has {n} row(s), expected {'exactly' if mode == 'exact' else 'at ' + mode + 'imum'} {want}" + (f" (it says {d['empty']!r})" if d["empty"] and not n else "")
+        if cols is not None:
+            assert len(hs) == int(cols), f"table has {len(hs)} column(s), expected {cols}: {[h or '(blank)' for h in hs]}"
+        if headers:
+            low = [h.lower() for h in hs]
+            missing = [h for h in headers if norm(h).lower() not in low]
+            assert not missing, f"missing column(s) {missing}; the table has {[h or '(blank)' for h in hs]}"
+            if ordered:
+                at = [low.index(norm(h).lower()) for h in headers]
+                assert at == sorted(at), f"columns are in a different order: {[h or '(blank)' for h in hs]}"
+        for key_col, key, col, op, val in cells:
+            ki, ci = column(hs, key_col), column(hs, col)
+            hit = [r for r in rs if ki < len(r) and norm(key) in r[ki]]
+            assert hit, f"no row has {key!r} in its {key_col!r} cell ({n} row(s) read)"
+            assert len(hit) == 1, f"{len(hit)} rows have {key!r} in their {key_col!r} cell - the key must identify one row"
+            got = hit[0][ci] if ci < len(hit[0]) else ""
+            if op == "equals":
+                assert got == norm(val), f"{col!r} of the row {key!r} is {got!r}, expected {val!r}"
+            elif op == "contains":
+                assert norm(val) in got, f"{col!r} of the row {key!r} is {got!r}, expected it to contain {val!r}"
+            elif op == "pattern":
+                assert re.search(val, got), f"{col!r} of the row {key!r} is {got!r}, expected it to match {val}"
+            saw.append(f"{col} of {key!r} = {got[:40]!r}")
+        for ref, pick, op in refs:
+            text = norm(ref.inner_text())
+            nums = re.findall(r"\d[\d,]*", text)
+            assert nums, f"the reference element has no number in it: {text!r}"
+            num = int(nums[-1 if pick == "last" else 0].replace(",", ""))
+            ok = {"==": n == num, ">=": n >= num, "<=": n <= num}.get(op, n == num)
+            assert ok, f"table has {n} row(s) but the reference says {num} ({text[:60]!r}); expected rows {op} {num}"
+            saw.append(f"reference {num} {op} rows")
+        return "; ".join(saw), (n, tuple(hs))
+
+    deadline = time.time() + timeout
+    while True:
+        try:
+            summary, shape = check()
+            time.sleep(0.3)                                   # passed: make sure it was not a half-loaded moment
+            if check()[1] == shape:
+                return summary
+        except AssertionError:
+            if time.time() >= deadline:
+                raise
+        time.sleep(0.4)'''
+exec(TABLE_HELPER_SRC)   # defines assert_table() for the live replay
+
+
 # Chart data points (SVG circles) are found by their place ON the chart - column = rank of the x position among the chart's
 # points, row = rank of the y position within that column - never by their place in the DOM. Charts re-render when hovered and
 # put the hovered point in a different spot of the DOM, so a DOM position changes from one hover to the next.
@@ -452,6 +549,46 @@ def uses_datetime(steps):
     return any(s.get("type") == "assert_datetime" for s in steps)
 
 
+def uses_table(steps):
+    return any(s.get("type") == "assert_table" for s in steps)
+
+
+def table_spec(s):
+    """An assert_table step's settings, cleaned up: the keyword arguments for assert_table() minus the locators."""
+    mode = s.get("rows_mode") if s.get("rows_mode") in ("exact", "min", "max") else None
+    try:
+        n = max(0, int(float(s.get("rows_n"))))
+    except (TypeError, ValueError):
+        n, mode = 0, None
+    try:
+        cols = max(0, int(float(s.get("cols")))) if s.get("cols") not in (None, "") else None
+    except (TypeError, ValueError):
+        cols = None
+    cells = [(str(c.get("key_col") or ""), str(c.get("key") or ""), str(c.get("col") or ""),
+              c.get("op") if c.get("op") in TABLE_CELL_OPS else "equals", str(c.get("value") or ""))
+             for c in (s.get("cells") or []) if c.get("key_col") and c.get("col")]
+    refs = [(r.get("locator") or {}, "last" if r.get("pick") == "last" else "first", r.get("op") if r.get("op") in ("==", ">=", "<=") else "==")
+            for r in (s.get("refs") or []) if r.get("locator")]
+    return {"rows": (mode, n) if mode else None, "cols": cols, "headers": [str(h) for h in (s.get("headers") or []) if str(h).strip()],
+            "ordered": bool(s.get("ordered")), "cells": cells, "refs": refs}
+
+
+def table_summary(s):
+    """The checks of an assert_table step in words, for reports and the step list."""
+    sp, out = table_spec(s), []
+    if sp["rows"]:
+        out.append({"exact": "exactly", "min": "at least", "max": "at most"}[sp["rows"][0]] + f" {sp['rows'][1]} row(s)")
+    if sp["cols"] is not None:
+        out.append(f"{sp['cols']} column(s)")
+    if sp["headers"]:
+        out.append(f"{len(sp['headers'])} header(s)" + (" in order" if sp["ordered"] else ""))
+    if sp["cells"]:
+        out.append(f"{len(sp['cells'])} cell check(s)")
+    if sp["refs"]:
+        out.append(f"rows match {len(sp['refs'])} reference number(s)")
+    return ", ".join(out) or "nothing selected yet"
+
+
 COMPARE_OPS = {"equals": "==", "not_equals": "!=", "contains": "in", "not_contains": "not in"}
 
 
@@ -584,6 +721,8 @@ def _for_portal(line, portal):
         return line.replace("capture_value(page.", f"capture_value({var}.", 1)
     if line.startswith("chart_point(page,"):
         return "chart_point(" + var + line[len("chart_point(page"):]
+    if line.startswith("assert_table(page."):
+        return "assert_table(" + var + line[len("assert_table(page"):]
     if line.startswith("assert_datetime(page."):
         return "assert_datetime(" + var + line[len("assert_datetime(page"):]
     if line.startswith("expect(page)"):
@@ -652,6 +791,23 @@ def _render_step_page(s, secrets, locfn=None):
     if t == "assert_datetime":
         mode = s.get("mode") if s.get("mode") in DATETIME_MODES else "datetime_now"
         return f"assert_datetime({_locator_expr(loc)}, {_s(mode)}, {_tol(s)})"
+    if t == "assert_table":
+        sp, pv = table_spec(s), _PAGE_VAR.get(s.get("portal", "A"), "page")
+        on = lambda e: pv + e[4:] if e.startswith("page.") else e   # refs are inline expressions; point them at this step's window
+        parts = [_locator_expr(loc)]
+        if sp["rows"]:
+            parts.append(f"rows=({_s(sp['rows'][0])}, {sp['rows'][1]})")
+        if sp["cols"] is not None:
+            parts.append(f"cols={sp['cols']}")
+        if sp["headers"]:
+            parts.append("headers=" + json.dumps(sp["headers"]))
+            if sp["ordered"]:
+                parts.append("ordered=True")
+        if sp["cells"]:
+            parts.append("cells=[" + ", ".join("(" + ", ".join(_s(x) for x in c) + ")" for c in sp["cells"]) + "]")
+        if sp["refs"]:
+            parts.append("refs=[" + ", ".join(f"({on(_locator(l))}, {_s(pk)}, {_s(op)})" for l, pk, op in sp["refs"]) + "]")
+        return "assert_table(" + ", ".join(parts) + ")"
     if t == "assert_url":
         return f"expect(page).to_have_url(re.compile(re.escape({_s(s.get('value'))})))"
     if t == "hover":
@@ -781,6 +937,7 @@ def generate_ui_test(name, steps, timeout_s=15, shared_session=True):
         "",
         *((CAPTURE_HELPER_SRC.splitlines() + ["", ""]) if uses_capture(steps) else []),
         *((DATETIME_HELPER_SRC.splitlines() + ["", ""]) if uses_datetime(steps) else []),
+        *((TABLE_HELPER_SRC.splitlines() + ["", ""]) if uses_table(steps) else []),
         *((SCRIPT_HELPER_SRC.splitlines() + ["", ""]) if uses_script(steps) else []),
         *((CHARTPOINT_HELPER_SRC.splitlines() + ["", ""]) if uses_chartpoint(steps) else []),
         '@pytest.fixture(scope="session")',
@@ -910,6 +1067,12 @@ def replay_step(page, step, expect, captured=None):
     elif t == "assert_datetime":
         mode = step.get("mode") if step.get("mode") in DATETIME_MODES else "datetime_now"
         saw = assert_datetime(resolve_locator(page, loc), mode, _tol(step))
+        if captured is not None:
+            captured["__saw__"] = saw
+    elif t == "assert_table":
+        sp = table_spec(step)
+        saw = assert_table(resolve_locator(page, loc), rows=sp["rows"], cols=sp["cols"], headers=sp["headers"], ordered=sp["ordered"],
+                           cells=sp["cells"], refs=[(resolve_locator(page, l), pk, op) for l, pk, op in sp["refs"]])
         if captured is not None:
             captured["__saw__"] = saw
     elif t == "hover":
