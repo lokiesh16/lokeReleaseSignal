@@ -415,6 +415,64 @@ def _ui_add_step(step, portal):
     _ui_emit_steps()
 
 
+def _ui_table_attach_ref(ref):
+    with ui_rec_lock:
+        tbl = next((st for st in reversed(ui_rec["steps"]) if st.get("type") == "assert_table"), None)
+        if not tbl or not ref.get("locator"):
+            err = "Add an 'Assert table' step first - pick the table, then the number to compare with its rows"
+        else:
+            err = None
+            refs = tbl.setdefault("refs", [])
+            if ref["locator"] not in [r.get("locator") for r in refs]:
+                refs.append({"locator": ref["locator"], "text": str(ref.get("text") or "")[:80],
+                             "pick": "last" if ref.get("pick") == "last" else "first", "op": "=="})
+    if err:
+        with app.app_context():
+            socketio.emit("error", {"msg": err})
+    else:
+        _ui_emit_steps()
+
+
+@socketio.on("ui_table_edit")
+def ui_table_edit(data):
+    """Console edits to an 'Assert table' step: `field` is replaced as a whole (lists come back complete)."""
+    data = data or {}
+    sid, field, value = data.get("id"), data.get("field"), data.get("value")
+    try:
+        if field == "rows_mode":
+            value = value if value in ("exact", "min", "max", "") else None
+        elif field == "rows_n":
+            value = max(0, int(float(value)))
+        elif field == "cols":
+            value = None if value in (None, "") else max(0, int(float(value)))
+        elif field == "ordered":
+            value = bool(value)
+        elif field == "headers":
+            value = [str(h)[:80] for h in (value or [])][:40]
+        elif field == "cells":
+            value = [{"key_col": str(c.get("key_col") or "")[:80], "key": str(c.get("key") or "")[:200], "col": str(c.get("col") or "")[:80],
+                      "op": c.get("op") if c.get("op") in ("equals", "contains", "pattern", "exists") else "equals",
+                      "value": str(c.get("value") or "")[:300]} for c in (value or []) if c.get("key_col") and c.get("col")][:60]
+            for c in value:
+                if c["op"] == "pattern" and c["value"]:
+                    re.compile(c["value"])
+        elif field == "refs":
+            value = [{"locator": r.get("locator") or {}, "text": str(r.get("text") or "")[:80],
+                      "pick": "last" if r.get("pick") == "last" else "first",
+                      "op": r.get("op") if r.get("op") in ("==", ">=", "<=") else "=="} for r in (value or []) if r.get("locator")][:10]
+        else:
+            return
+    except re.error:
+        emit("error", {"msg": "That is not a valid regular expression"}); return
+    except (TypeError, ValueError, AttributeError):
+        return
+    with ui_rec_lock:
+        for st in ui_rec["steps"]:
+            if st.get("id") == sid and st.get("type") == "assert_table":
+                st[field] = value
+    _ui_emit_steps()
+
+
 def _ui_binding(source, step):
     """Called from the page. '__state' lets a freshly loaded document ask whether
     a recording is live (so the toolbar survives navigations); anything else is a step."""
@@ -431,6 +489,9 @@ def _ui_binding(source, step):
         ui_rec["anchor"] = bool(step.get("value"))
         return None
     perform = step.pop("perform", False)
+    if step.get("type") == "table_ref":    # a picked number is attached to the newest "Assert table" step, not added as a step
+        _ui_table_attach_ref(step.get("ref") or {})
+        return None
     _ui_add_step(step, portal)
     if perform and ui_rec["recording"] and portal in ui_rec["portals"]:
         ui_pending.append((portal, step))
@@ -742,7 +803,7 @@ def playwright_worker():
                     pass
                 if st.get("type") == "assert_url":
                     row["saw"] = pg.url[:200]
-                elif st.get("type") in ("capture", "compare", "assert_datetime") and "__saw__" in replay_vars:
+                elif st.get("type") in ("capture", "compare", "assert_datetime", "assert_table") and "__saw__" in replay_vars:
                     row["saw"] = str(replay_vars["__saw__"])[:200]
                 elif st.get("type") in ("assert_text", "assert_value") and st.get("locator"):
                     try:   # the value actually observed, next to the one expected (most useful when the assertion failed)
@@ -781,7 +842,7 @@ def playwright_worker():
                                 pass
                         replay_step(rpage, s, pw_expect, replay_vars)
                         res = {"id": s["id"], "ok": True}
-                        if s.get("type") in ("capture", "compare", "assert_datetime", "script"):
+                        if s.get("type") in ("capture", "compare", "assert_datetime", "assert_table", "script"):
                             res["detail"] = replay_vars.get("__saw__", "")
                         if want_report:
                             report_rows.append(report_row(rpage, s, True, step_t0))
