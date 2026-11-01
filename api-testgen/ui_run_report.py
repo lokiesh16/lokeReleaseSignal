@@ -18,9 +18,9 @@ _VERBS = {
     "check": "check", "uncheck": "uncheck", "press": "press", "press_page": "press",
     "hover": "hover", "scroll_into_view": "scroll to", "wait_for": "wait for", "wait": "wait",
     "scroll_page": "scroll page", "assert_text": "assert text", "assert_value": "assert value",
-    "assert_visible": "assert visible", "assert_attr": "assert attribute", "assert_js": "assert script", "assert_url": "assert URL", "capture": "capture", "compare": "compare", "assert_datetime": "assert date/time", "script": "run script",
+    "assert_visible": "assert visible", "assert_attr": "assert attribute", "assert_js": "assert script", "assert_url": "assert URL", "capture": "capture", "compare": "compare", "assert_datetime": "assert date/time", "assert_table": "assert table", "script": "run script",
 }
-_ASSERTS = ("assert_datetime", "assert_text", "assert_value", "assert_visible", "assert_attr", "assert_js", "assert_url", "compare")
+_ASSERTS = ("assert_table", "assert_datetime", "assert_text", "assert_value", "assert_visible", "assert_attr", "assert_js", "assert_url", "compare")
 _SECRET_IN_TEXT = re.compile(r"(?i)\b(pass(?:word|wd)?|pwd|secret|token|api[_-]?key|otp|cvv)\b(\s*[=:]\s*)(\S+)")
 
 
@@ -78,6 +78,9 @@ def step_detail(s):
         return f'{s.get("source") or "text"} → {s.get("var", "")}'
     if t == "compare":
         return f'expected: {s.get("left", "")} {(s.get("op") or "equals").replace("_", " ")} {s.get("right", "")}'
+    if t == "assert_table":
+        from ui_test_generator import table_summary
+        return "expected: " + table_summary(s)
     if t == "assert_datetime":
         return f'expected: {_DT_TEXT.get(s.get("mode"), _DT_TEXT["datetime_now"])} (±{s.get("tol", 2)} min)'
     if t == "assert_url":

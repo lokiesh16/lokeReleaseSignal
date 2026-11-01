@@ -472,6 +472,19 @@
   .pill { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: rgba(255,255,255,.08); color: var(--muted); font-family: var(--mono); }
   .pill.b { color: #38bdf8; background: rgba(56,189,248,.12); } .pill.a { color: var(--accent2); background: rgba(245,165,36,.14); }
   .pill.ok { color: var(--green); background: rgba(45,212,160,.12); } .pill.no { color: var(--red); background: rgba(255,95,109,.12); } .pill.warn { color: var(--amber); background: rgba(255,183,77,.12); }
+  .sr-detail:has(> .tbl-ed) { display: block; min-width: 0; max-width: calc(100% - 64px); box-sizing: border-box; }
+  .srow.moved { outline: 2px solid #22c55e; outline-offset: -2px; border-radius: 8px; transition: outline-color .6s; }
+  .tbl-ed { width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .tbl-ed .trow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .tbl-ed .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 9px; border: 1px solid var(--border2); border-radius: 999px; font-size: 12px; }
+  .tbl-ed .chip button { border: 0; background: none; color: var(--muted); cursor: pointer; padding: 0 4px; font-size: 13px; }
+  .tbl-grid { width: 100%; max-width: 100%; box-sizing: border-box; overflow: auto; max-height: 260px; border: 1px solid var(--border2); border-radius: 8px; }
+  .tbl-grid table { border-collapse: collapse; font-size: 12px; width: max-content; min-width: 100%; }
+  .tbl-grid th, .tbl-grid td { border-bottom: 1px solid var(--border2); padding: 5px 9px; text-align: left; max-width: 240px; vertical-align: top; cursor: pointer; }
+  .tbl-grid th { position: sticky; top: 0; background: var(--bg2, #eef); font-weight: 600; }
+  .tbl-grid td:hover, .tbl-grid th:hover { outline: 1px solid var(--accent, #6d5bd0); outline-offset: -1px; }
+  .tbl-grid .on { background: rgba(34,197,94,.16); box-shadow: inset 0 0 0 1px #22c55e; }
+  .tbl-grid .keycol { font-style: italic; }
   .sr-detail { margin: 2px 8px 8px 56px; padding: 10px 12px; background: rgba(255,255,255,.04); border: 1px dashed var(--border2); border-radius: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; }
   .sr-note { margin: 0 8px 8px 56px; font-size: 12px; white-space: pre-wrap; word-break: break-word; }
   .sr-note.err { color: var(--red); } .sr-note.hint { color: var(--amber); }
@@ -1202,6 +1215,16 @@
 
             <div class="card compact" id="ai-card" data-fold="ai">
               <h3><svg class="ic"><use href="#i-sparkles"/></svg> Let AI do it <span id="explore-status-badge" class="badge">idle</span></h3>
+              <div class="psum"><span>Source:</span>
+                <select id="explore-source" class="ux-input" style="padding:3px 8px" onchange="exploreSourceChanged()">
+                  <option value="goal" selected>My description</option>
+                  <option value="jira">Jira ticket (description + comments)</option>
+                </select>
+              </div>
+              <div class="field tight" id="explore-jira-row" style="display:none">
+                <input type="text" id="explore-jira-keys" class="ux-input" placeholder="Ticket key or link, e.g. HAB-123 (several: comma separated)">
+                <p class="hint" style="margin:4px 0 0">Reads requirements, acceptance criteria and test data from the ticket, plans the cases, and runs them. Needs JIRA_BASE_URL, JIRA_EMAIL and JIRA_API_TOKEN in .env.</p>
+              </div>
               <div class="field tight"><textarea id="explore-goal" placeholder="Describe what to test, e.g. Log in with qa@example.com / password and check the dashboard loads" style="min-height:62px"></textarea></div>
               <div class="psum"><span>AI:</span> <b class="provider-summary-text">Claude</b> <button class="btn btn-ghost btn-sm" onclick="openProviderDialog()">Change</button></div>
               <details class="fold">
@@ -2267,6 +2290,17 @@ function uiUpdateStepper() {
 function uiCloseMenu() { const m = document.getElementById('row-menu'); if (m) m.remove(); }
 document.addEventListener('click', uiCloseMenu);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { uiCloseMenu(); closeProviderDialog(); } });
+function uiMoveTo(id) {
+  uiCloseMenu();
+  const acts = uiLastSteps.filter(x => x.type !== 'case'), from = acts.findIndex(x => x.id === id);
+  if (from < 0) return;
+  const ans = prompt(`Move step ${from + 1} to which step number? (1 = first, ${acts.length} = last)`, '1');
+  if (ans === null) return;
+  const to = Math.max(1, Math.min(acts.length, parseInt(ans, 10) || 0)) - 1;
+  if (!ans.trim() || isNaN(parseInt(ans, 10)) || to === from) return;
+  socket.emit('ui_step_move', { id, target_id: acts[to].id, where: to < from ? 'before' : 'after' });
+  setTimeout(() => { const row = document.querySelector(`#ui-steps .srow[data-id="${id}"]`); if (row) { row.scrollIntoView({ block: 'center', behavior: 'smooth' }); row.classList.add('moved'); setTimeout(() => row.classList.remove('moved'), 1600); } }, 400);
+}
 function uiRowMenu(id, ev) {
   ev.stopPropagation();
   const st = uiLastSteps.find(x => x.id === id);
@@ -2279,6 +2313,7 @@ function uiRowMenu(id, ev) {
     items.push(['🔍', 'Check locator on the live page', `uiQuickCheck(${id})`]);
     items.push(['✎', 'Edit or swap the locator…', `uiToggleEditLoc(${id})`]);
   }
+  items.push(['⇅', 'Move to step number…', `uiMoveTo(${id})`]);
   items.push(['＋', 'Insert a wait / go-to / test-case split after…', `uiToggleInsert(${id})`]);
   const m = document.createElement('div');
   m.className = 'rowmenu'; m.id = 'row-menu'; m.dataset.id = id;
@@ -2292,7 +2327,7 @@ function uiRowMenu(id, ev) {
 
 const UI_VERB = { goto: 'Go to', back: 'Go back', reload: 'Reload', script: 'Run script', click: 'Click', clear: 'Clear', fill: 'Fill', select: 'Select', check: 'Check', uncheck: 'Uncheck',
   press: 'Press', press_page: 'Press', assert_text: 'Assert text', assert_value: 'Assert value', assert_visible: 'Assert visible',
-  assert_attr: 'Assert attr', assert_js: 'Assert script', assert_url: 'Assert URL', capture: 'Capture', compare: 'Compare', assert_datetime: 'Assert date/time', hover: 'Hover', scroll_into_view: 'Scroll to', wait_for: 'Wait for', wait: 'Wait (ms)',
+  assert_attr: 'Assert attr', assert_js: 'Assert script', assert_url: 'Assert URL', capture: 'Capture', compare: 'Compare', assert_datetime: 'Assert date/time', assert_table: 'Assert table', hover: 'Hover', scroll_into_view: 'Scroll to', wait_for: 'Wait for', wait: 'Wait (ms)',
   scroll_page: 'Scroll page', note: 'Note' };
 const UI_DT_MODES = [['time_now', 'Time is now'], ['datetime_now', 'Date & time now'], ['date_today', 'Date is today']];
 const UI_EDITABLE = ['goto', 'fill', 'select', 'press', 'press_page', 'assert_text', 'assert_value', 'assert_attr', 'assert_js', 'assert_url', 'wait_for', 'wait', 'scroll_page'];
@@ -2313,6 +2348,106 @@ const UI_EMPTY = `<div class="empty"><div class="big">🧪</div><h4>No steps yet
       <li>Press <b>⏺ Start recording</b> on the right</li>
       <li>Use the app normally — every click and entry appears here</li></ol>
   <p>…or describe a goal and let <b>🤖 AI</b> do it for you.</p></div>`;
+
+
+// ── Assert table editor ───────────────────────────────────────────────────────────────────────────────────────────────
+const uiTblClosed = {}, uiTblKey = {};
+const UI_TBL_ROWS = [['exact', 'exactly'], ['min', 'at least'], ['max', 'at most'], ['', 'not checked']];
+const UI_TBL_OPS = [['equals', 'equals'], ['contains', 'contains'], ['pattern', 'matches pattern'], ['exists', 'row exists']];
+function uiTblStep(id) { return uiLastSteps.find(x => x.id === id); }
+function uiTblToggle(id) { uiTblClosed[id] = !uiTblClosed[id]; renderUiSteps(uiLastSteps); }
+function uiTblSend(id, field, value) { socket.emit('ui_table_edit', { id, field, value }); }
+function uiTblSummary(s) {
+  const out = [];
+  if (s.rows_mode) out.push(({ exact: 'exactly', min: 'at least', max: 'at most' })[s.rows_mode] + ' ' + s.rows_n + ' row(s)');
+  if (s.cols != null && s.cols !== '') out.push(s.cols + ' column(s)');
+  if ((s.headers || []).length) out.push(s.headers.length + ' header(s)' + (s.ordered ? ' in order' : ''));
+  if ((s.cells || []).length) out.push(s.cells.length + ' cell check(s)');
+  if ((s.refs || []).length) out.push('rows = ' + s.refs.length + ' reference number(s)');
+  return out.join(' · ') || 'nothing checked yet';
+}
+// Which column identifies a row: the first one whose (first words of) text differs in every row, so it still holds when data is added.
+function uiTblKeyCol(s) {
+  const snap = s.snapshot || { headers: [], rows: [] };
+  if (uiTblKey[s.id] != null && uiTblKey[s.id] < snap.headers.length) return uiTblKey[s.id];
+  for (let c = 0; c < snap.headers.length; c++) {
+    if (!snap.headers[c]) continue;
+    const vals = snap.rows.map(r => r[c] || '');
+    if (vals.every(v => v) && new Set(vals).size === vals.length) return c;
+  }
+  return Math.max(0, snap.headers.findIndex(h => h));
+}
+// What to type in the key box for a row: an email or id inside the cell when there is one, otherwise the text itself.
+function uiTblKeyFor(text) {
+  const m = (text || '').match(/[\w.+-]+@[\w-]+\.[\w.-]+/) || (text || '').match(/\bID\s+([0-9a-f]{8,})/i);
+  return m ? (m[1] || m[0]) : (text || '').slice(0, 50).trim();
+}
+// A date or time changes with the data, so a cell that looks like one is checked by its shape instead of its text.
+function uiTblShape(text) {
+  return '^' + text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b/g, '[A-Za-z]+').replace(/\d+/g, '\\d+').replace(/ +/g, '\\s+') + '$';
+}
+function uiTblCellClick(id, r, c) {
+  const s = uiTblStep(id), snap = s.snapshot, kc = uiTblKeyCol(s);
+  const col = snap.headers[c], keyCol = snap.headers[kc];
+  if (!col || !keyCol) return;
+  const key = uiTblKeyFor(snap.rows[r][kc]), text = snap.rows[r][c] || '';
+  const cells = JSON.parse(JSON.stringify(s.cells || []));
+  const at = cells.findIndex(x => x.key_col === keyCol && x.key === key && x.col === col);
+  if (at >= 0) cells.splice(at, 1);
+  else {
+    const dated = /\b\d{1,2}:\d{2}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\b[A-Za-z]{3,9}\.? \d{1,2},? \d{4}\b/.test(text);
+    cells.push(c === kc ? { key_col: keyCol, key, col, op: 'exists', value: '' }
+      : dated ? { key_col: keyCol, key, col, op: 'pattern', value: uiTblShape(text) }
+      : /\d/.test(text) && text.split(/\d/)[0].trim().length >= 3 ? { key_col: keyCol, key, col, op: 'contains', value: text.split(/\d/)[0].trim() }   // "In Review 21 days left": keep the part that is not a changing number
+      : { key_col: keyCol, key, col, op: text.length <= 30 ? 'equals' : 'contains', value: text.length <= 80 ? text : text.slice(0, 80) });
+  }
+  uiTblSend(id, 'cells', cells);
+}
+function uiTblHeaderClick(id, c) {
+  const s = uiTblStep(id), h = s.snapshot.headers[c];
+  if (!h) return;
+  const hs = (s.headers || []).slice(), at = hs.indexOf(h);
+  if (at >= 0) hs.splice(at, 1); else hs.push(h);
+  hs.sort((a, b) => s.snapshot.headers.indexOf(a) - s.snapshot.headers.indexOf(b));
+  uiTblSend(id, 'headers', hs);
+}
+function uiTblHeaderDel(id, i) { const hs = (uiTblStep(id).headers || []).slice(); hs.splice(i, 1); uiTblSend(id, 'headers', hs); }
+function uiTblCell(id, i, field, v) { const s = uiTblStep(id), cells = JSON.parse(JSON.stringify(s.cells || [])); cells[i][field] = v; uiTblSend(id, 'cells', cells); }
+function uiTblCellDel(id, i) { const s = uiTblStep(id), cells = (s.cells || []).slice(); cells.splice(i, 1); uiTblSend(id, 'cells', cells); }
+function uiTblRef(id, i, field, v) { const s = uiTblStep(id), refs = JSON.parse(JSON.stringify(s.refs || [])); if (field === null) refs.splice(i, 1); else refs[i][field] = v; uiTblSend(id, 'refs', refs); }
+function uiTblEditor(s) {
+  const snap = s.snapshot || { headers: [], rows: [], total: 0 }, kc = uiTblKeyCol(s), hs = s.headers || [];
+  const checked = new Set((s.cells || []).map(x => x.key_col + '\u0001' + x.key + '\u0001' + x.col));
+  const keyOf = r => snap.headers[kc] + '\u0001' + uiTblKeyFor(snap.rows[r][kc]) + '\u0001';
+  const grid = snap.headers.length
+    ? `<div class="tbl-grid"><table><thead><tr>` + snap.headers.map((h, c) => `<th class="${hs.includes(h) ? 'on' : ''}${c === kc ? ' keycol' : ''}" onclick="uiTblHeaderClick(${s.id}, ${c})" title="Click: require this column header${c === kc ? ' (rows are identified by this column)' : ''}">${escapeHtml(h || '(blank)')}</th>`).join('') + `</tr></thead><tbody>`
+      + snap.rows.map((row, r) => `<tr>` + row.map((v, c) => `<td class="${checked.has(keyOf(r) + snap.headers[c]) ? 'on' : ''}" onclick="uiTblCellClick(${s.id}, ${r}, ${c})" title="Click: check this value (click again to remove)">${escapeHtml(v.length > 80 ? v.slice(0, 79) + '…' : v)}</td>`).join('') + `</tr>`).join('')
+      + (snap.rows.length ? '' : `<tr><td colspan="${snap.headers.length}" style="cursor:default;color:var(--muted)">(no rows when recorded)</td></tr>`) + `</tbody></table></div>`
+      + `<span class="hint" style="margin:0">As recorded${snap.total > snap.rows.length ? ` (first ${snap.rows.length} of ${snap.total} rows)` : ''}. Click a header to require that column; click a cell to check its value in that row.</span>`
+    : `<span class="hint" style="margin:0">No headers were found in this table, so only the row count can be checked.</span>`;
+  const cellRows = (s.cells || []).map((x, i) => `<div class="trow"><span class="hint" style="margin:0">the row where</span><b>${escapeHtml(x.key_col)}</b><span class="hint" style="margin:0">contains</span>`
+    + `<input type="text" class="ux-input" style="width:190px" value="${escapeHtml(x.key)}" title="Text that identifies ONE row - it fails if several rows contain it" onchange="uiTblCell(${s.id}, ${i}, 'key', this.value)">`
+    + `<span class="hint" style="margin:0">→</span><b>${escapeHtml(x.col)}</b>`
+    + `<select class="ux-input" style="padding:4px 6px" onchange="uiTblCell(${s.id}, ${i}, 'op', this.value)">${UI_TBL_OPS.map(([v, l]) => `<option value="${v}"${v === x.op ? ' selected' : ''}>${l}</option>`).join('')}</select>`
+    + (x.op === 'exists' ? '' : `<input type="text" class="ux-input" style="width:230px" value="${escapeHtml(x.value)}" title="${x.op === 'pattern' ? 'A regular expression: digits and words that change are matched by shape' : 'The text expected in that cell'}" onchange="uiTblCell(${s.id}, ${i}, 'value', this.value)">`)
+    + `<button class="ibtn del" title="Remove this check" onclick="uiTblCellDel(${s.id}, ${i})">${ic('trash')}</button></div>`).join('');
+  const refRows = (s.refs || []).map((x, i) => `<div class="trow"><span class="hint" style="margin:0">the</span>`
+    + `<select class="ux-input" style="padding:4px 6px" onchange="uiTblRef(${s.id}, ${i}, 'pick', this.value)"><option value="first"${x.pick !== 'last' ? ' selected' : ''}>first</option><option value="last"${x.pick === 'last' ? ' selected' : ''}>last</option></select>`
+    + `<span class="hint" style="margin:0">number in</span><span class="pill" title="${escapeHtml(uiDescribeLocator(x.locator))}">“${escapeHtml(x.text || uiDescribeLocator(x.locator))}”</span>`
+    + `<span class="hint" style="margin:0">must be</span><select class="ux-input" style="padding:4px 6px" onchange="uiTblRef(${s.id}, ${i}, 'op', this.value)">${[['==', 'equal to'], ['>=', 'at least'], ['<=', 'at most']].map(([v, l]) => `<option value="${v}"${v === (x.op || '==') ? ' selected' : ''}>${l}</option>`).join('')}</select>`
+    + `<span class="hint" style="margin:0">the number of rows</span><button class="ibtn del" title="Remove this reference" onclick="uiTblRef(${s.id}, ${i}, null)">${ic('trash')}</button></div>`).join('');
+  return `<div class="sr-detail"><div class="tbl-ed">`
+    + `<div class="trow"><b>Rows</b><select class="ux-input" style="padding:4px 6px" onchange="uiTblSend(${s.id}, 'rows_mode', this.value)">${UI_TBL_ROWS.map(([v, l]) => `<option value="${v}"${v === (s.rows_mode || '') ? ' selected' : ''}>${l}</option>`).join('')}</select>`
+    + (s.rows_mode ? `<input type="number" class="ux-input" min="0" style="width:70px;padding:4px 6px" value="${s.rows_n != null ? s.rows_n : 0}" onchange="uiTblSend(${s.id}, 'rows_n', this.value)">` : '')
+    + `<span style="color:var(--muted)">│</span><label class="hint" style="margin:0;display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox"${s.cols != null && s.cols !== '' ? ' checked' : ''} onchange="uiTblSend(${s.id}, 'cols', this.checked ? ${snap.headers.length} : null)">column count</label>`
+    + (s.cols != null && s.cols !== '' ? `<input type="number" class="ux-input" min="0" style="width:64px;padding:4px 6px" value="${s.cols}" onchange="uiTblSend(${s.id}, 'cols', this.value)">` : '')
+    + `<span style="color:var(--muted)">│</span><label class="hint" style="margin:0;display:flex;gap:4px;align-items:center;cursor:pointer" title="Required headers must appear in this order"><input type="checkbox"${s.ordered ? ' checked' : ''} onchange="uiTblSend(${s.id}, 'ordered', this.checked)">headers in this order</label></div>`
+    + (hs.length ? `<div class="trow"><b>Headers</b>${hs.map(h => `<span class="chip">${escapeHtml(h)}<button title="Stop requiring this header" onclick="uiTblHeaderDel(${s.id}, ${hs.indexOf(h)})">×</button></span>`).join('')}</div>` : '')
+    + grid
+    + (cellRows ? `<div style="display:flex;flex-direction:column;gap:6px"><b>Cell checks</b>${cellRows}</div>` : '')
+    + `<div style="display:flex;flex-direction:column;gap:6px"><b>Compare with a number on the page</b>${refRows || `<span class="hint" style="margin:0">None. In Pick mode, click a number (e.g. a card saying “1 In Review”, or “Showing 1–1 of 1”) and choose “Use this number as a table reference”.</span>`}</div>`
+    + `</div></div>`;
+}
 
 function uiStepDetail(s, n, r) {
   const parts = [];
@@ -2349,7 +2484,8 @@ function uiStepDetail(s, n, r) {
       + `<span style="color:var(--muted)">│</span><span><b>📋 New test case</b></span><input type="text" class="ux-input" placeholder="name (optional)" value="${escapeHtml(uiDraft.name)}" oninput="uiDraft.name=this.value" style="width:170px">`
       + `<button class="btn btn-ghost btn-sm" onclick="uiInsertCase(${s.id})" title="Steps after this one start a new test case">Split after this step</button></div>`);
   }
-  if (r && r.ok && r.detail) parts.push(`<div class="sr-note hint">${s.type === 'capture' ? 'Captured: ' : s.type === 'script' ? 'Script: ' : 'Compared: '}${escapeHtml(r.detail)}</div>`);
+  if (s.type === 'assert_table' && !uiTblClosed[s.id]) parts.push(uiTblEditor(s));
+  if (r && r.ok && r.detail) parts.push(`<div class="sr-note hint">${s.type === 'capture' ? 'Captured: ' : s.type === 'script' ? 'Script: ' : s.type === 'assert_table' ? 'Read: ' : 'Compared: '}${escapeHtml(r.detail)}</div>`);
   if (r && !r.ok) {
     parts.push(`<div class="sr-note err">${escapeHtml(r.error)}${r.screenshot ? `<img src="data:image/jpeg;base64,${r.screenshot}" alt="page at the failure">` : ''}</div>`);
     if (/matched 0/.test(r.error || '')) parts.push('<div class="sr-note hint">The locator finds nothing on the page at this point. Use <b>⋯ → Edit or swap the locator</b> to try a better selector (a data-testid, an id or a CSS path), then <b>Check</b> it.</div>');
@@ -2394,6 +2530,10 @@ function renderUiSteps(steps) {
       const sel = (field, cur) => `<select class="ux-input" onchange="uiUpdateStep(${s.id}, this.value, '${field}')">${names.map(v => `<option${v === cur ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('')}</select>`;
       val = `<span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${sel('left', s.left)}<select class="ux-input" onchange="uiUpdateStep(${s.id}, this.value, 'op')">`
         + UI_CMP_OPS.map(([v, l]) => `<option value="${v}"${v === (s.op || 'equals') ? ' selected' : ''}>${l}</option>`).join('') + `</select>${sel('right', s.right)}</span>`;
+    }
+    else if (s.type === 'assert_table') {
+      val = `<span style="display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap"><span class="hint" style="margin:0">${escapeHtml(uiTblSummary(s))}</span>`
+        + `<button class="btn btn-ghost btn-sm" onclick="uiTblToggle(${s.id})">${uiTblClosed[s.id] ? 'Edit checks' : 'Hide'}</button></span>`;
     }
     else if (s.type === 'assert_datetime') {
       const pat = s.locator && s.locator.kind === 'pattern'
@@ -2457,6 +2597,20 @@ function renderUiSteps(steps) {
     try { e.dataTransfer.setData('text/plain', String(dragId)); } catch (err) {}
     setTimeout(() => row.classList.add('dragging'), 0);
   });
+  // The browser does not scroll a page for us while a row is dragged inside it, so a far-away drop was impossible:
+  // near the top/bottom edge of whatever scrolls, scroll it ourselves (dragover keeps firing while the pointer is held still).
+  const scroller = () => { for (let n = box; n && n !== document.body; n = n.parentElement) { const o = getComputedStyle(n).overflowY; if (/(auto|scroll)/.test(o) && n.scrollHeight > n.clientHeight) return n; } return document.scrollingElement; };
+  let lastY = null, timer = null;
+  const autoScroll = () => {
+    if (dragId == null || lastY == null) return;
+    const sc = scroller(), isDoc = sc === document.scrollingElement || sc === document.documentElement;
+    const top = isDoc ? 0 : sc.getBoundingClientRect().top, bottom = isDoc ? innerHeight : sc.getBoundingClientRect().bottom, zone = 90;
+    const dy = lastY < top + zone ? -Math.ceil((top + zone - lastY) / 3) : lastY > bottom - zone ? Math.ceil((lastY - (bottom - zone)) / 3) : 0;
+    if (dy) sc.scrollTop += Math.max(-20, Math.min(20, dy));
+  };
+  const stopAuto = () => { clearInterval(timer); timer = null; lastY = null; };
+  document.addEventListener('dragover', (e) => { if (dragId != null) { lastY = e.clientY; if (!timer) timer = setInterval(autoScroll, 30); } });
+  document.addEventListener('dragend', stopAuto); document.addEventListener('drop', stopAuto);
   box.addEventListener('dragover', (e) => {
     if (dragId == null) return;
     const t = targetOf(e);
@@ -2924,10 +3078,24 @@ function exploreLog(msg, kind = 'info') {
   box.scrollTop = box.scrollHeight;
 }
 
+function exploreSourceChanged() {
+  const jira = document.getElementById('explore-source').value === 'jira';
+  document.getElementById('explore-jira-row').style.display = jira ? '' : 'none';
+  document.getElementById('explore-goal').placeholder = jira
+    ? 'Optional extra notes, e.g. the app URL, which login to use, or what to skip'
+    : 'Describe what to test, e.g. Log in with qa@example.com / password and check the dashboard loads';
+  const broaden = document.getElementById('explore-broaden');
+  broaden.disabled = jira;
+  document.getElementById('explore-max-cases').disabled = jira ? false : !broaden.checked;
+}
+
 function startExplore() {
   uiFoldOpen('ai');
+  const useJira = document.getElementById('explore-source').value === 'jira';
+  const jiraKeys = document.getElementById('explore-jira-keys').value.trim();
   const goal = document.getElementById('explore-goal').value.trim();
-  if (!goal) { toast('Describe a goal first', 'err'); return; }
+  if (useJira && !jiraKeys) { toast('Enter a Jira ticket key first', 'err'); return; }
+  if (!useJira && !goal) { toast('Describe a goal first', 'err'); return; }
   if (!browserOpen) { toast('Launch the browser first (▶ Launch in the bar above)', 'err'); return; }
   const providerFields = getProviderFields();
   if (!providerFields) return;
@@ -2943,7 +3111,7 @@ function startExplore() {
   document.getElementById('btn-explore-stop').style.display = 'inline-flex';
   document.getElementById('explore-status-badge').textContent = 'planning...';
 
-  socket.emit('explore_start', { ...providerFields, goal, portal, max_steps: maxSteps, max_cases: maxCases,
+  socket.emit('explore_start', { ...providerFields, goal, use_jira: useJira, jira_keys: jiraKeys, portal, max_steps: maxSteps, max_cases: maxCases,
                                  record_steps: document.getElementById('explore-record-steps').checked,
                                  screenshots: document.getElementById('explore-screenshots').checked,
                                  broaden: document.getElementById('explore-broaden').checked });
@@ -2963,6 +3131,13 @@ socket.on('explore_log', (d) => exploreLog(d.msg, d.kind));
 
 socket.on('explore_done', (d) => {
   currentExploreRunId = null;
+  if (!d.run_id) {   // failed before a run began (e.g. Jira unreachable) - nothing to report or publish
+    document.getElementById('btn-explore-start').style.display = 'inline-flex';
+    document.getElementById('btn-explore-stop').style.display = 'none';
+    document.getElementById('explore-status-badge').textContent = 'idle';
+    exploreLog(d.feedback || d.summary, 'err');
+    return;
+  }
   lastExploreRunId = d.run_id;
   document.getElementById('btn-explore-start').style.display = 'inline-flex';
   document.getElementById('btn-explore-stop').style.display = 'none';
