@@ -1099,6 +1099,25 @@
   .test-group:first-child { border-top: none; }
   .test-group-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .test-group-desc { font-size: 13.5px; font-weight: 600; }
+  .fr-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 12px 0; }
+  .fr-tile { border: 1px solid var(--ink-line); border-radius: 10px; padding: 10px 12px; }
+  .fr-tile b { display: block; font-size: 22px; line-height: 1.1; overflow-wrap: anywhere; }
+  .fr-tile span { font-size: 11px; color: var(--paper-dim); text-transform: uppercase; letter-spacing: .06em; }
+  .fr-tile.pass b { color: var(--circuit); } .fr-tile.fail b { color: var(--alert); }
+  .fr-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+  .fr-filters .lbl { font-size: 11px; color: var(--paper-dim); text-transform: uppercase; letter-spacing: .06em; margin-right: 2px; }
+  .fr-chip { background: transparent; border: 1px solid var(--ink-line); color: var(--paper); border-radius: 20px; padding: 3px 11px; font-size: 12px; cursor: pointer; }
+  .fr-chip.on { border-color: var(--circuit); background: rgba(76,230,170,0.14); }
+  .fr-search { height: 28px; font-size: 12px; width: 200px; }
+  .fr-env { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .fr-env-h { font-size: 11px; color: var(--paper-dim); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .fr-env-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-top: 1px solid var(--ink-line); font-size: 12.5px; }
+  .fr-env-row span { color: var(--paper-dim); } .fr-env-row b { font-weight: 600; text-align: right; word-break: break-word; }
+  @media (max-width: 700px) { .fr-env { grid-template-columns: 1fr; } }
+  .fr-flow { border-top: 1px solid var(--ink-line); padding: 10px 0; }
+  .fr-flow > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; }
+  .fr-flow > summary::-webkit-details-marker { display: none; }
+  .fr-flow .fr-sub { font-size: 11.5px; font-weight: 400; color: var(--paper-dim); }
   .rep-btn { background: transparent; border: 1px solid var(--ink-line); color: var(--paper); border-radius: 6px; padding: 4px 10px; font-size: 11.5px; cursor: pointer; }
   .rep-btn:hover { border-color: var(--signal); }
   .rep-case > summary::-webkit-details-marker { display: none; }
@@ -1886,6 +1905,7 @@
       </div>
       <div id="savedFlowsFolderBar" class="flows-folder-bar"></div>
       <div id="savedFlowsMoveBar" class="flows-move-bar"></div>
+      <div id="folderRunPanel"></div>
       <div id="savedFlowsList" class="flows-grid">Loading…</div>
 
       <div class="card" id="savedFlowDetailCard" style="margin-top:18px;">
@@ -3363,6 +3383,11 @@
     if (heroSynced) heroSynced.textContent = lastBridgeSyncAt ? ('Last synced ' + timeAgo(lastBridgeSyncAt)) : 'Not synced yet';
   }
 
+  // Each of these is fetched once at page load and swallows failures; if the
+  // bridge wasn't answering yet they'd stay empty forever. checkBridge (every
+  // 4s) retries whichever hasn't loaded once the bridge is reachable.
+  let flowModulesLoaded = false, savedFlowsLoaded = false, preconditionsLoaded = false;
+
   async function checkBridge() {
     const dot = document.getElementById('bridgeDot');
     const text = document.getElementById('bridgeStatusText');
@@ -3380,6 +3405,9 @@
         startBtn.style.display = 'none';
         stopBtn.style.display = 'inline-block';
         mirrorBridgeStatus(true);
+        if (!flowModulesLoaded) loadFlowModules();
+        if (!savedFlowsLoaded) loadSavedFlows();
+        if (!preconditionsLoaded) loadPreconditions();
         return true;
       }
     } catch (e) {}
@@ -4738,6 +4766,7 @@ ${clone.innerHTML}
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed to load folders');
       flowModules = data.modules || [];
+      flowModulesLoaded = true;
     } catch (e) {
       // Bridge not reachable yet - same posture as loadSavedFlows; keep what we had.
     }
@@ -4768,8 +4797,425 @@ ${clone.innerHTML}
          <button type="button" class="copy" data-folder-create style="padding:5px 12px; font-size:12px;">Create${n ? ` + move ${n}` : ''}</button>
          <button type="button" class="copy" data-folder-cancel style="padding:5px 12px; font-size:12px; background:var(--ink-line); color:var(--paper);">Cancel</button>`
       : `<button type="button" class="folder-pill folder-pill-new" data-folder-new>+ New folder</button>`;
-    el.innerHTML = pills.join('') + create;
+    const runnable = (savedFlowsModuleFilter === 'all') ? [] : folderFlowsInView();
+    const runBtn = runnable.length
+      ? `<button type="button" class="copy" data-folder-run ${folderRun && folderRun.running ? 'disabled' : ''} style="padding:5px 14px; font-size:12px;" title="Run every flow in this folder one after another and get one combined report">▶ ${folderRun && folderRun.running ? 'Running folder…' : `Run folder (${runnable.length} flow${runnable.length === 1 ? '' : 's'})`}</button>`
+      : '';
+    el.innerHTML = pills.join('') + create + runBtn;
     if (folderCreateOpen) { const inp = document.getElementById('folderNewInput'); if (inp) inp.focus(); }
+  }
+
+
+  // ---------- Run a whole folder + combined report ----------
+  // Runs every flow in the selected folder one after another (they share one
+  // device, so never in parallel) through the same /api/flows/<slug>/run a
+  // single run uses, with its default settings, then merges the per-flow
+  // reports into one summary with cumulative test/pass/fail counts and
+  // filters. A flow that fails does not stop the folder.
+  let folderRun = null;   // {folder, items:[{slug,name,status,note,data}], running, cancel, startedAt}
+  const folderRunSleep = ms => new Promise(r => setTimeout(r, ms));
+
+  function folderFlowsInView() {
+    let flows = savedFlowsPlatformFilter === 'all' ? lastLoadedFlows : lastLoadedFlows.filter(f => f.platform === savedFlowsPlatformFilter);
+    if (savedFlowsModuleFilter === '__none__') flows = flows.filter(f => !f.module);
+    else if (savedFlowsModuleFilter !== 'all') flows = flows.filter(f => f.module === savedFlowsModuleFilter);
+    return flows;
+  }
+
+  async function runFolderFlow(item) {
+    const slug = item.slug;
+    flowRunState[slug] = {logs: ['Starting replay (folder run)…'], status: 'running', reportPath: null};
+    updateFlowBadge(slug, '', '');
+    let runId;
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/flows/' + encodeURIComponent(slug) + '/run', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({}),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'failed to start replay');
+      runId = d.run_id;
+    } catch (err) {
+      item.status = 'error'; item.note = 'Could not start: ' + err.message;
+      flowRunState[slug].status = 'error';
+      updateFlowBadge(slug, 'status-fail', 'ERROR');
+      return;
+    }
+    for (;;) {
+      await folderRunSleep(900);
+      let d;
+      try {
+        const res = await fetch(BRIDGE_URL + '/api/logs/' + runId);
+        d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'unknown run');
+      } catch (err) {
+        item.status = 'error'; item.note = 'Lost track of this run: ' + err.message;
+        flowRunState[slug].status = 'error';
+        updateFlowBadge(slug, 'status-fail', 'ERROR');
+        return;
+      }
+      flowRunState[slug].logs = d.logs;
+      item.lastLog = (d.logs || []).slice(-1)[0] || '';
+      renderFolderRunPanel();
+      if (d.status === 'done' || d.status === 'error') {
+        const r = d.result || {};
+        item.status = r.status || 'error';
+        item.note = r.note || '';
+        flowRunState[slug].status = d.status;
+        updateFlowBadge(slug, item.status === 'pass' ? 'status-pass' : 'status-fail', item.status === 'pass' ? 'PASS' : (item.status || 'FAIL').toUpperCase());
+        if (r.report_path) {
+          flowRunState[slug].reportPath = r.report_path;
+          flowRunState[slug].csvReportPath = r.csv_report_path;
+          flowRunState[slug].pdfReportPath = r.pdf_report_path;
+          const fname = r.report_path.split('/').pop().split('\\').pop();
+          flowReportFilesBySlug[slug] = {
+            csv: r.csv_report_path ? r.csv_report_path.split('/').pop().split('\\').pop() : null,
+            pdf: r.pdf_report_path ? r.pdf_report_path.split('/').pop().split('\\').pop() : null,
+          };
+          try {
+            const rr = await fetch(BRIDGE_URL + '/api/reports/' + encodeURIComponent(fname));
+            if (rr.ok) { item.data = await rr.json(); flowReportDataBySlug[slug] = item.data; }
+          } catch (e) { /* keep the status; just no detail */ }
+        }
+        return;
+      }
+    }
+  }
+
+  async function runFolder() {
+    if (folderRun && folderRun.running) return;
+    const flows = folderFlowsInView();
+    if (!flows.length) return;
+    const label = savedFlowsModuleFilter === '__none__' ? 'No folder' : savedFlowsModuleFilter;
+    if (!confirm(`Run all ${flows.length} flow(s) in "${label}" one after another on the connected device?`)) return;
+    folderRun = {folder: label, running: true, cancel: false, startedAt: new Date(),
+      items: flows.map(f => ({slug: f.slug, name: f.name || f.slug, status: 'pending', note: '', data: null}))};
+    renderFolderBar();
+    renderFolderRunPanel();
+    for (const item of folderRun.items) {
+      if (folderRun.cancel) { item.status = 'skipped'; item.note = 'Not run (stopped)'; continue; }
+      item.status = 'running';
+      renderFolderRunPanel();
+      await runFolderFlow(item);
+    }
+    folderRun.running = false;
+    folderRun.finishedAt = new Date();
+    renderFolderBar();
+    renderFolderRunPanel();
+    loadSavedFlows && loadSavedFlows();
+  }
+
+  function folderRunTotals(run) {
+    const t = {flows: run.items.length, flowsPass: 0, flowsFail: 0, tests: 0, pass: 0, fail: 0, skipped: 0, steps: 0};
+    run.items.forEach(it => {
+      if (it.status === 'pass') t.flowsPass++; else if (it.status !== 'pending' && it.status !== 'running' && it.status !== 'skipped') t.flowsFail++;
+      const d = it.data;
+      if (!d) return;
+      t.steps += d.step_count || (d.steps || []).length;
+      (d.tests || []).forEach(x => {
+        t.tests++;
+        if (x.status === 'pass') t.pass++; else if (x.status === 'skipped') t.skipped++; else t.fail++;
+      });
+    });
+    return t;
+  }
+
+  // Filtering must also work in the downloaded copy, so these two are plain
+  // functions on window whose source is embedded into the exported file.
+  window.repFilterApply = function (root) {
+    const st = root.dataset.status || 'all', fl = root.dataset.flow || 'all';
+    const qEl = root.querySelector('.fr-search');
+    const q = qEl ? qEl.value.trim().toLowerCase() : '';
+    let shown = 0, total = 0;
+    root.querySelectorAll('.fr-flow').forEach(flow => {
+      const cases = flow.querySelectorAll('.rep-case');
+      let vis = 0;
+      cases.forEach(c => {
+        const cs = c.dataset.status || '';
+        const okSt = st === 'all' || (st === 'pass' && cs === 'pass') || (st === 'skipped' && cs === 'skipped') || (st === 'fail' && cs !== 'pass' && cs !== 'skipped');
+        const ok = okSt && (!q || c.textContent.toLowerCase().indexOf(q) > -1);
+        c.style.display = ok ? '' : 'none';
+        total++;
+        if (ok) { vis++; shown++; }
+      });
+      const noCases = cases.length === 0;
+      const flowOk = (fl === 'all' || flow.dataset.flow === fl) && (vis > 0 || (noCases && st === 'all' && !q));
+      flow.style.display = flowOk ? '' : 'none';
+      const v = flow.querySelector('.fr-vis');
+      if (v) v.textContent = vis + ' of ' + cases.length + ' case(s) shown';
+    });
+    const sh = root.querySelector('.fr-showing');
+    if (sh) sh.textContent = 'Showing ' + shown + ' of ' + total + ' test case(s)';
+  };
+  window.repFilterSet = function (btn) {
+    const root = btn.closest('.fr-root');
+    const k = btn.getAttribute('data-k');
+    root.dataset[k] = btn.getAttribute('data-v');
+    root.querySelectorAll('.fr-chip[data-k="' + k + '"]').forEach(function (b) { b.classList.toggle('on', b === btn); });
+    window.repFilterApply(root);
+  };
+
+  // Distinct values of a field across the flows' reports, joined for display.
+  function folderEnvValues(run, group, key) {
+    const out = [];
+    run.items.forEach(it => {
+      const v = it.data && it.data[group] && it.data[group][key];
+      if (v && !out.includes(v)) out.push(v);
+    });
+    return out;
+  }
+  function folderPlatforms(run) {
+    const out = folderEnvValues(run, 'environment', 'platform');
+    if (!out.length) run.items.forEach(it => {
+      const f = (lastLoadedFlows || []).find(x => x.slug === it.slug);
+      if (f && f.platform && !out.includes(f.platform)) out.push(f.platform);
+    });
+    return out;
+  }
+  // "Environment" + "App tested against" card, from the details the bridge
+  // stores in each report (device, OS, Appium, app id/version). A field with
+  // several different values across flows shows all of them.
+  function envCardHtml(run) {
+    const row = (label, vals) => vals && vals.length ? `<div class="fr-env-row"><span>${label}</span><b>${vals.map(escapeHtml).join(', ')}</b></div>` : '';
+    const env = k => folderEnvValues(run, 'environment', k), app = k => folderEnvValues(run, 'app', k);
+    const appVer = app('version').map(v => v + (app('build').length ? ` (build ${app('build').join(', ')})` : ''));
+    const envHtml = row('Device tested on', folderPlatforms(run)) + row('Environment', env('environment')) + row('Device', env('device')) +
+      row('OS version', env('os_version').map(v => (folderPlatforms(run)[0] || '') + ' ' + v)) + row('Device ID', env('udid')) +
+      row('Automation', env('automation').map(a => a + (env('appium').length ? ' · Appium ' + env('appium').join(', ') : ''))) + row('Run from', env('host'));
+    const appHtml = row('App', app('name')) + row('Package / bundle', app('id')) + row('Version', appVer);
+    if (!envHtml && !appHtml) return '';
+    return `<div class="card"><div class="fr-env">
+      <div><div class="fr-env-h">Environment</div>${envHtml || '<div class="hint">Not recorded for these runs.</div>'}</div>
+      <div><div class="fr-env-h">App tested against</div>${appHtml || '<div class="hint">Not recorded for these runs.</div>'}</div>
+    </div></div>`;
+  }
+
+  function folderReportHtml(run) {
+    const t = folderRunTotals(run);
+    const when = (run.finishedAt || run.startedAt).toLocaleString();
+    const tile = (n, label, cls) => `<div class="fr-tile ${cls || ''}"><b>${n}</b><span>${label}</span></div>`;
+    const chip = (k, v, label, on) => `<button type="button" class="fr-chip ${on ? 'on' : ''}" data-k="${k}" data-v="${escapeHtml(v)}" onclick="repFilterSet(this)">${label}</button>`;
+    const flowChips = run.items.map(it => chip('flow', it.slug, `${escapeHtml(it.name)} <b style="opacity:.6">${(it.data && it.data.tests || []).length}</b>`, false)).join('');
+    let h = `<div class="fr-root" data-status="all" data-flow="all">
+      <div class="card">
+        <div class="report-meta">
+          <div class="report-goal"><b>Folder:</b> ${escapeHtml(run.folder)}<div style="font-size:12px; color:var(--paper-dim); margin-top:2px;">${t.flows} flow(s) · ${escapeHtml(when)}</div></div>
+          <span class="status-badge ${t.fail || t.flowsFail ? 'status-fail' : 'status-pass'}">${t.fail || t.flowsFail ? 'FAIL' : 'PASS'}</span>
+        </div>
+        <div class="fr-tiles">
+          ${tile(t.tests, 'Test cases')}${tile(t.pass, 'Passed', 'pass')}${tile(t.fail, 'Failed', t.fail ? 'fail' : '')}${tile(t.skipped, 'Skipped')}
+          ${tile(escapeHtml(folderPlatforms(run).join(' + ') || '—'), 'Device tested on')}${tile(t.flowsPass + ' / ' + t.flows, 'Flows passed', t.flowsFail ? 'fail' : 'pass')}${tile(t.steps, 'Steps')}
+        </div>
+      </div>
+      ${envCardHtml(run)}
+      <div class="card">
+        <div class="fr-filters"><span class="lbl">Status</span>${chip('status', 'all', 'All', true)}${chip('status', 'fail', 'Failed', false)}${chip('status', 'pass', 'Passed', false)}${chip('status', 'skipped', 'Skipped', false)}
+          <input class="fr-search" type="search" placeholder="Search cases…" oninput="repFilterApply(this.closest('.fr-root'))" style="margin-left:auto;"></div>
+        <div class="fr-filters"><span class="lbl">Flow</span>${chip('flow', 'all', 'All flows', true)}${flowChips}</div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px;">
+          <div class="fr-showing" style="font-size:12px; color:var(--paper-dim);"></div>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="rep-btn" onclick="this.closest('.fr-root').querySelectorAll('.rep-case,.fr-flow').forEach(function(d){d.open=true})">Unwrap all</button>
+            <button type="button" class="rep-btn" onclick="this.closest('.fr-root').querySelectorAll('.rep-case,.fr-flow').forEach(function(d){d.open=false})">Wrap all</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">`;
+    run.items.forEach(it => {
+      const d = it.data;
+      const tests = d ? (d.tests || []) : [];
+      const ok = it.status === 'pass';
+      const sub = d ? `${tests.length} case(s) · ${(d.step_count || (d.steps || []).length)} step(s)` : escapeHtml(it.note || it.status);
+      h += `<details class="fr-flow" data-flow="${escapeHtml(it.slug)}" ${ok ? '' : 'open'}>
+        <summary><span><span class="rep-caret">▸</span> ${escapeHtml(it.name)}<div class="fr-sub">${sub} <span class="fr-vis"></span></div></span>
+          <span class="status-badge ${statusClass(it.status === 'pass' ? 'pass' : it.status === 'skipped' || it.status === 'pending' ? 'skipped' : 'fail')}">${escapeHtml((it.status || '').toUpperCase())}</span></summary>
+        ${it.note && !ok ? `<div class="flag-box"><b>${escapeHtml(it.status)}:</b> ${escapeHtml(it.note)}</div>` : ''}
+        ${d ? reportBodyHtml(d, {noToolbar: true}) : ''}
+      </details>`;
+    });
+    h += '</div></div>';
+    return h;
+  }
+
+  function renderFolderRunPanel() {
+    const el = document.getElementById('folderRunPanel');
+    if (!el) return;
+    if (!folderRun) { el.innerHTML = ''; return; }
+    const run = folderRun;
+    if (run.running) {
+      const done = run.items.filter(i => !['pending', 'running'].includes(i.status)).length;
+      const icon = st => st === 'pass' ? '✓' : st === 'running' ? '…' : st === 'pending' ? '·' : st === 'skipped' ? '–' : '✗';
+      el.innerHTML = `<div class="card" style="margin:10px 0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <div><b>Running folder "${escapeHtml(run.folder)}"</b> <span class="hint">${done} of ${run.items.length} flow(s) finished</span></div>
+          <button type="button" class="rep-btn" data-folder-stop>${run.cancel ? 'Stopping after this flow…' : 'Stop after current flow'}</button>
+        </div>
+        <div style="margin-top:8px; font-size:12.5px; font-family:var(--mono);">${run.items.map(i => `<div style="opacity:${i.status === 'pending' ? .5 : 1}">${icon(i.status)} ${escapeHtml(i.name)} <span style="color:var(--paper-dim);">${escapeHtml(i.status === 'running' ? (i.lastLog || '') : i.status)}</span></div>`).join('')}</div>
+      </div>`;
+      const stop = el.querySelector('[data-folder-stop]');
+      if (stop) stop.onclick = () => { run.cancel = true; renderFolderRunPanel(); };
+      return;
+    }
+    el.innerHTML = `<div style="margin:10px 0;">
+      <div style="display:flex; gap:8px; justify-content:flex-end; align-items:center; flex-wrap:wrap; margin-bottom:6px;">
+        <label style="display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--paper-dim); margin-right:auto;"><input type="checkbox" class="fr-shots" checked style="width:auto;"> Include screenshots (larger file)</label>
+        <button type="button" class="copy" data-folder-download style="padding:5px 14px; font-size:12px;">Download HTML report</button>
+        <button type="button" class="copy" data-folder-publish style="padding:5px 14px; font-size:12px;">Publish</button>
+        <button type="button" class="copy" data-folder-slack style="padding:5px 14px; font-size:12px;">Post to Slack</button>
+        <button type="button" class="rep-btn" data-folder-close>Close</button>
+      </div>
+      <div class="hint fr-status" style="font-size:11.5px; text-align:right; margin-bottom:6px;">${run.publishedUrl ? `Published: <a href="${escapeHtml(run.publishedUrl)}" target="_blank" rel="noopener">${escapeHtml(run.publishedUrl)}</a>` : ''}</div>
+      <div class="fr-slack" style="display:none;"></div>
+      ${folderReportHtml(run)}</div>`;
+    const root = el.querySelector('.fr-root');
+    window.repFilterApply(root);
+    const statusEl = el.querySelector('.fr-status');
+    const shots = () => el.querySelector('.fr-shots').checked;
+    const setStatus = (m, bad) => { statusEl.innerHTML = `<span style="color:var(${bad ? '--alert' : '--paper-dim'});">${escapeHtml(m)}</span>`; };
+    const wire = (sel, label, fn) => {
+      const b = el.querySelector(sel);
+      b.onclick = async () => {
+        const all = el.querySelectorAll('[data-folder-download],[data-folder-publish],[data-folder-slack]');
+        all.forEach(x => x.disabled = true); b.textContent = 'Working…';
+        try { await fn(); } catch (e) { setStatus(e.message, true); }
+        finally { all.forEach(x => x.disabled = false); b.textContent = label; }
+      };
+    };
+    el.querySelector('[data-folder-close]').onclick = () => { folderRun = null; renderFolderRunPanel(); };
+    wire('[data-folder-download]', 'Download HTML report', () => downloadFolderReport(root, shots()));
+    wire('[data-folder-publish]', 'Publish', async () => {
+      setStatus('Building and publishing…');
+      const r = await publishFolderReport(root, shots());
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Published (${r.mb} MB): <a href="${escapeHtml(r.url)}" target="_blank" rel="noopener">${escapeHtml(r.url)}</a></span>`;
+    });
+    // Nothing goes to Slack from this button: it only opens a preview, and
+    // "Send to Slack" inside the preview is the one thing that posts.
+    const slackBox = el.querySelector('.fr-slack');
+    el.querySelector('[data-folder-slack]').onclick = () => {
+      slackBox.style.display = 'block';
+      slackBox.innerHTML = `<div class="card" style="margin:0 0 10px;">
+        <div style="font-size:12px; color:var(--paper-dim); margin-bottom:6px;">Message that will be posted to Slack - edit it if you like. Nothing is sent until you press Send.</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <textarea class="fr-slack-text" rows="11" style="font-family:var(--mono); font-size:12px; width:100%;"></textarea>
+          <div class="fr-slack-view" style="background:#fff; color:#1d1c1d; border-radius:8px; padding:10px 12px; font-size:13.5px; line-height:1.45; font-family:Lato,'Segoe UI',sans-serif; overflow:auto; max-height:260px;"></div>
+        </div>
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
+          <button type="button" class="rep-btn" data-slack-cancel>Cancel</button>
+          <button type="button" class="copy" data-slack-send style="padding:5px 14px; font-size:12px;">Send to Slack</button>
+        </div></div>`;
+      const ta = slackBox.querySelector('.fr-slack-text'), view = slackBox.querySelector('.fr-slack-view');
+      ta.value = folderSlackText(run, run.publishedUrl || FOLDER_LINK_PLACEHOLDER);
+      const paint = () => { view.innerHTML = slackPreviewHtml(ta.value); };
+      ta.addEventListener('input', paint); paint();
+      slackBox.querySelector('[data-slack-cancel]').onclick = () => { slackBox.style.display = 'none'; slackBox.innerHTML = ''; };
+      const send = slackBox.querySelector('[data-slack-send]');
+      send.onclick = async () => {
+        send.disabled = true; send.textContent = 'Sending…';
+        try {
+          const url = await sendFolderSlack(root, shots(), ta.value, m => setStatus(m));
+          statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Posted to Slack${url ? ` - link: <a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(url)}</a>` : ''}</span>`;
+          slackBox.style.display = 'none'; slackBox.innerHTML = '';
+        } catch (e) { setStatus(e.message, true); send.disabled = false; send.textContent = 'Send to Slack'; }
+      };
+    };
+  }
+
+  async function buildFolderReportDoc(rootEl, withShots) {
+    const clone = rootEl.cloneNode(true);
+    if (withShots) await lsInlineScreenshotsForExport(clone);
+    else clone.querySelectorAll('img').forEach(img => { const a = img.closest('a'); (a || img).remove(); });
+    // cloneNode keeps open/closed state only as attributes - sync them.
+    const src = rootEl.querySelectorAll('details'), dst = clone.querySelectorAll('details');
+    src.forEach((d, i) => { if (d.open) dst[i].setAttribute('open', ''); else dst[i].removeAttribute('open'); });
+    const styles = Array.from(document.querySelectorAll('style')).map(x => x.outerHTML).join('\n');
+    const title = 'Folder run - ' + (folderRun ? folderRun.folder : 'report');
+    const script = 'window.repFilterApply=' + window.repFilterApply.toString() + ';window.repFilterSet=' + window.repFilterSet.toString() +
+      ';document.addEventListener("DOMContentLoaded",function(){var r=document.querySelector(".fr-root");if(r)repFilterApply(r)});';
+    const doc = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${escapeHtmlForCode(title)}</title>
+${styles}
+</head>
+<body>
+<div style="max-width:960px; margin:0 auto;">
+${clone.outerHTML}
+</div>
+<script>${script}<\/script>
+</body>
+</html>`;
+    return {doc, title};
+  }
+
+  const folderFileName = (title) => (title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'folder_report');
+
+  async function downloadFolderReport(rootEl, withShots) {
+    const {doc, title} = await buildFolderReportDoc(rootEl, withShots);
+    const blob = new Blob([doc], {type: 'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = folderFileName(title) + '.html';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // Same GitHub-Pages publish route a single flow's report uses. The hosted
+  // URL is remembered on the run so "Post to Slack" can reuse it.
+  async function publishFolderReport(rootEl, withShots) {
+    const {doc, title} = await buildFolderReportDoc(rootEl, withShots);
+    const res = await fetch(BRIDGE_URL + '/api/publish-flow-report', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({filename: folderFileName(title) + '_' + Date.now() + '.html', html: doc}),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'publish failed');
+    folderRun.publishedUrl = result.url;
+    return {url: result.url, mb: (doc.length / 1048576).toFixed(1)};
+  }
+
+  function folderSlackText(run, url) {
+    const t = folderRunTotals(run);
+    // Counts and the report link only - which cases failed is in the report.
+    const lines = [
+      `*-Mobile automation report: ${run.folder}-*`,
+      `Device tested on: ${folderPlatforms(run).join(' + ') || 'n/a'}`,
+      ...(folderEnvValues(run, 'app', 'version').length ? [`App: ${(folderEnvValues(run, 'app', 'name')[0] || 'app')} ${folderEnvValues(run, 'app', 'version').join(', ')}`] : []),
+      `Total Tests: ${t.tests}`,
+      `:white_check_mark: Passed: ${t.pass}`,
+      `:x: Failed: ${t.fail}`,
+    ];
+    if (t.skipped) lines.push(`Skipped: ${t.skipped}`);
+    lines.push(`Test Report: ${url}`);
+    return lines.join('\n');
+  }
+
+  const FOLDER_LINK_PLACEHOLDER = '<report link - added when you send>';
+
+  // Sends the (possibly edited) text. If it still holds the link placeholder
+  // the report is published first so the real link goes in.
+  async function sendFolderSlack(rootEl, withShots, text, setStatus) {
+    let url = folderRun.publishedUrl || '';
+    if (text.includes(FOLDER_LINK_PLACEHOLDER)) {
+      if (!url) { setStatus('Publishing the report first…'); url = (await publishFolderReport(rootEl, withShots)).url; }
+      text = text.split(FOLDER_LINK_PLACEHOLDER).join(url);
+    }
+    setStatus('Posting to Slack…');
+    const res = await fetch(BRIDGE_URL + '/api/post-slack-summary', {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({text}),
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Slack post failed');
+    return url;
+  }
+
+  // Rough look of the message in Slack (bold, emoji, bullets, links).
+  function slackPreviewHtml(text) {
+    return escapeHtml(text)
+      .replace(/\*([^*\n]+)\*/g, '<b>$1</b>')
+      .replace(/:white_check_mark:/g, '✅').replace(/:x:/g, '❌')
+      .replace(/(https?:\/\/[^\s<]+)/g, '<span style="color:#1d9bd1;">$1</span>')
+      .replace(/\n/g, '<br>');
   }
 
   function renderMoveBar() {
@@ -4841,6 +5287,7 @@ ${clone.innerHTML}
       } catch (err) { alert('Could not delete folder: ' + err.message); }
       return;
     }
+    if (e.target.closest('[data-folder-run]')) { runFolder(); return; }
     const pillBtn = e.target.closest('[data-folder]');
     if (pillBtn) {
       savedFlowsModuleFilter = pillBtn.dataset.folder;
@@ -5100,13 +5547,14 @@ ${clone.innerHTML}
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed to load saved flows');
       renderFlowsSidebar(data.flows || []);
+      savedFlowsLoaded = true;
       if (selectedFlowSlug) renderFlowDetail(selectedFlowSlug);
     } catch (e) {
       listEl.innerHTML = `<div class="empty-hint">Couldn't load saved flows: ${escapeHtml(e.message)} (is the bridge server running?)</div>`;
     }
   }
   loadSavedFlows();
-  document.getElementById('refreshFlowsBtn').addEventListener('click', loadSavedFlows);
+  document.getElementById('refreshFlowsBtn').addEventListener('click', () => { loadFlowModules(); loadPreconditions(); loadSavedFlows(); });
 
   // -------- Shared Flows: publish/import via the team's shared repo --------
   // A flow published here becomes a plain .json file in that repo's
@@ -6585,6 +7033,7 @@ ${clone.innerHTML}
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'failed to load preconditions');
       lastLoadedPreconditions = data.preconditions || [];
+      preconditionsLoaded = true;
       renderPreconditionOptions();
       refreshFlowPreconditionSelects();
     } catch (e) {
@@ -7042,21 +7491,37 @@ ${clone.innerHTML}
       kinds.push({key: 'number', label: m[2] ? `Any number + "${m[2]}"` : 'Any number', rx: '^-?[0-9]+([.,][0-9]+)?' + unit + '$'});
     } else if (/\d/.test(text) && !/["'\\]/.test(text)) {
       // Fixed words around a changing number, e.g. "Target: 391.0 lbs": keep the
-      // words, let each number vary. No backslashes (see note above): only a
-      // safe set of characters is kept literally, "." becomes [.], anything
-      // else is matched by a plain "." wildcard.
-      const lit = seg => Array.from(seg).map(c => /[A-Za-z0-9 :;,%°_\-]/.test(c) ? c : (c === '.' ? '[.]' : '.')).join('');
+      // letters/digits, let each number vary, and let every run of anything
+      // else (spaces, colons, non-breaking spaces, newlines, invisible marks)
+      // match any such characters - the scraped label can differ from the
+      // element's real text in exactly those. No backslashes (see note above).
       const parts = text.split(/(\d+(?:[.,]\d+)?)/);
-      const rx = '^' + parts.map((seg, i) => (i % 2 ? '[0-9]+([.,][0-9]+)?' : lit(seg))).join('') + '$';
-      const shown = parts.map((seg, i) => (i % 2 ? 'N' : seg)).join('');
-      kinds.push({key: 'textnum', label: `Same text, any number ("${shown}")`, rx});
+      // A separator sitting between two numbers must be non-empty, or "80"
+      // could be read as 8 + 0.
+      const lit = (seg, i) => seg.replace(/[^A-Za-z0-9]+/g, (i > 0 && i < parts.length - 1 && !/[A-Za-z0-9]/.test(seg)) ? '[^A-Za-z0-9]+' : '[^A-Za-z0-9]*');
+      const rx = '^' + parts.map((seg, i) => (i % 2 ? '[0-9]+([.,][0-9]+)?' : lit(seg, i))).join('') + '$';
+      const shown = parts.map((seg, i) => (i % 2 ? 'N' : seg)).join('').trim();
+      // Android: no regex at all - Appium's UiSelector parser is unreliable with
+      // some characters (a colon, notably), while XPath can say it directly:
+      // the text with its digits/./, removed equals the recorded text with
+      // the same removed, and it contains at least one digit.
+      const stripped = text.replace(/[0-9.,]/g, '').replace(/\s+/g, ' ').trim();
+      kinds.push({key: 'textnum', label: `Same text, any number ("${shown}")`, rx,
+        xp: /["]/.test(stripped) ? null : `//*[normalize-space(translate(@text,"0123456789.,",""))="${stripped}" and translate(@text,"0123456789","")!=@text]`});
     }
     const android = (document.getElementById('lsPlatform') || {}).value === 'Android';
+    // The scraped text is trimmed for detection, but the element's real text
+    // often carries a stray space/newline at either end (e.g. "124 " before a
+    // separate unit label) - so every pattern tolerates non-alphanumeric
+    // characters at both ends instead of silently missing it.
+    kinds.forEach(k => {
+      if (k.key !== 'textnum') k.rx = k.rx.replace(/^\^/, '^[^A-Za-z0-9-]*').replace(/\$$/, '[^A-Za-z0-9]*$');
+    });
     return kinds.map(k => ({
       key: k.key,
       label: k.label,
-      strategy: android ? '-android uiautomator' : '-ios predicate string',
-      value: android ? `new UiSelector().textMatches("${k.rx}")` : `label MATCHES '${k.rx}'`,
+      strategy: android ? (k.xp ? 'xpath' : '-android uiautomator') : '-ios predicate string',
+      value: android ? (k.xp || `new UiSelector().textMatches("${k.rx}")`) : `label MATCHES '${k.rx}'`,
     }));
   }
 
@@ -7185,6 +7650,7 @@ ${clone.innerHTML}
             <option value="is_tomorrow">is tomorrow's date</option>
           </select>
           <input class="ls-act-expected" placeholder="expected value" style="display:none; width:auto; flex:1; min-width:100px;">
+          <select class="ls-act-insert" title="Insert a captured value into the expected text" style="display:none; width:auto; max-width:190px;"></select>
           <input class="ls-act-saveas" placeholder="remember as… (e.g. before_weight)" style="display:none; width:auto; flex:1; min-width:200px;">
           <button class="copy ls-act-run-btn" data-index="${i}" style="padding:6px 14px; font-size:12px;">Do it + Record</button>
         </div>
@@ -7389,6 +7855,19 @@ ${clone.innerHTML}
       const compareField = row.querySelector('.ls-act-compare');
       const expectedField = row.querySelector('.ls-act-expected');
       const saveAsField = row.querySelector('.ls-act-saveas');
+      // "+ captured value": lists values remembered earlier in this flow and
+      // appends {{name}} to the expected text (numbers render as plain ints,
+      // so "{{sys}}/{{dia}} mmHg" -> "122/82 mmHg").
+      const insertSel = row.querySelector('.ls-act-insert');
+      const fillInsert = () => {
+        const names = [...new Set((lsCapturedSteps || []).filter(x => x.action === 'parse_label' && x.save_as).map(x => x.save_as))];
+        insertSel.innerHTML = '<option value="">+ captured value</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+        return names.length;
+      };
+      insertSel.addEventListener('change', () => {
+        if (insertSel.value) { expectedField.value += '{{' + insertSel.value + '}}'; expectedField.dispatchEvent(new Event('input')); }
+        insertSel.value = '';
+      });
       const applyVisibility = () => {
         const t = sel.value;
         textField.style.display = t === 'type_text' ? 'block' : 'none';
@@ -7400,6 +7879,7 @@ ${clone.innerHTML}
         extractField.style.display = (isAssertValue || isParseLabel) ? 'block' : 'none';
         compareField.style.display = isAssertValue ? 'block' : 'none';
         expectedField.style.display = isAssertValue ? 'block' : 'none';
+        insertSel.style.display = (isAssertValue && fillInsert()) ? 'block' : 'none';
         saveAsField.style.display = isParseLabel ? 'block' : 'none';
         const isEl = row.querySelector('.ls-act-sentence-is');
         if (isEl) isEl.style.display = isAssertValue ? 'inline' : 'none';
@@ -10093,24 +10573,11 @@ ${lines}
     return 'status-stuck';
   }
 
-  function renderReport(data, targetEl) {
-    targetEl = targetEl || reportOut;
-    const flagCount = (data.bug_flags || []).length;
-    let html = `<div class="card">
-      <div class="report-meta">
-        <div class="report-goal"><b>Goal:</b> ${escapeHtml(data.goal || '(none)')}</div>
-        <span class="status-badge ${statusClass(data.final_status)}">${escapeHtml(data.final_status || 'unknown')}</span>
-      </div>
-      <div style="font-size:13px; color:var(--paper-dim); margin-bottom:4px;">${escapeHtml(data.final_note || '')}</div>
-      <div style="font-size:12px; color:var(--paper-dim);">${data.step_count || (data.steps||[]).length} steps · ${flagCount} judge flag${flagCount === 1 ? '' : 's'}</div>
-    </div>`;
-
-    // A flow-replay report (see server.py's _execute_replay) carries "tests" -
-    // named test-case groups, each with its own pass/fail/skipped status and,
-    // on failure, the error attached directly to that description rather
-    // than just a bare step number. A live agent run's report has no such
-    // field, so this section is skipped for those (they get the flat step
-    // list below, as before).
+  // Test-case blocks (or the flat step list) for one report, shared by the
+  // single-flow report and the combined folder report.
+  function reportBodyHtml(data, opts) {
+    opts = opts || {};
+    let html = '';
     const stepHtml = (s) => {
       let h = '';
         const flagged = s.judge && s.judge.verdict === 'flag';
@@ -10170,7 +10637,7 @@ ${lines}
       const used = new Set();
       const tgl = v => `document.querySelectorAll('.rep-case').forEach(function(d){d.open=${v}})`;
       html += `<div class="card">
-        <div style="display:flex; gap:8px; align-items:center; justify-content:space-between;">
+        <div style="display:${opts.noToolbar ? 'none' : 'flex'}; gap:8px; align-items:center; justify-content:space-between;">
           <div style="font-size:12px; color:var(--paper-dim);">${tests.length} test case(s) - each holds its steps and screenshots</div>
           <div style="display:flex; gap:6px;">
             <button type="button" class="rep-btn" onclick="${tgl('true')}">Unwrap all</button>
@@ -10181,7 +10648,7 @@ ${lines}
         const tSteps = (t.steps || []).map(ts => byNum[ts.step]).filter(Boolean);
         tSteps.forEach(s => used.add(s.step));
         const isFail = t.status && t.status !== 'pass' && t.status !== 'skipped';
-        html += `<details class="rep-case test-group" ${isFail ? 'open' : ''}>
+        html += `<details class="rep-case test-group" data-status="${escapeHtml(t.status || '')}" ${isFail ? 'open' : ''}>
           <summary class="test-group-head" style="cursor:pointer; list-style:none;">
             <div>
               <div class="test-group-desc"><span class="rep-caret">▸</span> #${i + 1} ${escapeHtml(t.description || '(untitled test)')}</div>
@@ -10199,6 +10666,29 @@ ${lines}
     } else if (steps.length) {
       html += `<div class="card">${steps.map(stepHtml).join('')}</div>`;
     }
+
+    return html;
+  }
+
+  function renderReport(data, targetEl) {
+    targetEl = targetEl || reportOut;
+    const flagCount = (data.bug_flags || []).length;
+    let html = `<div class="card">
+      <div class="report-meta">
+        <div class="report-goal"><b>Goal:</b> ${escapeHtml(data.goal || '(none)')}</div>
+        <span class="status-badge ${statusClass(data.final_status)}">${escapeHtml(data.final_status || 'unknown')}</span>
+      </div>
+      <div style="font-size:13px; color:var(--paper-dim); margin-bottom:4px;">${escapeHtml(data.final_note || '')}</div>
+      <div style="font-size:12px; color:var(--paper-dim);">${data.step_count || (data.steps||[]).length} steps · ${flagCount} judge flag${flagCount === 1 ? '' : 's'}</div>
+    </div>`;
+
+    // A flow-replay report (see server.py's _execute_replay) carries "tests" -
+    // named test-case groups, each with its own pass/fail/skipped status and,
+    // on failure, the error attached directly to that description rather
+    // than just a bare step number. A live agent run's report has no such
+    // field, so this section is skipped for those (they get the flat step
+    // list below, as before).
+    html += reportBodyHtml(data);
 
     targetEl.innerHTML = html;
   }
