@@ -1114,6 +1114,10 @@
   .fr-env-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-top: 1px solid var(--ink-line); font-size: 12.5px; }
   .fr-env-row span { color: var(--paper-dim); } .fr-env-row b { font-weight: 600; text-align: right; word-break: break-word; }
   @media (max-width: 700px) { .fr-env { grid-template-columns: 1fr; } }
+  .fr-table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 12.5px; }
+  .fr-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--paper-dim); text-transform: uppercase; letter-spacing: .06em; padding: 6px 8px; border-bottom: 1px solid var(--ink-line); }
+  .fr-table td { padding: 6px 8px; border-top: 1px solid var(--ink-line); }
+  .fr-table tr.tot td { font-weight: 700; border-top: 2px solid var(--ink-line-strong, var(--ink-line)); }
   .fr-flow { border-top: 1px solid var(--ink-line); padding: 10px 0; }
   .fr-flow > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; }
   .fr-flow > summary::-webkit-details-marker { display: none; }
@@ -1905,6 +1909,7 @@
       </div>
       <div id="savedFlowsFolderBar" class="flows-folder-bar"></div>
       <div id="savedFlowsMoveBar" class="flows-move-bar"></div>
+      <div id="folderPicker"></div>
       <div id="folderRunPanel"></div>
       <div id="savedFlowsList" class="flows-grid">Loading…</div>
 
@@ -4797,11 +4802,12 @@ ${clone.innerHTML}
          <button type="button" class="copy" data-folder-create style="padding:5px 12px; font-size:12px;">Create${n ? ` + move ${n}` : ''}</button>
          <button type="button" class="copy" data-folder-cancel style="padding:5px 12px; font-size:12px; background:var(--ink-line); color:var(--paper);">Cancel</button>`
       : `<button type="button" class="folder-pill folder-pill-new" data-folder-new>+ New folder</button>`;
-    const runnable = (savedFlowsModuleFilter === 'all') ? [] : folderFlowsInView();
+    const runnable = (savedFlowsModuleFilter === 'all') ? [] : flowsInFolder(savedFlowsModuleFilter);
     const runBtn = runnable.length
       ? `<button type="button" class="copy" data-folder-run ${folderRun && folderRun.running ? 'disabled' : ''} style="padding:5px 14px; font-size:12px;" title="Run every flow in this folder one after another and get one combined report">▶ ${folderRun && folderRun.running ? 'Running folder…' : `Run folder (${runnable.length} flow${runnable.length === 1 ? '' : 's'})`}</button>`
       : '';
-    el.innerHTML = pills.join('') + create + runBtn;
+    const multiBtn = `<button type="button" class="copy" data-folders-run-open ${folderRun && folderRun.running ? 'disabled' : ''} style="padding:5px 14px; font-size:12px; background:var(--ink-line); color:var(--paper);" title="Pick several folders and run them together with one combined report">▶ Run folders…</button>`;
+    el.innerHTML = pills.join('') + create + runBtn + multiBtn;
     if (folderCreateOpen) { const inp = document.getElementById('folderNewInput'); if (inp) inp.focus(); }
   }
 
@@ -4814,13 +4820,6 @@ ${clone.innerHTML}
   // filters. A flow that fails does not stop the folder.
   let folderRun = null;   // {folder, items:[{slug,name,status,note,data}], running, cancel, startedAt}
   const folderRunSleep = ms => new Promise(r => setTimeout(r, ms));
-
-  function folderFlowsInView() {
-    let flows = savedFlowsPlatformFilter === 'all' ? lastLoadedFlows : lastLoadedFlows.filter(f => f.platform === savedFlowsPlatformFilter);
-    if (savedFlowsModuleFilter === '__none__') flows = flows.filter(f => !f.module);
-    else if (savedFlowsModuleFilter !== 'all') flows = flows.filter(f => f.module === savedFlowsModuleFilter);
-    return flows;
-  }
 
   async function runFolderFlow(item) {
     const slug = item.slug;
@@ -4881,14 +4880,26 @@ ${clone.innerHTML}
     }
   }
 
-  async function runFolder() {
+  // Flows (current platform filter) belonging to one folder value
+  // ('__none__' = no folder).
+  function flowsInFolder(value) {
+    const flows = savedFlowsPlatformFilter === 'all' ? lastLoadedFlows : lastLoadedFlows.filter(f => f.platform === savedFlowsPlatformFilter);
+    return value === '__none__' ? flows.filter(f => !f.module) : flows.filter(f => f.module === value);
+  }
+
+  async function runFolders(values) {
     if (folderRun && folderRun.running) return;
-    const flows = folderFlowsInView();
-    if (!flows.length) return;
-    const label = savedFlowsModuleFilter === '__none__' ? 'No folder' : savedFlowsModuleFilter;
-    if (!confirm(`Run all ${flows.length} flow(s) in "${label}" one after another on the connected device?`)) return;
-    folderRun = {folder: label, running: true, cancel: false, startedAt: new Date(),
-      items: flows.map(f => ({slug: f.slug, name: f.name || f.slug, status: 'pending', note: '', data: null}))};
+    const items = [];
+    values.forEach(v => flowsInFolder(v).forEach(f => items.push({
+      slug: f.slug, name: f.name || f.slug, folder: f.module || 'No folder', status: 'pending', note: '', data: null,
+    })));
+    if (!items.length) return;
+    const names = [...new Set(items.map(i => i.folder))];
+    const label = names.join(', ');
+    if (!confirm(`Run ${items.length} flow(s) from ${names.length} folder(s) (${label}) one after another on the connected device?`)) return;
+    folderRun = {folder: label, folders: names, running: true, cancel: false, startedAt: new Date(), items};
+    folderPick = null;
+    renderFolderPicker();
     renderFolderBar();
     renderFolderRunPanel();
     for (const item of folderRun.items) {
@@ -4902,6 +4913,36 @@ ${clone.innerHTML}
     renderFolderBar();
     renderFolderRunPanel();
     loadSavedFlows && loadSavedFlows();
+  }
+  const runFolder = () => runFolders([savedFlowsModuleFilter]);
+
+  // Multi-folder picker ("Run folders…"): tick any folders, run them in order.
+  let folderPick = null;   // null = closed, else Set of folder values
+  function renderFolderPicker() {
+    const el = document.getElementById('folderPicker');
+    if (!el) return;
+    if (!folderPick) { el.innerHTML = ''; return; }
+    const opts = flowModules.map(m => ({value: m.name, label: m.name})).concat([{value: '__none__', label: 'No folder'}])
+      .map(o => ({...o, n: flowsInFolder(o.value).length})).filter(o => o.n);
+    const picked = opts.filter(o => folderPick.has(o.value));
+    const total = picked.reduce((a, o) => a + o.n, 0);
+    el.innerHTML = `<div class="card" style="margin:8px 0;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+        <b>Run folders</b>
+        <span><button type="button" class="folder-link" data-pick-all>Select all</button> · <button type="button" class="folder-link" data-pick-none>Clear</button></span>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px 18px; margin:10px 0;">
+        ${opts.length ? opts.map(o => `<label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;"><input type="checkbox" data-pick="${escapeHtml(o.value)}" ${folderPick.has(o.value) ? 'checked' : ''} style="width:auto;"> ${escapeHtml(o.label)} <span class="hint">${o.n} flow${o.n === 1 ? '' : 's'}</span></label>`).join('') : '<span class="hint">No folders have flows for this platform filter.</span>'}
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button type="button" class="rep-btn" data-pick-cancel>Cancel</button>
+        <button type="button" class="copy" data-pick-run ${total ? '' : 'disabled'} style="padding:5px 14px; font-size:12px;">▶ Run ${total} flow${total === 1 ? '' : 's'} in ${picked.length} folder${picked.length === 1 ? '' : 's'}</button>
+      </div></div>`;
+    el.querySelectorAll('[data-pick]').forEach(cb => cb.onchange = () => { cb.checked ? folderPick.add(cb.dataset.pick) : folderPick.delete(cb.dataset.pick); renderFolderPicker(); });
+    el.querySelector('[data-pick-all]').onclick = () => { opts.forEach(o => folderPick.add(o.value)); renderFolderPicker(); };
+    el.querySelector('[data-pick-none]').onclick = () => { folderPick.clear(); renderFolderPicker(); };
+    el.querySelector('[data-pick-cancel]').onclick = () => { folderPick = null; renderFolderPicker(); };
+    el.querySelector('[data-pick-run]').onclick = () => runFolders(opts.filter(o => folderPick.has(o.value)).map(o => o.value));
   }
 
   function folderRunTotals(run) {
@@ -4922,23 +4963,24 @@ ${clone.innerHTML}
   // Filtering must also work in the downloaded copy, so these two are plain
   // functions on window whose source is embedded into the exported file.
   window.repFilterApply = function (root) {
-    const st = root.dataset.status || 'all', fl = root.dataset.flow || 'all';
+    const st = root.dataset.status || 'all', fl = root.dataset.flow || 'all', fo = root.dataset.folder || 'all';
     const qEl = root.querySelector('.fr-search');
     const q = qEl ? qEl.value.trim().toLowerCase() : '';
     let shown = 0, total = 0;
     root.querySelectorAll('.fr-flow').forEach(flow => {
       const cases = flow.querySelectorAll('.rep-case');
+      const inScope = (fl === 'all' || flow.dataset.flow === fl) && (fo === 'all' || flow.dataset.folder === fo);
       let vis = 0;
       cases.forEach(c => {
         const cs = c.dataset.status || '';
         const okSt = st === 'all' || (st === 'pass' && cs === 'pass') || (st === 'skipped' && cs === 'skipped') || (st === 'fail' && cs !== 'pass' && cs !== 'skipped');
         const ok = okSt && (!q || c.textContent.toLowerCase().indexOf(q) > -1);
         c.style.display = ok ? '' : 'none';
-        total++;
-        if (ok) { vis++; shown++; }
+        if (inScope) total++;
+        if (ok) { vis++; if (inScope) shown++; }
       });
       const noCases = cases.length === 0;
-      const flowOk = (fl === 'all' || flow.dataset.flow === fl) && (vis > 0 || (noCases && st === 'all' && !q));
+      const flowOk = (fl === 'all' || flow.dataset.flow === fl) && (fo === 'all' || flow.dataset.folder === fo) && (vis > 0 || (noCases && st === 'all' && !q));
       flow.style.display = flowOk ? '' : 'none';
       const v = flow.querySelector('.fr-vis');
       if (v) v.textContent = vis + ' of ' + cases.length + ' case(s) shown';
@@ -4989,27 +5031,44 @@ ${clone.innerHTML}
     </div></div>`;
   }
 
+  function folderBreakdown(run) {
+    const by = {};
+    run.items.forEach(it => {
+      const k = it.folder || run.folder;
+      const r = by[k] || (by[k] = {folder: k, flows: 0, flowsPass: 0, tests: 0, pass: 0, fail: 0, skipped: 0});
+      r.flows++;
+      if (it.status === 'pass') r.flowsPass++;
+      ((it.data && it.data.tests) || []).forEach(x => {
+        r.tests++;
+        if (x.status === 'pass') r.pass++; else if (x.status === 'skipped') r.skipped++; else r.fail++;
+      });
+    });
+    return Object.values(by);
+  }
+
   function folderReportHtml(run) {
     const t = folderRunTotals(run);
     const when = (run.finishedAt || run.startedAt).toLocaleString();
     const tile = (n, label, cls) => `<div class="fr-tile ${cls || ''}"><b>${n}</b><span>${label}</span></div>`;
     const chip = (k, v, label, on) => `<button type="button" class="fr-chip ${on ? 'on' : ''}" data-k="${k}" data-v="${escapeHtml(v)}" onclick="repFilterSet(this)">${label}</button>`;
     const flowChips = run.items.map(it => chip('flow', it.slug, `${escapeHtml(it.name)} <b style="opacity:.6">${(it.data && it.data.tests || []).length}</b>`, false)).join('');
-    let h = `<div class="fr-root" data-status="all" data-flow="all">
+    let h = `<div class="fr-root" data-status="all" data-flow="all" data-folder="all">
       <div class="card">
         <div class="report-meta">
-          <div class="report-goal"><b>Folder:</b> ${escapeHtml(run.folder)}<div style="font-size:12px; color:var(--paper-dim); margin-top:2px;">${t.flows} flow(s) · ${escapeHtml(when)}</div></div>
+          <div class="report-goal"><b>${(run.folders || []).length > 1 ? 'Folders' : 'Folder'}:</b> ${escapeHtml(run.folder)}<div style="font-size:12px; color:var(--paper-dim); margin-top:2px;">${(run.folders || []).length > 1 ? (run.folders.length + ' folders · ') : ''}${t.flows} flow(s) · ${escapeHtml(when)}</div></div>
           <span class="status-badge ${t.fail || t.flowsFail ? 'status-fail' : 'status-pass'}">${t.fail || t.flowsFail ? 'FAIL' : 'PASS'}</span>
         </div>
         <div class="fr-tiles">
           ${tile(t.tests, 'Test cases')}${tile(t.pass, 'Passed', 'pass')}${tile(t.fail, 'Failed', t.fail ? 'fail' : '')}${tile(t.skipped, 'Skipped')}
           ${tile(escapeHtml(folderPlatforms(run).join(' + ') || '—'), 'Device tested on')}${tile(t.flowsPass + ' / ' + t.flows, 'Flows passed', t.flowsFail ? 'fail' : 'pass')}${tile(t.steps, 'Steps')}
         </div>
+        ${(run.folders || []).length > 1 ? `<table class="fr-table"><thead><tr><th>Folder</th><th>Flows</th><th>Test cases</th><th>Passed</th><th>Failed</th><th>Skipped</th></tr></thead><tbody>${folderBreakdown(run).map(r => `<tr><td>${escapeHtml(r.folder)}</td><td>${r.flowsPass} / ${r.flows}</td><td>${r.tests}</td><td style="color:var(--circuit)">${r.pass}</td><td style="color:${r.fail ? 'var(--alert)' : 'inherit'}">${r.fail}</td><td>${r.skipped}</td></tr>`).join('')}<tr class="tot"><td>All folders</td><td>${t.flowsPass} / ${t.flows}</td><td>${t.tests}</td><td style="color:var(--circuit)">${t.pass}</td><td style="color:${t.fail ? 'var(--alert)' : 'inherit'}">${t.fail}</td><td>${t.skipped}</td></tr></tbody></table>` : ''}
       </div>
       ${envCardHtml(run)}
       <div class="card">
         <div class="fr-filters"><span class="lbl">Status</span>${chip('status', 'all', 'All', true)}${chip('status', 'fail', 'Failed', false)}${chip('status', 'pass', 'Passed', false)}${chip('status', 'skipped', 'Skipped', false)}
           <input class="fr-search" type="search" placeholder="Search cases…" oninput="repFilterApply(this.closest('.fr-root'))" style="margin-left:auto;"></div>
+        ${(run.folders || []).length > 1 ? `<div class="fr-filters"><span class="lbl">Folder</span>${chip('folder', 'all', 'All folders', true)}${run.folders.map(f => chip('folder', f, `${escapeHtml(f)} <b style="opacity:.6">${folderBreakdown(run).find(r => r.folder === f).tests}</b>`, false)).join('')}</div>` : ''}
         <div class="fr-filters"><span class="lbl">Flow</span>${chip('flow', 'all', 'All flows', true)}${flowChips}</div>
         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px;">
           <div class="fr-showing" style="font-size:12px; color:var(--paper-dim);"></div>
@@ -5024,8 +5083,8 @@ ${clone.innerHTML}
       const d = it.data;
       const tests = d ? (d.tests || []) : [];
       const ok = it.status === 'pass';
-      const sub = d ? `${tests.length} case(s) · ${(d.step_count || (d.steps || []).length)} step(s)` : escapeHtml(it.note || it.status);
-      h += `<details class="fr-flow" data-flow="${escapeHtml(it.slug)}" ${ok ? '' : 'open'}>
+      const sub = d ? `${(run.folders || []).length > 1 ? escapeHtml(it.folder || '') + ' · ' : ''}${tests.length} case(s) · ${(d.step_count || (d.steps || []).length)} step(s)` : escapeHtml(it.note || it.status);
+      h += `<details class="fr-flow" data-flow="${escapeHtml(it.slug)}" data-folder="${escapeHtml(it.folder || run.folder)}" ${ok ? '' : 'open'}>
         <summary><span><span class="rep-caret">▸</span> ${escapeHtml(it.name)}<div class="fr-sub">${sub} <span class="fr-vis"></span></div></span>
           <span class="status-badge ${statusClass(it.status === 'pass' ? 'pass' : it.status === 'skipped' || it.status === 'pending' ? 'skipped' : 'fail')}">${escapeHtml((it.status || '').toUpperCase())}</span></summary>
         ${it.note && !ok ? `<div class="flag-box"><b>${escapeHtml(it.status)}:</b> ${escapeHtml(it.note)}</div>` : ''}
@@ -5288,6 +5347,11 @@ ${clone.outerHTML}
       return;
     }
     if (e.target.closest('[data-folder-run]')) { runFolder(); return; }
+    if (e.target.closest('[data-folders-run-open]')) {
+      folderPick = new Set(savedFlowsModuleFilter !== 'all' && flowsInFolder(savedFlowsModuleFilter).length ? [savedFlowsModuleFilter] : []);
+      renderFolderPicker();
+      return;
+    }
     const pillBtn = e.target.closest('[data-folder]');
     if (pillBtn) {
       savedFlowsModuleFilter = pillBtn.dataset.folder;
