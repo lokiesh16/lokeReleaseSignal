@@ -1205,7 +1205,8 @@
   .ls-row-grid { display:grid; grid-template-columns: 74px 118px minmax(0,1fr) minmax(0,300px) auto; align-items:center; gap:12px; min-height:44px; }
   .ls-col-idx { display:flex; align-items:center; gap:6px; color:var(--paper-faint); font-size:12.5px; }
   .ls-col-verb { font-weight:600; font-size:13.5px; white-space:nowrap; }
-  .ls-col-target { font-family: var(--mono); font-size:12.5px; color:var(--paper); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ls-col-target { font-family: var(--mono); font-size:12.5px; color:var(--paper); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:flex; align-items:center; min-width:0; }
+  .ls-pos-name:focus { border-color: var(--circuit) !important; outline:none; background: var(--ink-raised-2); }
   .ls-col-val { display:flex; align-items:center; gap:6px; min-width:0; }
   .ls-col-act { display:flex; align-items:center; gap:2px; }
   .ls-val-op { font-size:12px; color:var(--paper-dim); white-space:nowrap; }
@@ -2172,7 +2173,11 @@
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
         <span style="font-size:11.5px; text-transform:uppercase; letter-spacing:0.06em; color:var(--paper-dim); font-weight:600;">Captured steps</span>
         <span class="hint" id="lsCapturedCount" style="font-size:11px;">0 step(s)</span>
+        <span style="flex:1;"></span>
+        <input id="lsOrganizeGuidance" placeholder="Optional hint, e.g. one test case per assertion" style="width:300px; max-width:40%; font-size:11.5px; padding:5px 9px;">
+        <button class="copy" id="lsOrganizeBtn" title="AI reads the recorded steps, splits them into test cases and writes a description for each" style="padding:6px 12px; font-size:11.5px; background:linear-gradient(135deg, #007BA7, #FF2D95); color:#fff;">✨ AI: organize into test cases</button>
       </div>
+      <div id="lsOrganizeStatus" style="font-size:11.5px; margin:-2px 0 8px;"></div>
 
       <!-- Flow-scoped tools: switching the foreground app, comparing captured
            values, and hand-testing a locator all only make sense as a step of
@@ -6961,7 +6966,54 @@ ${clone.innerHTML}
   // locator instead. Patterns use character classes ([0-9]) and no
   // backslashes - Appium's UiSelector parser doesn't unescape them like Java
   // source would, so "\\d" silently matches nothing.
-  function lsDynamicOptions(el) {
+  // Relative-date support for calendar pickers: the day cell's label (e.g.
+  // "01 November 2026") is frozen at record time, so instead the locator asks
+  // for "today + N days" in the same format, resolved at replay via
+  // {{date_offset(N, "<fmt>")}} (see actions._date_offset).
+  const LS_MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const LS_WEEKDAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  function lsFmtDate(d, fmt) {
+    const full = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return fmt.replace(/%-d/g, String(d.getDate())).replace(/%d/g, String(d.getDate()).padStart(2, '0'))
+      .replace(/%B/g, full[d.getMonth()]).replace(/%A/g, LS_WEEKDAYS[d.getDay()]).replace(/%Y/g, String(d.getFullYear()));
+  }
+  function lsDetectRelativeDate(el) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    for (const raw of [el.accessibility_id, el.label, el.text]) {
+      const text = String(raw || '').trim();
+      let m = text.match(/^(\d{1,2}) ([A-Za-z]+) (\d{4})/);
+      if (m && LS_MONTHS.includes(m[2].toLowerCase())) {
+        const d = new Date(+m[3], LS_MONTHS.indexOf(m[2].toLowerCase()), +m[1]);
+        return {fmt: m[1].length === 2 ? '%d %B %Y' : '%-d %B %Y', offset: Math.round((d - today) / 86400000)};
+      }
+      m = text.match(/^([A-Za-z]+), ([A-Za-z]+) (\d{1,2})(?:, (\d{4}))?$/);
+      if (m && LS_MONTHS.includes(m[2].toLowerCase())) {
+        const d = new Date(m[4] ? +m[4] : today.getFullYear(), LS_MONTHS.indexOf(m[2].toLowerCase()), +m[3]);
+        return {fmt: '%A, %B %-d' + (m[4] ? ', %Y' : ''), offset: Math.round((d - today) / 86400000)};
+      }
+    }
+    return null;
+  }
+  function lsRelDateLabel(n) {
+    return n === 0 ? 'Today\'s date' : `Date ${n > 0 ? '+' : '−'}${Math.abs(n)} day${Math.abs(n) === 1 ? '' : 's'} from today`;
+  }
+  function lsDynamicOptions(el, opts = {}) {
+    const rel = lsDetectRelativeDate(el);
+    const relOptions = [];
+    if (rel) {
+      const off = Number.isFinite(opts.offset) ? opts.offset : rel.offset;
+      const android = (document.getElementById('lsPlatform') || {}).value === 'Android';
+      const expr = `{{date_offset(${off}, ${android ? '"' + rel.fmt + '"' : "'" + rel.fmt + "'"})}}`;
+      relOptions.push({
+        key: 'reldate', label: 'Relative date (N days from today)', isRelDate: true, defaultOffset: rel.offset, fmt: rel.fmt,
+        strategy: android ? 'xpath' : '-ios predicate string',
+        value: android ? `//*[contains(@content-desc, '${expr}')]` : `label CONTAINS "${expr}"`,
+        dynLabel: lsRelDateLabel(off),
+      });
+    }
+    return relOptions.concat(lsDynamicOptionsText(el));
+  }
+  function lsDynamicOptionsText(el) {
     const text = String(el.label || el.text || '').trim();
     if (!text) return [];
     const kinds = [];
@@ -7037,8 +7089,13 @@ ${clone.innerHTML}
           <span style="color:var(--paper-dim);">Locator style:</span>
           <select class="ls-act-style" data-index="${i}" style="width:auto; flex:0 0 190px; font-size:11.5px;">
             <option value="exact">Exact (breaks if value changes)</option>
-            ${dynOptions.map(o => `<option value="${o.key}">${escapeHtml(o.label)} (pattern)</option>`).join('')}
+            ${dynOptions.map(o => `<option value="${o.key}">${escapeHtml(o.label)}${o.isRelDate ? '' : ' (pattern)'}</option>`).join('')}
           </select>
+          <span class="ls-act-reldate" style="display:none; align-items:center; gap:6px;">
+            <input class="ls-act-reloffset" type="number" step="1" value="${(dynOptions.find(o => o.isRelDate) || {}).defaultOffset ?? 0}" style="width:72px; font-size:11.5px; padding:4px 6px;" title="Days from today: negative = go back, positive = go forward">
+            <span style="color:var(--paper-dim);">days from today</span>
+            <span class="ls-act-reldate-preview" style="font-family:var(--mono);"></span>
+          </span>
           <span class="ls-act-style-status" style="font-size:11px;"></span>
         </div>
       </div>` : '';
@@ -7335,12 +7392,27 @@ ${clone.innerHTML}
     });
 
     container.querySelectorAll('.ls-act-style').forEach(sel => {
-      sel.addEventListener('change', async () => {
-        const statusEl = sel.parentElement.querySelector('.ls-act-style-status');
-        if (sel.value === 'exact') { statusEl.textContent = ''; return; }
+      const wrap = sel.parentElement;
+      const statusEl = wrap.querySelector('.ls-act-style-status');
+      const relBox = wrap.querySelector('.ls-act-reldate');
+      const offInput = wrap.querySelector('.ls-act-reloffset');
+      const preview = wrap.querySelector('.ls-act-reldate-preview');
+      let timer = null;
+      const currentOpt = () => {
         const el = lsLastElements[Number(sel.dataset.index)];
-        const dyn = lsDynamicOptions(el).find(o => o.key === sel.value);
-        if (!dyn || !lsSessionId) return;
+        return lsDynamicOptions(el, {offset: offInput ? parseInt(offInput.value, 10) : NaN}).find(o => o.key === sel.value);
+      };
+      const refresh = async () => {
+        const dyn = sel.value === 'exact' ? null : currentOpt();
+        if (relBox) {
+          relBox.style.display = (dyn && dyn.isRelDate) ? 'inline-flex' : 'none';
+          if (dyn && dyn.isRelDate) {
+            const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + (parseInt(offInput.value, 10) || 0));
+            preview.textContent = `→ ${lsFmtDate(d, dyn.fmt)} (today's date at run time ${offInput.value >= 0 ? '+' : '−'} ${Math.abs(parseInt(offInput.value, 10) || 0)})`;
+          }
+        }
+        if (!dyn) { statusEl.textContent = ''; return; }
+        if (!lsSessionId) return;
         statusEl.innerHTML = '<span style="color:var(--paper-dim);">checking…</span>';
         try {
           const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/test_locator', {
@@ -7350,14 +7422,16 @@ ${clone.innerHTML}
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'check failed');
           statusEl.innerHTML = !data.found
-            ? '<span style="color:var(--alert);">✗ matches nothing on the current screen</span>'
+            ? '<span style="color:var(--alert);">✗ matches nothing on the current screen' + (dyn.isRelDate ? ' (is that date visible in the calendar?)' : '') + '</span>'
             : data.count > 1
               ? `<span style="color:var(--signal);">⚠ matches ${data.count} elements — the first one is used</span>`
               : '<span style="color:var(--circuit);">✓ matches exactly 1 element</span>';
         } catch (e) {
           statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
         }
-      });
+      };
+      sel.addEventListener('change', refresh);
+      if (offInput) offInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(refresh, 350); });
     });
 
     container.querySelectorAll('.ls-act-run-btn').forEach(btn => {
@@ -7373,8 +7447,9 @@ ${clone.innerHTML}
         let dynKind = null;
         const styleSel = details.querySelector('.ls-act-style');
         if (locator && styleSel && styleSel.value !== 'exact') {
-          const dyn = lsDynamicOptions(el).find(o => o.key === styleSel.value);
-          if (dyn) { locator = {strategy: dyn.strategy, value: dyn.value}; dynKind = dyn.label; }
+          const offInput = details.querySelector('.ls-act-reloffset');
+          const dyn = lsDynamicOptions(el, {offset: offInput ? parseInt(offInput.value, 10) : NaN}).find(o => o.key === styleSel.value);
+          if (dyn) { locator = {strategy: dyn.strategy, value: dyn.value}; dynKind = dyn.dynLabel || dyn.label; }
         }
         const point = useLocator ? null : lsCenterPoint(el);
 
@@ -7488,7 +7563,7 @@ ${clone.innerHTML}
   async function lsExecuteCapturedStep(i) {
     const s = lsCapturedSteps[i];
     const payload = {...s};
-    delete payload.label; delete payload.description; delete payload.optional; delete payload.splitBefore; delete payload.tag; delete payload.dynKind;
+    delete payload.label; delete payload.description; delete payload.optional; delete payload.splitBefore; delete payload.tag; delete payload.dynKind; delete payload.posName;
     const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -7646,8 +7721,16 @@ ${clone.innerHTML}
         else valueHtml = `<span class="ls-val-op">${escapeHtml(LS_COMPARE_WORDS[s.compare] || s.compare || 'equals')}</span>` + lsInlineInput(i, 'expected', s.expected, {placeholder: 'expected'});
         break;
     }
-    return {verb, target, targetTitle: targetTitle || target, valueHtml};
+    // Position-based steps have no locator to read a name from - an inline,
+    // editable name (blank = show the raw coordinates) makes them recognisable.
+    let targetHtml = '';
+    if (s.x != null && s.y != null && !s.strategy && s.x2 == null && s.action !== 'swipe') {
+      const coords = `(${s.x}, ${s.y})`;
+      targetHtml = `<input class="ls-pos-name" data-pos-idx="${i}" value="${escapeHtml(s.posName || '')}" placeholder="position ${coords} — click to name it" title="Give this position a name, e.g. Add weight button" style="font-family:var(--mono); font-size:12.5px; width:${s.posName ? 'auto' : '100%'}; min-width:0; max-width:100%; background:transparent; border:1px dashed ${s.posName ? 'transparent' : 'var(--ink-line-strong)'}; border-radius:6px; padding:3px 8px; color:var(--paper);">${s.posName ? `<span class="ls-val-op" style="margin-left:6px;">${coords}</span>` : ''}`;
+    }
+    return {verb, target, targetTitle: targetTitle || target, valueHtml, targetHtml};
   }
+  const lsPosOrigLabel = new WeakMap();   // label a position step had before it was given a name
   const lsCollapsedCases = new Set();   // start-step index of each collapsed test case
   function lsGroupByCase(rows) {
     const starts = [0];
@@ -7656,7 +7739,7 @@ ${clone.innerHTML}
       const end = n + 1 < starts.length ? starts[n + 1] : lsCapturedSteps.length;
       const count = end - start;
       const name = start === 0
-        ? ((document.getElementById('lsCapturedDescription') || {}).value || '').trim()
+        ? lsFirstGroupDescriptionValue()
         : (lsCapturedSteps[start].description || '').trim();
       const collapsed = lsCollapsedCases.has(start);
       return `
@@ -7774,7 +7857,7 @@ ${clone.innerHTML}
               <span class="ls-col-num">${i + 1}</span>
             </span>
             <span class="ls-col-verb" style="color:${accent.fg};" title="${escapeHtml(lsStepSentence(s))}">${escapeHtml(cols.verb)}</span>
-            <span class="ls-col-target" title="${escapeHtml(cols.targetTitle)}">${escapeHtml(cols.target)}${statusTags ? ` <span style="display:inline-flex; gap:4px; vertical-align:middle;">${statusTags}</span>` : ''}</span>
+            <span class="ls-col-target" title="${escapeHtml(cols.targetTitle)}">${cols.targetHtml || escapeHtml(cols.target)}${statusTags ? ` <span style="display:inline-flex; gap:4px; vertical-align:middle;">${statusTags}</span>` : ''}</span>
             <span class="ls-col-val">${cols.valueHtml}</span>
             <span class="ls-col-act">
               ${s.action !== 'note' ? `<button class="ls-icon-btn ls-step-run-btn" data-step-idx="${i}" title="Run this step now against the live session - catches up context (parse_label/switch_app/etc.) without re-recording it, so a later step you're testing has something real to work with." style="--ls-icon-hover:var(--signal);">${LS_ICON_PLAY}</button>` : '<span style="width:28px;"></span>'}
@@ -7801,6 +7884,19 @@ ${clone.innerHTML}
         </div>`;
     });
     listEl.innerHTML = lsGroupByCase(rowsHtml) + insertDivider(lsCapturedSteps.length);
+    listEl.querySelectorAll('.ls-pos-name').forEach(inp => {
+      const st = lsCapturedSteps[Number(inp.dataset.posIdx)];
+      inp.addEventListener('input', () => {
+        if (!lsPosOrigLabel.has(st)) lsPosOrigLabel.set(st, st.label);
+        const name = inp.value.trim();
+        st.posName = name || undefined;
+        // label drives the step's wording in the mini list and in replay logs
+        st.label = name || lsPosOrigLabel.get(st) || `screen point (${st.x}, ${st.y})`;
+        lsRenderMiniSteps();
+      });
+      inp.addEventListener('change', () => renderLsCapturedSteps());   // re-layout once typing is done
+      inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+    });
     listEl.querySelectorAll('.ls-case-head').forEach(h => {
       h.addEventListener('click', () => {
         const k = Number(h.dataset.caseStart);
@@ -8324,6 +8420,56 @@ ${clone.innerHTML}
   document.getElementById('lsCapturedDescriptionPicker').addEventListener('change', (e) => {
     if (e.target.value === '') return;
     document.getElementById('lsCapturedDescription').value = lsLoadedCases[e.target.value].description;
+  });
+
+
+  // AI: split the recorded steps into test cases + describe each. Applies the
+  // result through the same state "Split here" uses (splitBefore flags on the
+  // first step of each later case, their description, and the frozen
+  // description for case 1), so Save/Run treat it exactly like hand-made splits.
+  document.getElementById('lsOrganizeBtn').addEventListener('click', async () => {
+    const statusEl = document.getElementById('lsOrganizeStatus');
+    const btn = document.getElementById('lsOrganizeBtn');
+    const steps = lsCapturedSteps.filter(st => st.action !== 'note');
+    if (steps.length < 2) { statusEl.innerHTML = '<span style="color:var(--signal);">Record a few steps first.</span>'; return; }
+    const hasManual = lsCapturedSteps.some(st => st.splitBefore);
+    if (hasManual && !confirm('This replaces your existing test-case splits and their descriptions. Continue?')) return;
+    btn.disabled = true;
+    statusEl.innerHTML = '<span style="color:var(--paper-dim);">Reading your steps…</span>';
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/organize_steps', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          steps: lsCapturedSteps.map(st => lsStepSentence(st)),
+          guidance: document.getElementById('lsOrganizeGuidance').value.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'organize failed');
+      const cases = data.cases;
+      lsCapturedSteps.forEach(st => { delete st.splitBefore; });
+      cases.forEach((c, n) => {
+        if (n === 0) return;
+        const st = lsCapturedSteps[c.start - 1];
+        if (st) { st.splitBefore = true; st.description = c.description; }
+      });
+      lsPendingSplit = null;
+      if (cases.length > 1) {
+        // Same convention as "Split here": case 1's text is frozen, and the
+        // live field becomes scratch space for the case currently being built.
+        lsFirstGroupDescription = cases[0].description;
+        document.getElementById('lsCapturedDescription').value = cases[cases.length - 1].description;
+      } else {
+        lsFirstGroupDescription = null;
+        document.getElementById('lsCapturedDescription').value = cases[0].description;
+      }
+      renderLsCapturedSteps();
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Organized into ${cases.length} test case${cases.length === 1 ? '' : 's'}. Edit any description or move a split from a step's ⋯ menu.</span>`;
+    } catch (e) {
+      statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+    } finally {
+      btn.disabled = false;
+    }
   });
 
   document.getElementById('lsSplitHereBtn').addEventListener('click', () => {
