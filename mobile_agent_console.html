@@ -1099,6 +1099,11 @@
   .test-group:first-child { border-top: none; }
   .test-group-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .test-group-desc { font-size: 13.5px; font-weight: 600; }
+  .rep-btn { background: transparent; border: 1px solid var(--ink-line); color: var(--paper); border-radius: 6px; padding: 4px 10px; font-size: 11.5px; cursor: pointer; }
+  .rep-btn:hover { border-color: var(--signal); }
+  .rep-case > summary::-webkit-details-marker { display: none; }
+  .rep-case .rep-caret { display: inline-block; transition: transform .15s; color: var(--signal); }
+  .rep-case[open] .rep-caret { transform: rotate(90deg); }
   .test-group-meta { font-size: 11px; color: var(--paper-dim); margin-top: 2px; }
 
   .report-meta {
@@ -6888,6 +6893,10 @@ ${clone.innerHTML}
   // rather than asking the human to also choose a strategy on top of an
   // action and its params.
   function lsBestLocator(el) {
+    // A bare resource-id with no "package:id/" part (React Native testIDs,
+    // e.g. RNE__Input__text-input) is not matched by Appium's `id` strategy,
+    // which prepends the app package - the @resource-id xpath matches it as-is.
+    if (el.resource_id && !el.resource_id.includes(':') && el.xpath && el.xpath.includes('@resource-id')) return {strategy: 'xpath', value: el.xpath};
     if (el.resource_id) return {strategy: 'id', value: el.resource_id};
     if (el.accessibility_id) return {strategy: 'accessibility id', value: el.accessibility_id};
     if (el.ios_predicate_string) return {strategy: '-ios predicate string', value: el.ios_predicate_string};
@@ -7031,6 +7040,16 @@ ${clone.innerHTML}
     } else if ((m = text.match(/^-?\d+([.,]\d+)?(?:\s?([A-Za-z%°]+))?$/))) {
       const unit = m[2] ? '.?' + m[2] : '';
       kinds.push({key: 'number', label: m[2] ? `Any number + "${m[2]}"` : 'Any number', rx: '^-?[0-9]+([.,][0-9]+)?' + unit + '$'});
+    } else if (/\d/.test(text) && !/["'\\]/.test(text)) {
+      // Fixed words around a changing number, e.g. "Target: 391.0 lbs": keep the
+      // words, let each number vary. No backslashes (see note above): only a
+      // safe set of characters is kept literally, "." becomes [.], anything
+      // else is matched by a plain "." wildcard.
+      const lit = seg => Array.from(seg).map(c => /[A-Za-z0-9 :;,%°_\-]/.test(c) ? c : (c === '.' ? '[.]' : '.')).join('');
+      const parts = text.split(/(\d+(?:[.,]\d+)?)/);
+      const rx = '^' + parts.map((seg, i) => (i % 2 ? '[0-9]+([.,][0-9]+)?' : lit(seg))).join('') + '$';
+      const shown = parts.map((seg, i) => (i % 2 ? 'N' : seg)).join('');
+      kinds.push({key: 'textnum', label: `Same text, any number ("${shown}")`, rx});
     }
     const android = (document.getElementById('lsPlatform') || {}).value === 'Android';
     return kinds.map(k => ({
@@ -7099,6 +7118,22 @@ ${clone.innerHTML}
             <span class="ls-act-reldate-preview" style="font-family:var(--mono);"></span>
           </span>
           <span class="ls-act-style-status" style="font-size:11px;"></span>
+          <span class="ls-act-match-pick" style="display:none; align-items:center; gap:6px; font-size:11.5px;">
+            <span style="color:var(--paper-dim);">Use match</span>
+            <select class="ls-act-match-idx" style="width:auto; font-size:11.5px; padding:4px 6px; max-width:260px;"></select>
+          </span>
+        </div>
+      </div>` : '';
+
+    const matchOnlyPicker = (locator && !dynOptions.length) ? `
+      <div style="margin-top:6px; font-size:11.5px;">
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+          <select class="ls-act-style" data-index="${i}" style="display:none;"><option value="exact">exact</option></select>
+          <span class="ls-act-style-status" style="font-size:11px;"></span>
+          <span class="ls-act-match-pick" style="display:none; align-items:center; gap:6px; font-size:11.5px;">
+            <span style="color:var(--paper-dim);">Use match</span>
+            <select class="ls-act-match-idx" style="width:auto; font-size:11.5px; padding:4px 6px; max-width:260px;"></select>
+          </span>
         </div>
       </div>` : '';
 
@@ -7121,7 +7156,7 @@ ${clone.innerHTML}
     return `
       <div class="ls-act-panel">
         ${targetPicker}
-        ${dynamicPicker}
+        ${dynamicPicker}${matchOnlyPicker}
         ${positionOnlyNote}
         <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-top:8px;">
           <span style="font-size:12px; color:var(--paper-dim);">I want to</span>
@@ -7406,8 +7441,12 @@ ${clone.innerHTML}
         const el = lsLastElements[Number(sel.dataset.index)];
         return lsDynamicOptions(el, {offset: offInput ? parseInt(offInput.value, 10) : NaN}).find(o => o.key === sel.value);
       };
+      const matchBox = wrap.querySelector('.ls-act-match-pick');
+      const matchSel = wrap.querySelector('.ls-act-match-idx');
+      let lastMatches = [];
       const refresh = async () => {
-        const dyn = sel.value === 'exact' ? null : currentOpt();
+        const el = lsLastElements[Number(sel.dataset.index)];
+        let dyn = sel.value === 'exact' ? null : currentOpt();
         if (relBox) {
           relBox.style.display = (dyn && dyn.isRelDate) ? 'inline-flex' : 'none';
           if (dyn && dyn.isRelDate) {
@@ -7415,8 +7454,14 @@ ${clone.innerHTML}
             preview.textContent = `→ ${lsFmtDate(d, dyn.fmt)} (today's date at run time ${offInput.value >= 0 ? '+' : '−'} ${Math.abs(parseInt(offInput.value, 10) || 0)})`;
           }
         }
-        if (!dyn) { statusEl.textContent = ''; return; }
-        if (!lsSessionId) return;
+        // Exact style: still check the plain locator so a many-match element gets the picker too
+        if (!dyn) {
+          const best = lsBestLocator(el);
+          if (best) dyn = {strategy: best.strategy, value: best.value};
+        }
+        if (matchBox) matchBox.style.display = 'none';
+        if (!dyn || !lsSessionId) { statusEl.textContent = ''; return; }
+        const prevIdx = matchSel ? matchSel.value : '';
         statusEl.innerHTML = '<span style="color:var(--paper-dim);">checking…</span>';
         try {
           const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/test_locator', {
@@ -7425,16 +7470,34 @@ ${clone.innerHTML}
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'check failed');
-          statusEl.innerHTML = !data.found
-            ? '<span style="color:var(--alert);">✗ matches nothing on the current screen' + (dyn.isRelDate ? ' (is that date visible in the calendar?)' : '') + '</span>'
-            : data.count > 1
-              ? `<span style="color:var(--signal);">⚠ matches ${data.count} elements — the first one is used</span>`
-              : '<span style="color:var(--circuit);">✓ matches exactly 1 element</span>';
+          lastMatches = data.matches || [];
+          if (!data.found) {
+            statusEl.innerHTML = '<span style="color:var(--alert);">✗ matches nothing on the current screen' + (dyn.isRelDate ? ' (is that date visible in the calendar?)' : '') + '</span>';
+          } else if (data.count > 1 && matchSel) {
+            statusEl.innerHTML = `<span style="color:var(--signal);">⚠ matches ${data.count} elements —</span>`;
+            const opts = lastMatches.map(m => `<option value="${m.index}">#${m.index + 1} — "${escapeHtml(m.text || '(no text)')}"</option>`);
+            opts.push(`<option value="-1">Last match</option>`);
+            matchSel.innerHTML = opts.join('');
+            matchSel.value = (prevIdx !== '' && [...matchSel.options].some(o => o.value === prevIdx)) ? prevIdx : '0';
+            matchBox.style.display = 'inline-flex';
+            showChosen();
+          } else {
+            statusEl.innerHTML = '<span style="color:var(--circuit);">✓ matches exactly 1 element</span>';
+          }
         } catch (e) {
           statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
         }
       };
+      // Highlight the chosen match on the screenshot so it's obvious which one it is
+      const showChosen = () => {
+        if (!matchSel) return;
+        const v = parseInt(matchSel.value, 10);
+        const m = v === -1 ? lastMatches[lastMatches.length - 1] : lastMatches[v];
+        if (m && m.bounds && typeof lsHighlightBoundsOnScreenshot === 'function') lsHighlightBoundsOnScreenshot(m.bounds);
+      };
+      if (matchSel) matchSel.addEventListener('change', showChosen);
       sel.addEventListener('change', refresh);
+      refresh();   // check once up front so a many-match locator offers the picker straight away
       if (offInput) offInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(refresh, 350); });
     });
 
@@ -7459,6 +7522,12 @@ ${clone.innerHTML}
 
         const payload = {action: actionType};
         const step = {action: actionType, label: el.label || el.tag || '', tag: el.tag};
+        // "Use match #N": only when the locator matched several elements and a choice was offered
+        const matchPickEl = details.querySelector('.ls-act-match-pick');
+        const matchIdxEl = details.querySelector('.ls-act-match-idx');
+        const chosenIndex = (useLocator && matchPickEl && matchPickEl.style.display !== 'none' && matchIdxEl && matchIdxEl.value !== '')
+          ? parseInt(matchIdxEl.value, 10) : null;
+        if (chosenIndex !== null && !Number.isNaN(chosenIndex)) { payload.index = chosenIndex; step.index = chosenIndex; }
         if (details.querySelector('.ls-act-conditional').value === 'true') { step.optional = true; }
         if (dynKind) { step.dynKind = dynKind; }
         if (useLocator) {
@@ -7733,6 +7802,11 @@ ${clone.innerHTML}
     if (s.x != null && s.y != null && !s.strategy && s.x2 == null && s.action !== 'swipe') {
       const coords = `(${s.x}, ${s.y})`;
       targetHtml = `<input class="ls-pos-name" data-pos-idx="${i}" value="${escapeHtml(s.posName || '')}" placeholder="position ${coords} — click to name it" title="Give this position a name, e.g. Add weight button" style="font-family:var(--mono); font-size:12.5px; width:${s.posName ? 'auto' : '100%'}; min-width:0; max-width:100%; background:transparent; border:1px dashed ${s.posName ? 'transparent' : 'var(--ink-line-strong)'}; border-radius:6px; padding:3px 8px; color:var(--paper);">${s.posName ? `<span class="ls-val-op" style="margin-left:6px;">${coords}</span>` : ''}`;
+    }
+    if (s.index != null && s.strategy) {
+      const tag = s.index === -1 ? 'last match' : `match #${s.index + 1}`;
+      target = `${target}  [${tag}]`;
+      targetTitle = `${targetTitle || target} — ${tag}`;
     }
     return {verb, target, targetTitle: targetTitle || target, valueHtml, targetHtml};
   }
@@ -10037,32 +10111,12 @@ ${lines}
     // than just a bare step number. A live agent run's report has no such
     // field, so this section is skipped for those (they get the flat step
     // list below, as before).
-    const tests = data.tests || [];
-    if (tests.length) {
-      html += '<div class="card">';
-      tests.forEach((t, i) => {
-        html += `<div class="test-group">
-          <div class="test-group-head">
-            <div class="test-group-desc">#${i + 1} ${escapeHtml(t.description || '(untitled test)')}</div>
-            <span class="status-badge ${statusClass(t.status)}">${escapeHtml(t.status || 'unknown')}</span>
-          </div>
-          <div class="test-group-meta">${(t.steps || []).length} step(s)</div>`;
-        if (t.error) {
-          html += `<div class="flag-box"><b>error:</b> ${escapeHtml(t.error)}</div>`;
-        }
-        html += '</div>';
-      });
-      html += '</div>';
-    }
-
-    const steps = data.steps || [];
-    if (steps.length) {
-      html += '<div class="card">';
-      steps.forEach(s => {
+    const stepHtml = (s) => {
+      let h = '';
         const flagged = s.judge && s.judge.verdict === 'flag';
         const netCalls = s.network_calls || [];
         const netErrors = netCalls.filter(c => c.is_error);
-        html += `<div class="step ${flagged || netErrors.length ? 'flagged' : ''}">
+        h += `<div class="step ${flagged || netErrors.length ? 'flagged' : ''}">
           <div class="step-head"><span class="n">#${s.step}</span> ${escapeHtml(s.action || '')}${s.element_id ? ' → ' + escapeHtml(s.element_id) : ''}</div>
           <div class="step-reason">${escapeHtml(s.reasoning || '')}</div>`;
         if (s.screenshot) {
@@ -10072,22 +10126,22 @@ ${lines}
           // by /api/report-screenshot/<path> (same bridge, so this works
           // wherever the console itself is hosted).
           const shotUrl = BRIDGE_URL + '/api/report-screenshot/' + s.screenshot;
-          html += `<a href="${shotUrl}" target="_blank" title="Open full-size screenshot">
+          h += `<a href="${shotUrl}" target="_blank" title="Open full-size screenshot">
             <img src="${shotUrl}" loading="lazy" style="margin-top:6px; max-width:160px; max-height:320px; border:1px solid var(--ink-line); border-radius:6px; display:block;">
           </a>`;
         }
         if (flagged) {
-          html += `<div class="flag-box"><b>flagged (${escapeHtml(s.judge.confidence || '')}):</b> ${escapeHtml(s.judge.explanation || '')}</div>`;
+          h += `<div class="flag-box"><b>flagged (${escapeHtml(s.judge.confidence || '')}):</b> ${escapeHtml(s.judge.explanation || '')}</div>`;
         }
         netErrors.forEach(c => {
           const reqBlock = c.request_body ? `<div style="margin-top:4px;"><span style="color:var(--paper-dim);">request:</span> ${escapeHtml(c.request_body)}</div>` : '';
           const resBlock = c.response_body ? `<div style="margin-top:4px;"><span style="color:var(--paper-dim);">response:</span> ${escapeHtml(c.response_body)}</div>` : '';
-          html += `<div class="flag-box"><b>network error:</b> ${escapeHtml(c.method)} ${escapeHtml(c.url)} → ${c.status_code}${reqBlock}${resBlock}</div>`;
+          h += `<div class="flag-box"><b>network error:</b> ${escapeHtml(c.method)} ${escapeHtml(c.url)} → ${c.status_code}${reqBlock}${resBlock}</div>`;
         });
         if (netCalls.length) {
           const okCalls = netCalls.filter(c => !c.is_error);
           if (okCalls.length) {
-            html += `<div style="font-size:11.5px; color:var(--paper-dim); margin-top:6px; font-family:var(--mono);">
+            h += `<div style="font-size:11.5px; color:var(--paper-dim); margin-top:6px; font-family:var(--mono);">
               ${okCalls.length} network call(s) in this step:
               ${okCalls.map(c => {
                 const summary = `${escapeHtml(c.method)} ${escapeHtml(c.url)} → ${c.status_code}`;
@@ -10099,11 +10153,51 @@ ${lines}
             </div>`;
           }
         } else if (s.network_calls !== undefined && s.network_calls !== null) {
-          html += `<div style="font-size:11.5px; color:var(--paper-dim); margin-top:6px;">0 network calls captured in this step's window</div>`;
+          h += `<div style="font-size:11.5px; color:var(--paper-dim); margin-top:6px;">0 network calls captured in this step's window</div>`;
         }
-        html += `</div>`;
+        h += `</div>`;
+      return h;
+    };
+
+    const steps = data.steps || [];
+    const tests = data.tests || [];
+    if (tests.length) {
+      // Cases are <details> so Wrap/Unwrap works with no script at all - the
+      // downloaded/published copy is a static clone of this markup. Failing
+      // cases start open, passing ones collapsed.
+      const byNum = {};
+      steps.forEach(s => { byNum[s.step] = s; });
+      const used = new Set();
+      const tgl = v => `document.querySelectorAll('.rep-case').forEach(function(d){d.open=${v}})`;
+      html += `<div class="card">
+        <div style="display:flex; gap:8px; align-items:center; justify-content:space-between;">
+          <div style="font-size:12px; color:var(--paper-dim);">${tests.length} test case(s) - each holds its steps and screenshots</div>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="rep-btn" onclick="${tgl('true')}">Unwrap all</button>
+            <button type="button" class="rep-btn" onclick="${tgl('false')}">Wrap all</button>
+          </div>
+        </div>`;
+      tests.forEach((t, i) => {
+        const tSteps = (t.steps || []).map(ts => byNum[ts.step]).filter(Boolean);
+        tSteps.forEach(s => used.add(s.step));
+        const isFail = t.status && t.status !== 'pass' && t.status !== 'skipped';
+        html += `<details class="rep-case test-group" ${isFail ? 'open' : ''}>
+          <summary class="test-group-head" style="cursor:pointer; list-style:none;">
+            <div>
+              <div class="test-group-desc"><span class="rep-caret">▸</span> #${i + 1} ${escapeHtml(t.description || '(untitled test)')}</div>
+              <div class="test-group-meta">${(t.steps || []).length} step(s)</div>
+            </div>
+            <span class="status-badge ${statusClass(t.status)}">${escapeHtml(t.status || 'unknown')}</span>
+          </summary>`;
+        if (t.error) html += `<div class="flag-box"><b>error:</b> ${escapeHtml(t.error)}</div>`;
+        html += `<div style="margin-top:10px;">${tSteps.map(stepHtml).join('') || '<div class="hint">No step details recorded for this case.</div>'}</div>`;
+        html += '</details>';
       });
       html += '</div>';
+      const rest = steps.filter(s => !used.has(s.step));
+      if (rest.length) html += `<div class="card">${rest.map(stepHtml).join('')}</div>`;
+    } else if (steps.length) {
+      html += `<div class="card">${steps.map(stepHtml).join('')}</div>`;
     }
 
     targetEl.innerHTML = html;
