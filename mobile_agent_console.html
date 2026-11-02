@@ -2299,6 +2299,8 @@
                 <option value="matches">matches</option>
                 <option value="within_minutes_of_now">within_minutes_of_now</option>
                 <option value="is_today">is_today</option>
+                <option value="is_yesterday">is_yesterday</option>
+                <option value="is_tomorrow">is_tomorrow</option>
               </select>
               <input id="lsLabActExpected" placeholder="expected value" style="display:none; width:auto; flex:1; min-width:100px;">
               <input id="lsLabActSaveAs" placeholder="save as (e.g. stepsFromApp)" style="display:none; width:auto; flex:1; min-width:140px;">
@@ -7048,8 +7050,8 @@ ${clone.innerHTML}
       expectedEl.style.minWidth = '210px';
       if (!expectedEl.value) expectedEl.value = '1';
       expectedEl.disabled = false;
-    } else if (c === 'is_today') {
-      expectedEl.placeholder = 'not needed - compares to today';
+    } else if (c === 'is_today' || c === 'is_yesterday' || c === 'is_tomorrow') {
+      expectedEl.placeholder = 'not needed - compares to the device date';
       expectedEl.value = '';
       expectedEl.disabled = true;
     } else {
@@ -7144,6 +7146,8 @@ ${clone.innerHTML}
             <option value="matches">matches pattern</option>
             <option value="within_minutes_of_now">is within … min of now</option>
             <option value="is_today">is today's date</option>
+            <option value="is_yesterday">is yesterday's date</option>
+            <option value="is_tomorrow">is tomorrow's date</option>
           </select>
           <input class="ls-act-expected" placeholder="expected value" style="display:none; width:auto; flex:1; min-width:100px;">
           <input class="ls-act-saveas" placeholder="remember as… (e.g. before_weight)" style="display:none; width:auto; flex:1; min-width:200px;">
@@ -7634,6 +7638,8 @@ ${clone.innerHTML}
       case 'assert_value': {
         if (s.compare === 'within_minutes_of_now') return `Check ${target} is within ${s.expected || 1} min of now`;
         if (s.compare === 'is_today') return `Check ${target} is today's date`;
+        if (s.compare === 'is_yesterday') return `Check ${target} is yesterday's date`;
+        if (s.compare === 'is_tomorrow') return `Check ${target} is tomorrow's date`;
         return `Check ${target} ${LS_COMPARE_WORDS[s.compare] || s.compare || 'equals'} "${s.expected ?? ''}"`;
       }
       case 'parse_label': return `Remember ${target} as ${s.save_as || '(unnamed)'}`;
@@ -7716,7 +7722,7 @@ ${clone.innerHTML}
       case 'wait': valueHtml = lsInlineInput(i, 'seconds', s.seconds ?? 2, {number: true, width: '80px'}) + '<span class="ls-val-op">sec</span>'; break;
       case 'parse_label': valueHtml = `<span class="ls-val-op">as</span>` + lsInlineInput(i, 'save_as', s.save_as, {placeholder: 'name'}); break;
       case 'assert_value':
-        if (s.compare === 'is_today') valueHtml = '<span class="ls-val-pill">is today</span>';
+        if (s.compare === 'is_today' || s.compare === 'is_yesterday' || s.compare === 'is_tomorrow') valueHtml = `<span class="ls-val-pill">${s.compare.replace('is_', 'is ')}</span>`;
         else if (s.compare === 'within_minutes_of_now') valueHtml = '<span class="ls-val-op">within</span>' + lsInlineInput(i, 'expected', s.expected ?? 1, {number: true, width: '70px'}) + '<span class="ls-val-op">min of now</span>';
         else valueHtml = `<span class="ls-val-op">${escapeHtml(LS_COMPARE_WORDS[s.compare] || s.compare || 'equals')}</span>` + lsInlineInput(i, 'expected', s.expected, {placeholder: 'expected'});
         break;
