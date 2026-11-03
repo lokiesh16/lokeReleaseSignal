@@ -2235,6 +2235,17 @@
               <button class="copy" id="lsSwitchAppBtn" style="flex-shrink:0;">Switch app</button>
               <button class="copy" id="lsBackToAppBtn" style="flex-shrink:0; background:var(--ink-line); color:var(--paper);">Back to app under test</button>
             </div>
+            <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12px; cursor:pointer;">
+              <input type="checkbox" id="lsSwitchFresh" checked style="width:auto;">
+              Open fresh - close it first if it is already running in the background
+            </label>
+            <div id="lsSwitchFreshHow" style="margin-top:6px; font-size:12px; display:flex; align-items:center; gap:8px;">
+              <span class="hint">Close it by</span>
+              <select id="lsSwitchFreshMode" style="width:auto;">
+                <option value="swipe">swiping it away in the app switcher (like real life, iOS)</option>
+                <option value="terminate">terminating it directly (instant)</option>
+              </select>
+            </div>
             <div id="lsSwitchAppStatus" style="font-size:12px; margin-top:6px;"></div>
           </div>
         </details>
@@ -2327,6 +2338,7 @@
                 <option value="greater_than">greater_than</option><option value="less_than">less_than</option>
                 <option value="greater_than_or_equal">greater_than_or_equal</option><option value="less_than_or_equal">less_than_or_equal</option>
                 <option value="matches">matches</option>
+                <option value="approx_equals">approx_equals (± tolerance)</option>
                 <option value="within_minutes_of_now">within_minutes_of_now</option>
                 <option value="is_today">is_today</option>
                 <option value="is_yesterday">is_yesterday</option>
@@ -3391,7 +3403,39 @@
   // Each of these is fetched once at page load and swallows failures; if the
   // bridge wasn't answering yet they'd stay empty forever. checkBridge (every
   // 4s) retries whichever hasn't loaded once the bridge is reachable.
+  // Background polling that behaves: never overlaps itself (the next run is
+  // scheduled only after the last one finished), pauses while this tab is hidden
+  // or minimised, resumes at once when you come back, and backs off when the
+  // bridge is slow or unreachable instead of stacking up pending requests.
+  function startPoller(fn, intervalMs, maxMs) {
+    let delay = intervalMs, timer = null, running = false;
+    const tick = async () => {
+      timer = null;
+      if (document.hidden) return;              // resumed by visibilitychange below
+      running = true;
+      const t0 = Date.now();
+      let ok = true;
+      try { ok = (await fn()) !== false; } catch (e) { ok = false; }
+      running = false;
+      delay = ok ? Math.max(intervalMs, (Date.now() - t0) * 2) : Math.min(maxMs, delay * 2);
+      if (!document.hidden) timer = setTimeout(tick, delay);
+    };
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden || running) return;
+      if (timer) clearTimeout(timer);
+      delay = intervalMs;
+      tick();
+    });
+    tick();
+  }
+  function fetchWithTimeout(url, ms, opts) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms);
+    return fetch(url, {...(opts || {}), signal: ctl.signal}).finally(() => clearTimeout(t));
+  }
+
   let flowModulesLoaded = false, savedFlowsLoaded = false, preconditionsLoaded = false;
+  let bridgeOnline = false;
 
   async function checkBridge() {
     const dot = document.getElementById('bridgeDot');
@@ -3400,8 +3444,9 @@
     const startBtn = document.getElementById('bridgeStartBtn');
     const stopBtn = document.getElementById('bridgeStopBtn');
     try {
-      const res = await fetch(BRIDGE_URL + '/api/health');
+      const res = await fetchWithTimeout(BRIDGE_URL + '/api/health', 6000);
       if (res.ok) {
+        bridgeOnline = true;
         lastBridgeSyncAt = new Date();
         dot.style.background = 'var(--circuit)';
         dot.style.boxShadow = '0 0 8px var(--circuit)';
@@ -3416,6 +3461,7 @@
         return true;
       }
     } catch (e) {}
+    bridgeOnline = false;
     dot.style.background = 'var(--alert)';
     dot.style.boxShadow = 'none';
     text.textContent = 'Bridge server is off.';
@@ -3425,8 +3471,7 @@
     mirrorBridgeStatus(false);
     return false;
   }
-  checkBridge();
-  setInterval(checkBridge, 4000);
+  startPoller(checkBridge, 4000, 12000);
 
   document.getElementById('bridgeStartBtn').addEventListener('click', async () => {
     const btn = document.getElementById('bridgeStartBtn');
@@ -3504,15 +3549,50 @@
     return prefix ? prefix + name[0].toUpperCase() + name.slice(1) : name;
   }
 
-  async function pollConnectedDeviceForPrefix(prefix) {
+  // When several devices are plugged in, offer them as a dropdown under the UDID
+  // box (pick one -> UDID, device name and OS version fill in); the box itself
+  // stays typable. Gone again when 0 or 1 device is connected.
+  function syncDevicePicker(prefix, devices) {
+    const udidEl = document.getElementById(fieldId(prefix, 'udid'));
+    if (!udidEl) return;
+    let sel = document.querySelector(`.device-pick[data-prefix="${prefix}"]`);
+    if (devices.length < 2) { if (sel) sel.remove(); return; }
+    if (!sel) {
+      sel = document.createElement('select');
+      sel.className = 'device-pick';
+      sel.dataset.prefix = prefix;
+      sel.style.cssText = 'margin-top:6px; width:100%;';
+      udidEl.insertAdjacentElement('afterend', sel);
+      sel.addEventListener('change', () => {
+        const opt = sel.selectedOptions[0];
+        if (!opt || !opt.value) return;
+        const set = (name, v) => { const el = document.getElementById(fieldId(prefix, name)); if (el && v) { el.value = v; el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true})); } };
+        set('udid', opt.value);
+        set('device', opt.dataset.name);
+        set('platformVersion', opt.dataset.version);
+      });
+    }
+    const chosen = sel.value || udidEl.value;
+    sel.innerHTML = `<option value="">Choose a device (${devices.length} connected)…</option>` + devices.map(d =>
+      `<option value="${escapeHtml(d.udid || '')}" data-name="${escapeHtml(d.name || '')}" data-version="${escapeHtml(d.platform_version || '')}">${escapeHtml(d.name || d.udid)}${d.platform_version ? ' - ' + escapeHtml(d.platform_version) : ''}  (${escapeHtml((d.udid || '').slice(0, 12))}…)</option>`).join('');
+    if (devices.some(d => d.udid === chosen)) sel.value = chosen;
+  }
+
+  async function pollConnectedDeviceForPrefix(prefix, cache) {
     const platformEl = document.getElementById(fieldId(prefix, 'platform'));
     const platform = platformEl ? platformEl.value : 'iOS';
     const statusEl = document.querySelector(`.device-detect-status[data-target-prefix="${prefix}"]`);
     try {
-      const res = await fetch(BRIDGE_URL + '/api/devices?platform=' + encodeURIComponent(platform));
-      if (!res.ok) return;
-      const data = await res.json();
+      // One request per platform per round, shared by every form that uses it.
+      let pending = cache.get(platform);
+      if (!pending) {
+        pending = fetchWithTimeout(BRIDGE_URL + '/api/devices?platform=' + encodeURIComponent(platform), 15000)
+          .then(res => { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); });
+        cache.set(platform, pending);
+      }
+      const data = await pending;
       const devices = data.devices || [];
+      syncDevicePicker(prefix, devices);
       let statusText;
       if (devices.length === 1) {
         const d = devices[0];
@@ -3521,19 +3601,22 @@
         fillIfIdle(fieldId(prefix, 'device'), d.name);
         fillIfIdle(fieldId(prefix, 'platformVersion'), d.platform_version);
       } else if (devices.length > 1) {
-        statusText = `${devices.length} devices connected (${devices.map(d => d.name).join(', ')}) — enter the UDID manually to pick one`;
+        statusText = `${devices.length} devices connected (${devices.map(d => d.name).join(', ')}) — choose one from the list below`;
       } else {
         statusText = `no connected ${platform} device detected — enter UDID manually, or plug one in`;
       }
       if (statusEl) statusEl.textContent = statusText;
-    } catch (e) { /* bridge server reachability already surfaced by checkBridge() above */ }
+      return true;
+    } catch (e) { return false; /* bridge reachability is surfaced by checkBridge() */ }
   }
 
-  function pollAllConnectedDevices() {
-    PLATFORM_FIELD_PREFIXES.forEach(pollConnectedDeviceForPrefix);
+  async function pollAllConnectedDevices() {
+    if (!bridgeOnline) return true;   // nothing to ask while the bridge is off
+    const cache = new Map();
+    const results = await Promise.all(PLATFORM_FIELD_PREFIXES.map(p => pollConnectedDeviceForPrefix(p, cache)));
+    return results.every(r => r !== false);
   }
-  pollAllConnectedDevices();
-  setInterval(pollAllConnectedDevices, 3000);
+  startPoller(pollAllConnectedDevices, 8000, 30000);
 
   // ---------- Platform-aware fields (Run / Replay / Inspector tabs) ----------
   // Xcode Team ID only means anything for iOS (XCUITest real-device
@@ -4828,7 +4911,11 @@ ${clone.innerHTML}
     let runId;
     try {
       const res = await fetch(BRIDGE_URL + '/api/flows/' + encodeURIComponent(slug) + '/run', {
-        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({}),
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          appium: (folderRun.apps && folderRun.apps[item.platform]) ? {bundle_id: folderRun.apps[item.platform]} : undefined,
+          fresh_start: folderRun.fresh || undefined,
+        }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'failed to start replay');
@@ -4891,13 +4978,16 @@ ${clone.innerHTML}
     if (folderRun && folderRun.running) return;
     const items = [];
     values.forEach(v => flowsInFolder(v).forEach(f => items.push({
-      slug: f.slug, name: f.name || f.slug, folder: f.module || 'No folder', status: 'pending', note: '', data: null,
+      slug: f.slug, name: f.name || f.slug, folder: f.module || 'No folder', platform: f.platform, status: 'pending', note: '', data: null,
     })));
     if (!items.length) return;
     const names = [...new Set(items.map(i => i.folder))];
     const label = names.join(', ');
-    if (!confirm(`Run ${items.length} flow(s) from ${names.length} folder(s) (${label}) one after another on the connected device?`)) return;
-    folderRun = {folder: label, folders: names, running: true, cancel: false, startedAt: new Date(), items};
+    const apps = {};
+    Object.keys(folderOpts.apps).forEach(pf => { const v = (folderOpts.apps[pf] || '').trim(); if (v && items.some(i => i.platform === pf)) apps[pf] = v; });
+    const appText = Object.keys(apps).length ? ' against ' + Object.entries(apps).map(([pf, v]) => `${v} (${pf})`).join(', ') : " against each flow's own app";
+    if (!confirm(`Run ${items.length} flow(s) from ${names.length} folder(s) (${label}) one after another on the connected device${appText}?`)) return;
+    folderRun = {folder: label, folders: names, running: true, cancel: false, startedAt: new Date(), items, apps, fresh: folderOpts.fresh};
     folderPick = null;
     renderFolderPicker();
     renderFolderBar();
@@ -4914,7 +5004,12 @@ ${clone.innerHTML}
     renderFolderRunPanel();
     loadSavedFlows && loadSavedFlows();
   }
-  const runFolder = () => runFolders([savedFlowsModuleFilter]);
+  // "Run folder" opens the picker with this folder ticked, so the app and
+  // start options are chosen the same way for one folder or several.
+  const runFolder = () => { folderPick = new Set([savedFlowsModuleFilter]); renderFolderPicker(); };
+  // What to run against: per platform an app (bundle/package id; blank = each
+  // flow's own app), and whether the app is closed and reopened first.
+  const folderOpts = {apps: {}, fresh: ''};
 
   // Multi-folder picker ("Run folders…"): tick any folders, run them in order.
   let folderPick = null;   // null = closed, else Set of folder values
@@ -4926,6 +5021,17 @@ ${clone.innerHTML}
       .map(o => ({...o, n: flowsInFolder(o.value).length})).filter(o => o.n);
     const picked = opts.filter(o => folderPick.has(o.value));
     const total = picked.reduce((a, o) => a + o.n, 0);
+    // One app chooser per platform among the picked folders' flows (a bundle id
+    // for Android is meaningless to an iOS flow).
+    const platforms = [...new Set(picked.flatMap(o => flowsInFolder(o.value).map(f => f.platform)))].filter(Boolean);
+    const appRowsHtml = platforms.map(pf => {
+      const cur = folderOpts.apps[pf] || '';
+      return `<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 8px; font-size:12px;">
+        <span style="min-width:150px; color:var(--paper-dim);">App to test (${escapeHtml(pf)})</span>
+        <select data-pick-app-env="${escapeHtml(pf)}" style="width:auto; flex:1 1 220px; font-size:12px; padding:4px 8px;">${renderEnvironmentOptions(pf, "— each flow's own app —", cur)}</select>
+        <input type="text" data-pick-app="${escapeHtml(pf)}" value="${escapeHtml(cur)}" placeholder="or type a custom bundle/package id" style="width:auto; flex:1 1 220px; min-width:160px; font-size:12px; padding:4px 8px;">
+      </div>`;
+    }).join('');
     el.innerHTML = `<div class="card" style="margin:8px 0;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
         <b>Run folders</b>
@@ -4934,11 +5040,29 @@ ${clone.innerHTML}
       <div style="display:flex; flex-wrap:wrap; gap:8px 18px; margin:10px 0;">
         ${opts.length ? opts.map(o => `<label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;"><input type="checkbox" data-pick="${escapeHtml(o.value)}" ${folderPick.has(o.value) ? 'checked' : ''} style="width:auto;"> ${escapeHtml(o.label)} <span class="hint">${o.n} flow${o.n === 1 ? '' : 's'}</span></label>`).join('') : '<span class="hint">No folders have flows for this platform filter.</span>'}
       </div>
+      ${appRowsHtml}
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 10px; font-size:12px;">
+        <span style="min-width:150px; color:var(--paper-dim);">App at start</span>
+        <select data-pick-fresh style="width:auto; flex:1 1 260px; font-size:12px; padding:4px 8px;">
+          <option value="">Use as is</option>
+          <option value="swipe" ${folderOpts.fresh === 'swipe' ? 'selected' : ''}>Close and reopen fresh - swipe it away (iOS)</option>
+          <option value="terminate" ${folderOpts.fresh === 'terminate' ? 'selected' : ''}>Close and reopen fresh - kill it directly</option>
+        </select>
+        <span class="hint">once before each flow</span>
+      </div>
       <div style="display:flex; gap:8px; justify-content:flex-end;">
         <button type="button" class="rep-btn" data-pick-cancel>Cancel</button>
         <button type="button" class="copy" data-pick-run ${total ? '' : 'disabled'} style="padding:5px 14px; font-size:12px;">▶ Run ${total} flow${total === 1 ? '' : 's'} in ${picked.length} folder${picked.length === 1 ? '' : 's'}</button>
       </div></div>`;
     el.querySelectorAll('[data-pick]').forEach(cb => cb.onchange = () => { cb.checked ? folderPick.add(cb.dataset.pick) : folderPick.delete(cb.dataset.pick); renderFolderPicker(); });
+    el.querySelectorAll('[data-pick-app-env]').forEach(sel => sel.onchange = () => {
+      folderOpts.apps[sel.dataset.pickAppEnv] = sel.value;
+      const inp = el.querySelector(`[data-pick-app="${CSS.escape(sel.dataset.pickAppEnv)}"]`);
+      if (inp) inp.value = sel.value;
+    });
+    el.querySelectorAll('[data-pick-app]').forEach(inp => inp.oninput = () => { folderOpts.apps[inp.dataset.pickApp] = inp.value.trim(); });
+    const freshSel = el.querySelector('[data-pick-fresh]');
+    if (freshSel) freshSel.onchange = () => { folderOpts.fresh = freshSel.value; };
     el.querySelector('[data-pick-all]').onclick = () => { opts.forEach(o => folderPick.add(o.value)); renderFolderPicker(); };
     el.querySelector('[data-pick-none]').onclick = () => { folderPick.clear(); renderFolderPicker(); };
     el.querySelector('[data-pick-cancel]').onclick = () => { folderPick = null; renderFolderPicker(); };
@@ -5560,6 +5684,15 @@ ${clone.outerHTML}
         <select class="flow-step-delay" data-slug="${escapeHtml(f.slug)}" style="width:auto; flex:1 1 160px; font-size:11px; padding:3px 6px;">
           <option value="">Fast (default)</option>
           <option value="2">Human speed (~2s/step)</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px; font-size:11px;" title="Close the app first if it is already running, then open it again, so the run starts from the app's normal start screen instead of wherever it was left. Swiping it away in the app switcher is how you'd do it by hand (iOS); it falls back to a direct kill if that doesn't work.">
+        <span class="hint" style="font-size:11px; flex-shrink:0;">App at start:</span>
+        <select class="flow-fresh-start" data-slug="${escapeHtml(f.slug)}" style="width:auto; flex:1 1 200px; font-size:11px; padding:3px 6px;">
+          <option value="">Use as is (default)</option>
+          <option value="swipe">Close and reopen fresh - swipe it away in the app switcher (iOS)</option>
+          <option value="terminate">Close and reopen fresh - kill it directly</option>
         </select>
       </div>
 
@@ -6517,6 +6650,8 @@ ${clone.outerHTML}
       // default", not "run at 0 seconds".
       const stepDelaySelect = document.querySelector(`.flow-step-delay[data-slug="${CSS.escape(slug)}"]`);
       const stepDelayValue = stepDelaySelect ? stepDelaySelect.value : '';
+      const freshStartSelect = document.querySelector(`.flow-fresh-start[data-slug="${CSS.escape(slug)}"]`);
+      const freshStartValue = freshStartSelect ? freshStartSelect.value : '';
 
       // Optional - replays a saved precondition (e.g. login) on the same
       // app session before this flow's own steps run. Blank means "just
@@ -6547,6 +6682,7 @@ ${clone.outerHTML}
             precondition_password: preconditionLoginVisible && preconditionPasswordInput ? preconditionPasswordInput.value : undefined,
             run_api_script: runApiScript,
             step_delay_seconds: stepDelayValue ? Number(stepDelayValue) : undefined,
+            fresh_start: freshStartValue || undefined,
           }),
         });
         const data = await res.json();
@@ -7535,7 +7671,93 @@ ${clone.outerHTML}
         dynLabel: lsRelDateLabel(off),
       });
     }
-    return relOptions.concat(lsDynamicOptionsText(el));
+    return relOptions.concat(lsDynamicOptionsText(el), lsNeighborOptions(el));
+  }
+  // Tries each "Next to a label" locator on the live screen and keeps the
+  // ones that land on THIS element (matching bounds), nudging the position
+  // number when the element list's order differs from the screen's. Options
+  // that never land are removed, so what's left is known to work right now.
+  async function lsVerifyNear(sel, el) {
+    if (!lsSessionId || !el || el._nearChecked === lsSessionId + '|' + lsLastElements.length) return;
+    const opts = lsNeighborOptions(el);
+    const me = lsCenterPoint(el);
+    if (!opts.length || !me) return;
+    el._nearOk = el._nearOk || {};
+    const near = (b) => b && Math.abs(b.x + b.width / 2 - me.x) <= 4 && Math.abs(b.y + b.height / 2 - me.y) <= 4;
+    for (const o of opts) {
+      if (!sel.isConnected) return;
+      const optEl = Array.from(sel.options).find(x => x.value === o.key);
+      if (!optEl || el._nearOk[o.key]) continue;
+      let hit = null;
+      for (const c of [o.cnt, o.cnt + 1, o.cnt - 1, o.cnt + 2, o.cnt - 2]) {
+        if (c < 1) continue;
+        const value = o.build(c);
+        try {
+          const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/test_locator', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({strategy: 'xpath', value}),
+          });
+          const data = await res.json();
+          if (!res.ok) break;
+          const ms = data.matches || [];
+          const k = ms.findIndex(m => near(m.bounds));
+          if (k >= 0) { hit = {value, index: ms.length > 1 ? k : null}; break; }
+        } catch (e) { return; }
+      }
+      if (!sel.isConnected) return;
+      if (hit) {
+        el._nearOk[o.key] = hit;
+        optEl.textContent = o.label.replace(/ ✓$/, '') + ' ✓';
+      } else if (sel.value !== o.key) {
+        optEl.remove();
+      } else {
+        optEl.textContent = o.label + ' - does not land on this element';
+      }
+    }
+    el._nearChecked = lsSessionId + '|' + lsLastElements.length;
+  }
+  // "Next to a label": finds the element by the fixed text beside it (e.g. the
+  // "Goal" caption above a changing 1500), so the locator survives the value
+  // changing. Counts same-type elements with text from the label to the target
+  // in screen order and uses that position on the following:: / preceding:: axis.
+  function lsNeighborOptions(el) {
+    const idx = lsLastElements.indexOf(el);
+    const tag = el && el.tag;
+    if (idx < 0 || !tag) return [];
+    const android = (document.getElementById('lsPlatform') || {}).value === 'Android';
+    const txt = e => String(e.label || e.text || '').trim();
+    const attr = android ? '@text' : '@label';
+    const mine = txt(el);
+    if (!mine) return [];
+    const ok = c => { const t = txt(c); return t && t !== mine && !/["\n]/.test(t) && !/\d/.test(t) && t.length <= 40 && !/[\/:]id\//.test(t) && !t.includes('/'); };
+    const out = [];
+    const seen = new Set();
+    const scan = (dir) => {
+      let tried = 0;
+      for (let j = idx + dir; j >= 0 && j < lsLastElements.length && tried < 3; j += dir) {
+        const c = lsLastElements[j];
+        if (!ok(c)) continue;
+        tried++;
+        const t = txt(c);
+        const key = `${dir}|${t}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        // n counts same-type elements with text between the label and the target, target included
+        const cnt = (dir < 0 ? lsLastElements.slice(j + 1, idx + 1) : lsLastElements.slice(idx, j)).filter(e => e.tag === tag && txt(e)).length;
+        const axis = dir < 0 ? 'following' : 'preceding';
+        const okey = 'near' + (dir < 0 ? 'A' : 'B') + out.length;
+        const build = c => `//*[${attr}="${t}"]/${axis}::${tag}[normalize-space(${attr})!=""][${c}]`;
+        const fixed = el._nearOk && el._nearOk[okey];
+        out.push({
+          key: okey, isNear: true, build, cnt,
+          label: `Next to "${t}" (the ${dir < 0 ? 'value after' : 'value before'} that label)${fixed ? ' ✓' : ''}`,
+          strategy: 'xpath',
+          value: fixed ? fixed.value : build(cnt), index: fixed ? fixed.index : null,
+        });
+      }
+    };
+    scan(-1); scan(1);
+    return out;
   }
   function lsDynamicOptionsText(el) {
     const text = String(el.label || el.text || '').trim();
@@ -7571,7 +7793,7 @@ ${clone.outerHTML}
       // the same removed, and it contains at least one digit.
       const stripped = text.replace(/[0-9.,]/g, '').replace(/\s+/g, ' ').trim();
       kinds.push({key: 'textnum', label: `Same text, any number ("${shown}")`, rx,
-        xp: /["]/.test(stripped) ? null : `//*[normalize-space(translate(@text,"0123456789.,",""))="${stripped}" and translate(@text,"0123456789","")!=@text]`});
+        xp: /["]/.test(stripped) || !/[:\\\/()]/.test(text) ? null : `//*[normalize-space(translate(@text,"0123456789.,",""))="${stripped}" and translate(@text,"0123456789","")!=@text]`});
     }
     const android = (document.getElementById('lsPlatform') || {}).value === 'Android';
     // The scraped text is trimmed for detection, but the element's real text
@@ -7603,8 +7825,8 @@ ${clone.outerHTML}
       expectedEl.value = '';
       expectedEl.disabled = true;
     } else {
-      expectedEl.placeholder = 'expected value';
-      expectedEl.style.minWidth = '100px';
+      expectedEl.placeholder = c === 'approx_equals' ? 'value, optional ± tolerance (e.g. 19.26 ± 0.05; default ± 0.01)' : 'expected value';
+      expectedEl.style.minWidth = c === 'approx_equals' ? '300px' : '100px';
       expectedEl.disabled = false;
     }
   }
@@ -7616,6 +7838,34 @@ ${clone.outerHTML}
   // app update) and a human driving this tool may deliberately prefer a
   // raw tap. Position-only actions are restricted to "tap" (see actions.py/
   // scrape_act - there's no element to type into or assert against).
+  // The distinct values inside an element's text, for "which one do you want
+  // to remember": numbers (with the unit word that follows) and clock times,
+  // in the order they appear. Mirrors assertions.extract_value's number:N / time.
+  function lsTextValues(el) {
+    const text = String(el.label || el.text || el.value || '');
+    const timeRe = /\d{1,2}:\d{2}(?::\d{2})?(?:\s?[AaPp][Mm])?/g;
+    const times = text.match(timeRe) || [];
+    const rest = text.replace(timeRe, ' ');
+    const nums = [];
+    const numRe = /-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?/g;
+    let m;
+    while ((m = numRe.exec(rest))) {
+      const unit = (rest.slice(numRe.lastIndex).match(/^\s*([A-Za-z%°\/]{1,12})/) || [])[1] || '';
+      nums.push(unit ? `${m[0]} ${unit}` : m[0]);
+    }
+    return {nums, times: times.map(t => t.trim())};
+  }
+  function lsExtractOptionsHtml(el) {
+    const v = lsTextValues(el);
+    let h = '<option value="text">as text</option><option value="number">as number</option><option value="duration_seconds">as duration (seconds)</option>';
+    if (v.nums.length + v.times.length >= 2) {
+      h += '<optgroup label="This element shows several values - which one?">' +
+        v.nums.map((n, i) => `<option value="number:${i + 1}">${escapeHtml(n)} (number ${i + 1})</option>`).join('') +
+        (v.times.length ? `<option value="time">${escapeHtml(v.times[0])} (time)</option>` : '') + '</optgroup>';
+    }
+    return h;
+  }
+
   function lsRenderActPanel(el, i) {
     const locator = lsBestLocator(el);
     const point = lsCenterPoint(el);
@@ -7634,12 +7884,12 @@ ${clone.outerHTML}
     const dynOptions = locator ? lsDynamicOptions(el) : [];
     const dynamicPicker = dynOptions.length ? `
       <div style="margin-top:6px; font-size:11.5px;">
-        <div style="color:var(--signal); margin-bottom:3px;">⚠ "${escapeHtml(String(el.label || el.text || ''))}" looks like a value that changes between runs — use a pattern so replays don't break.</div>
+        <div style="color:var(--signal); margin-bottom:3px;">${dynOptions.some(o => !o.isNear) ? `⚠ "${escapeHtml(String(el.label || el.text || ''))}" looks like a value that changes between runs — use a pattern so replays don't break.` : `Tip: if this value changes between runs, find it by the label beside it instead.`}</div>
         <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
           <span style="color:var(--paper-dim);">Locator style:</span>
-          <select class="ls-act-style" data-index="${i}" style="width:auto; flex:0 0 190px; font-size:11.5px;">
+          <select class="ls-act-style" data-index="${i}" style="width:auto; flex:0 1 auto; max-width:340px; font-size:11.5px;">
             <option value="exact">Exact (breaks if value changes)</option>
-            ${dynOptions.map(o => `<option value="${o.key}">${escapeHtml(o.label)}${o.isRelDate ? '' : ' (pattern)'}</option>`).join('')}
+            ${dynOptions.map(o => `<option value="${o.key}">${escapeHtml(o.label)}${(o.isRelDate || o.isNear) ? '' : ' (pattern)'}</option>`).join('')}
           </select>
           <span class="ls-act-reldate" style="display:none; align-items:center; gap:6px;">
             <input class="ls-act-reloffset" type="number" step="1" value="${(dynOptions.find(o => o.isRelDate) || {}).defaultOffset ?? 0}" style="width:72px; font-size:11.5px; padding:4px 6px;" title="Days from today: negative = go back, positive = go forward">
@@ -7694,6 +7944,10 @@ ${clone.outerHTML}
             ${nonTapOptions}
           </select>
           <input class="ls-act-text" placeholder="text to type" style="display:none; width:auto; flex:1; min-width:120px;">
+          <select class="ls-act-random" title="Type a different random number each run. Appends {{random_digits(N)}} to the text." style="display:none; width:auto; max-width:190px;">
+            <option value="">🎲 random digits…</option>
+            ${[1,2,3,4,5,6,8,10].map(n => `<option value="${n}">${n} random digit${n > 1 ? 's' : ''}</option>`).join('')}
+          </select>
           <select class="ls-act-direction" style="display:none; width:auto; flex:0 0 100px;">
             <option value="up">up</option><option value="down">down</option><option value="left">left</option><option value="right">right</option>
           </select>
@@ -7707,6 +7961,7 @@ ${clone.outerHTML}
             <option value="less_than">is less than</option>
             <option value="greater_than_or_equal">is at least</option>
             <option value="less_than_or_equal">is at most</option>
+            <option value="approx_equals">is about (± tolerance)</option>
             <option value="matches">matches pattern</option>
             <option value="within_minutes_of_now">is within … min of now</option>
             <option value="is_today">is today's date</option>
@@ -7728,9 +7983,10 @@ ${clone.outerHTML}
               <option value="label">label (iOS)</option>
               <option value="name">name</option>
               <option value="content-desc">content-desc (Android)</option>
+              <option value="ocr">screen text (OCR) - when the app doesn't expose it</option>
             </select>
-            <select class="ls-act-extract" style="display:none; width:auto; flex:0 0 150px;" title="How to turn the text into a value before comparing">
-              <option value="text">as text</option><option value="number">as number</option><option value="duration_seconds">as duration (seconds)</option>
+            <select class="ls-act-extract" data-multi="${(() => { const v = lsTextValues(el); return v.nums.length + v.times.length >= 2 ? '1' : '0'; })()}" style="display:none; width:auto; flex:0 0 190px;" title="How to turn the text into a value before comparing">
+              ${lsExtractOptionsHtml(el)}
             </select>
             <select class="ls-act-conditional" style="width:auto; flex:0 0 260px;" title="Required: fails the test if the element is missing. Only if present: skips without failing - e.g. an iOS system alert (notifications/Face ID/save-password) that doesn't always show up.">
               <option value="false">Required — fail if element is missing</option>
@@ -7919,12 +8175,17 @@ ${clone.outerHTML}
       const compareField = row.querySelector('.ls-act-compare');
       const expectedField = row.querySelector('.ls-act-expected');
       const saveAsField = row.querySelector('.ls-act-saveas');
+      const randomSel = row.querySelector('.ls-act-random');
+      randomSel.addEventListener('change', () => {
+        if (randomSel.value) textField.value += '{{random_digits(' + randomSel.value + ')}}';
+        randomSel.value = '';
+      });
       // "+ captured value": lists values remembered earlier in this flow and
       // appends {{name}} to the expected text (numbers render as plain ints,
       // so "{{sys}}/{{dia}} mmHg" -> "122/82 mmHg").
       const insertSel = row.querySelector('.ls-act-insert');
       const fillInsert = () => {
-        const names = [...new Set((lsCapturedSteps || []).filter(x => x.action === 'parse_label' && x.save_as).map(x => x.save_as))];
+        const names = [...new Set((lsCapturedSteps || []).filter(x => (x.action === 'parse_label' || x.action === 'type_text') && x.save_as).map(x => x.save_as))];
         insertSel.innerHTML = '<option value="">+ captured value</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
         return names.length;
       };
@@ -7935,6 +8196,7 @@ ${clone.outerHTML}
       const applyVisibility = () => {
         const t = sel.value;
         textField.style.display = t === 'type_text' ? 'block' : 'none';
+        randomSel.style.display = t === 'type_text' ? 'block' : 'none';
         directionField.style.display = t === 'swipe' ? 'block' : 'none';
         secondsField.style.display = t === 'wait' ? 'block' : 'none';
         const isAssertValue = t === 'assert_value';
@@ -7944,7 +8206,12 @@ ${clone.outerHTML}
         compareField.style.display = isAssertValue ? 'block' : 'none';
         expectedField.style.display = isAssertValue ? 'block' : 'none';
         insertSel.style.display = (isAssertValue && fillInsert()) ? 'block' : 'none';
-        saveAsField.style.display = isParseLabel ? 'block' : 'none';
+        saveAsField.style.display = (isParseLabel || t === 'type_text') ? 'block' : 'none';
+        saveAsField.placeholder = t === 'type_text' ? 'remember what was typed as… (optional)' : 'remember as… (e.g. before_weight)';
+        // An element that shows several values (e.g. "9.82 min  Target: 60 min  12:16 PM"):
+        // open Advanced so the "which value" menu is in front of you.
+        const advBox = row.querySelector('.ls-act-adv');
+        if (advBox && (isAssertValue || isParseLabel) && extractField.dataset.multi === '1') advBox.open = true;
         const isEl = row.querySelector('.ls-act-sentence-is');
         if (isEl) isEl.style.display = isAssertValue ? 'inline' : 'none';
       };
@@ -8019,7 +8286,11 @@ ${clone.outerHTML}
             statusEl.innerHTML = '<span style="color:var(--alert);">✗ matches nothing on the current screen' + (dyn.isRelDate ? ' (is that date visible in the calendar?)' : '') + '</span>';
           } else if (data.count > 1 && matchSel) {
             statusEl.innerHTML = `<span style="color:var(--signal);">⚠ matches ${data.count} elements —</span>`;
-            const opts = lastMatches.map(m => `<option value="${m.index}">#${m.index + 1} — "${escapeHtml(m.text || '(no text)')}"</option>`);
+            const opts = lastMatches.map(m => {
+              const b = m.bounds;
+              const where = b ? ` · at (${Math.round(b.x)}, ${Math.round(b.y)}) ${Math.round(b.width)}×${Math.round(b.height)}` : '';
+              return `<option value="${m.index}">#${m.index + 1} — ${m.text ? '"' + escapeHtml(m.text) + '"' : '(no text)'}${m.tag ? ' · ' + escapeHtml(m.tag) : ''}${where}</option>`;
+            });
             opts.push(`<option value="-1">Last match</option>`);
             matchSel.innerHTML = opts.join('');
             matchSel.value = (prevIdx !== '' && [...matchSel.options].some(o => o.value === prevIdx)) ? prevIdx : '0';
@@ -8042,6 +8313,7 @@ ${clone.outerHTML}
       if (matchSel) matchSel.addEventListener('change', showChosen);
       sel.addEventListener('change', refresh);
       refresh();   // check once up front so a many-match locator offers the picker straight away
+      if (Array.from(sel.options).some(o => o.value.startsWith('near'))) lsVerifyNear(sel, lsLastElements[Number(sel.dataset.index)]);
       if (offInput) offInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(refresh, 350); });
     });
 
@@ -8056,11 +8328,12 @@ ${clone.outerHTML}
         const useLocator = targetRadio ? targetRadio.value === 'locator' : !!lsBestLocator(el);
         let locator = useLocator ? lsBestLocator(el) : null;
         let dynKind = null;
+        let nearIndex = null;
         const styleSel = details.querySelector('.ls-act-style');
         if (locator && styleSel && styleSel.value !== 'exact') {
           const offInput = details.querySelector('.ls-act-reloffset');
           const dyn = lsDynamicOptions(el, {offset: offInput ? parseInt(offInput.value, 10) : NaN}).find(o => o.key === styleSel.value);
-          if (dyn) { locator = {strategy: dyn.strategy, value: dyn.value}; dynKind = dyn.dynLabel || dyn.label; }
+          if (dyn) { locator = {strategy: dyn.strategy, value: dyn.value}; dynKind = dyn.dynLabel || dyn.label; if (dyn.index != null) nearIndex = dyn.index; }
         }
         const point = useLocator ? null : lsCenterPoint(el);
 
@@ -8072,6 +8345,7 @@ ${clone.outerHTML}
         const chosenIndex = (useLocator && matchPickEl && matchPickEl.style.display !== 'none' && matchIdxEl && matchIdxEl.value !== '')
           ? parseInt(matchIdxEl.value, 10) : null;
         if (chosenIndex !== null && !Number.isNaN(chosenIndex)) { payload.index = chosenIndex; step.index = chosenIndex; }
+        else if (nearIndex !== null) { payload.index = nearIndex; step.index = nearIndex; }
         if (details.querySelector('.ls-act-conditional').value === 'true') { step.optional = true; }
         if (dynKind) { step.dynKind = dynKind; }
         if (useLocator) {
@@ -8085,7 +8359,11 @@ ${clone.outerHTML}
           step.x = point.x;
           step.y = point.y;
         }
-        if (actionType === 'type_text') { payload.text = details.querySelector('.ls-act-text').value; step.text = payload.text; }
+        if (actionType === 'type_text') {
+          payload.text = details.querySelector('.ls-act-text').value; step.text = payload.text;
+          const typedAs = details.querySelector('.ls-act-saveas').value.trim();
+          if (typedAs) { payload.save_as = typedAs; step.save_as = typedAs; }
+        }
         if (actionType === 'swipe') { payload.direction = details.querySelector('.ls-act-direction').value; step.direction = payload.direction; }
         if (actionType === 'wait') { payload.seconds = parseFloat(details.querySelector('.ls-act-seconds').value || '1'); step.seconds = payload.seconds; }
         if (actionType === 'assert_value' || actionType === 'parse_label') {
@@ -9557,7 +9835,7 @@ ${clone.outerHTML}
   // app under test) via `mobile: activateApp` - the same WDA session stays
   // alive throughout, so this is just another recordable step, not a
   // reconnect. See ActionExecutor's SWITCH_APP branch in actions.py.
-  async function lsRunSwitchApp(bundleId) {
+  async function lsRunSwitchApp(bundleId, fresh) {
     if (!lsSessionId || !bundleId) return;
     const statusEl = document.getElementById('lsSwitchAppStatus');
     statusEl.textContent = 'Switching…';
@@ -9565,13 +9843,14 @@ ${clone.outerHTML}
       const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({action: 'switch_app', bundle_id: bundleId}),
+        body: JSON.stringify({action: 'switch_app', bundle_id: bundleId, ...(fresh ? {fresh} : {})}),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'switch failed');
-      lsCapturedSteps.push({action: 'switch_app', bundle_id: bundleId, label: `Switch to ${bundleId}`});
+      if (data.result && data.result.status !== 'ok') throw new Error(data.result.detail || 'switch failed');
+      lsCapturedSteps.push({action: 'switch_app', bundle_id: bundleId, ...(fresh ? {fresh} : {}), label: `Switch to ${bundleId}${fresh ? (fresh === 'swipe' ? ' (fresh start, swiped away)' : ' (fresh start)') : ''}`});
       renderLsCapturedSteps();
-      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ switched to ${escapeHtml(bundleId)} - recorded</span>`;
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ ${escapeHtml((data.result && data.result.detail) || ('switched to ' + bundleId))} - recorded</span>`;
     } catch (e) {
       statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
     }
@@ -9616,7 +9895,7 @@ ${clone.outerHTML}
     const bundleId = preset === '__custom__'
       ? document.getElementById('lsSwitchAppCustom').value.trim()
       : preset;
-    lsRunSwitchApp(bundleId);
+    lsRunSwitchApp(bundleId, document.getElementById('lsSwitchFresh').checked ? document.getElementById('lsSwitchFreshMode').value : false);
   });
 
   document.getElementById('lsBackToAppBtn').addEventListener('click', () => {
@@ -9710,7 +9989,7 @@ ${clone.outerHTML}
         const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/test_locator', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({strategy, value}),
+          body: JSON.stringify({strategy, value, ocr: true}),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'locator test failed');
