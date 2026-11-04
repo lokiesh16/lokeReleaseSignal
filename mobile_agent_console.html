@@ -2496,7 +2496,10 @@
                 <div class="hint" style="font-size:11px; margin-top:1px;">Tap on any element to inspect</div>
               </div>
             </div>
-            <button class="copy" id="lsScreenshotRefreshBtn" style="background:var(--ink-line); color:var(--paper); padding:7px 12px; font-size:11.5px; border-radius:20px; flex-shrink:0;">↻ Refresh</button>
+            <span style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+              <label title="Keeps the screen on the right up to date every few seconds. The locator list reloads by itself too, unless you have an element selected - then it only updates the picture, so your selection isn't lost." style="display:flex; align-items:center; gap:4px; font-size:11px; color:var(--paper-dim); cursor:pointer; white-space:nowrap;"><input type="checkbox" id="lsAutoRefresh" checked style="width:auto;"> Auto</label>
+              <button class="copy" id="lsScreenshotRefreshBtn" style="background:var(--ink-line); color:var(--paper); padding:7px 12px; font-size:11.5px; border-radius:20px; flex-shrink:0;">↻ Refresh</button>
+            </span>
           </div>
           <div id="lsScreenshotAiCaption" style="font-size:12px; color:var(--paper-dim); margin-bottom:8px; display:none;"></div>
           <div style="display:flex; align-items:center; justify-content:center; gap:10px;">
@@ -10578,6 +10581,7 @@ ${clone.outerHTML}
 
       lsScreenshotWindowSize = {width: data.window_width, height: data.window_height};
       lsScreenshotPoint = null;
+      lsAutoLastShot = data.screenshot_b64; lsElementsStale = false; lsAutoNote('');
       document.getElementById('lsScreenshotImg').src = 'data:image/png;base64,' + data.screenshot_b64;
       document.getElementById('lsScreenshotHighlight').style.display = 'none';
       document.getElementById('lsScreenshotTapBtn').disabled = true;
@@ -10599,12 +10603,53 @@ ${clone.outerHTML}
     }
   }
 
+  // Auto-refresh of the Live App Screen. Every few seconds it grabs just the
+  // screenshot (cheap) and compares it with the last one. If the screen
+  // changed: with nothing selected it does the full reload (picture + locator
+  // list); with an element selected it only swaps the picture, so Element
+  // Details isn't wiped mid-edit, and marks the list stale - clicking the
+  // picture then reloads first so a click never hit-tests against old bounds.
+  let lsAutoLastShot = null, lsElementsStale = false, lsAutoBusy = false, lsAutoLastFull = 0;
+  function lsAutoNote(msg) {
+    const el = document.getElementById('lsScreenshotStatus');
+    if (el && msg !== undefined && (msg || el.dataset.auto === '1')) { el.dataset.auto = msg ? '1' : ''; el.innerHTML = msg ? `<span style="color:var(--signal);">${msg}</span>` : ''; }
+  }
+  async function lsAutoTick() {
+    const toggle = document.getElementById('lsAutoRefresh');
+    const card = document.getElementById('lsScreenshotCard');
+    if (!toggle || !toggle.checked || document.hidden || !lsSessionId || lsAutoBusy) return;
+    if (!card || card.style.display === 'none' || card.offsetParent === null) return;
+    if (document.querySelector('.ls-act-run-btn:disabled') || document.getElementById('lsScreenshotRefreshBtn').disabled) return;
+    lsAutoBusy = true;
+    try {
+      const res = await fetchWithTimeout(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/screenshot', 8000, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.screenshot_b64 || data.screenshot_b64 === lsAutoLastShot) return;
+      const quiet = lsSelectedElementIndex == null && Date.now() - lsAutoLastFull > 8000;
+      if (quiet) { lsAutoLastFull = Date.now(); await loadScreenshot(); return; }
+      lsAutoLastShot = data.screenshot_b64;
+      document.getElementById('lsScreenshotImg').src = 'data:image/png;base64,' + data.screenshot_b64;
+      lsElementsStale = true;
+      lsAutoNote('Screen changed - locator list not reloaded (Refresh to update)');
+    } catch (e) { /* offline or busy - try again next tick */ }
+    finally { lsAutoBusy = false; }
+  }
+  try { const saved = localStorage.getItem('lsAutoRefresh'); if (saved === '0') document.getElementById('lsAutoRefresh').checked = false; } catch (e) {}
+  document.getElementById('lsAutoRefresh').addEventListener('change', e => {
+    try { localStorage.setItem('lsAutoRefresh', e.target.checked ? '1' : '0'); } catch (err) {}
+    if (!e.target.checked) lsAutoNote('');
+  });
+  setInterval(lsAutoTick, 3000);
+
   document.getElementById('lsScreenshotBtn').addEventListener('click', loadScreenshot);
   document.getElementById('lsScreenshotRefreshBtn').addEventListener('click', loadScreenshot);
   document.getElementById('lsTopRefreshBtn').addEventListener('click', loadScreenshot);
 
   document.getElementById('lsScreenshotImg').addEventListener('click', (e) => {
     if (!lsScreenshotWindowSize) return;
+    if (lsElementsStale) { loadScreenshot(); return; }   // the picture moved on: reload elements first, then click again
     const img = e.target;
     const rect = img.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
