@@ -1255,6 +1255,105 @@
   details.ls-more .ls-more-body .field { margin-top: 12px; }
   .tab-group-label.sec-capture { color: var(--circuit); }
   .tab-group-label.sec-exec { color: var(--signal); }
+
+  /* ---- Saved-flow detail panel (premium layout) ---- */
+  .fd { display:flex; flex-direction:column; gap:14px; }
+  .fd-hero { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;
+    padding:18px 20px; border:1px solid var(--ink-line); border-radius:14px;
+    background:linear-gradient(135deg, rgba(46,176,230,0.10), rgba(255,45,149,0.05) 60%, transparent); }
+  .fd-title { font-size:20px; font-weight:700; letter-spacing:-0.01em; line-height:1.2; overflow-wrap:anywhere; }
+  .fd-meta { margin-top:6px; font-size:12.5px; color:var(--paper-dim); line-height:1.5; overflow-wrap:anywhere; }
+  .fd-chips { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  .fd-chip { font-size:10px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:3px 9px;
+    border-radius:999px; border:1px solid var(--ink-line); color:var(--paper-dim); }
+  .fd-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .fd .copy.fd-run { padding:10px 22px; font-size:13.5px; font-weight:700; border-radius:10px; display:inline-flex; align-items:center; gap:8px;
+    box-shadow:0 6px 20px -8px var(--circuit); }
+  .fd .copy.fd-run::before { content:"▶"; font-size:10px; }
+  .fd .copy.fd-run:disabled { opacity:.7; box-shadow:none; }
+  .fd .copy.fd-ghost { padding:8px 14px; font-size:12px; border-radius:9px; background:transparent; color:var(--paper);
+    border:1px solid var(--ink-line); }
+  .fd .copy.fd-ghost:hover { background:var(--ink-line); }
+  .fd .copy.fd-danger:hover { color:var(--alert); border-color:var(--alert); background:transparent; }
+  .fd-card { border:1px solid var(--ink-line); border-radius:14px; padding:16px 18px; background:rgba(255,255,255,0.02); }
+  .fd-card-h { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:12px; }
+  .fd-card-h h4 { margin:0; font-size:11px; letter-spacing:0.09em; text-transform:uppercase; color:var(--paper-dim); font-weight:700; }
+  .fd-card-h span { font-size:11.5px; color:var(--paper-dim); }
+  .fd-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px 16px; }
+  .fd-span2 { grid-column:1 / -1; }
+  .fd-field > .fd-lab { display:block; font-size:11px; font-weight:600; color:var(--paper-dim); margin-bottom:6px; }
+  .fd-field select, .fd-field input[type=text], .fd-field input[type=password] {
+    width:100%; box-sizing:border-box; font-size:12.5px; padding:9px 11px; border-radius:9px; }
+  .fd-field .fd-stack { display:flex; flex-direction:column; gap:8px; }
+  .fd-field .fd-pair { display:grid; grid-template-columns:1.6fr 1fr; gap:8px; }
+  .fd-field-note { font-size:11px; color:var(--paper-dim); margin-top:5px; line-height:1.4; }
+  .fd-scripts { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
+  .fd-script { border:1px dashed var(--ink-line); border-radius:11px; padding:12px 14px; overflow-wrap:anywhere; }
+  .fd-script.is-set { border-style:solid; border-color:rgba(46,176,230,0.35); background:rgba(46,176,230,0.05); }
+  .fd-script-t { font-size:12.5px; font-weight:600; margin-bottom:3px; }
+  .fd-script-d { font-size:11.5px; color:var(--paper-dim); line-height:1.45; }
+  .fd-script .copy { margin-top:10px; padding:5px 12px; font-size:11.5px; border-radius:8px; background:transparent; color:var(--paper); border:1px solid var(--ink-line); }
+  .fd-script .copy:hover { background:var(--ink-line); }
+  .fd-script label { text-transform:none; letter-spacing:0; font-weight:500; display:flex; gap:7px; align-items:flex-start; font-size:11.5px; cursor:pointer; margin-top:8px; }
+  .fd-trace .terminal { border-radius:10px; }
+  .fd-empty { display:flex; flex-direction:column; align-items:center; gap:6px; padding:26px 12px; text-align:center;
+    border:1px dashed var(--ink-line); border-radius:11px; color:var(--paper-dim); font-size:12.5px; }
+  .fd-empty b { color:var(--paper); font-size:13px; }
+  .fd-reports { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .fd-reports .copy { padding:8px 14px; font-size:12px; border-radius:9px; background:transparent; color:var(--paper); border:1px solid var(--ink-line); }
+  .fd-reports .copy:hover { background:var(--ink-line); }
+  .fd-reports .copy.flow-publish-report-s3-btn { background:var(--circuit); color:#04121a; border-color:transparent; font-weight:600; }
+  .flow-report-actions > .fd-card { flex:1; }
+  @media (max-width:640px) { .fd-hero { padding:14px; } .fd-card { padding:14px; } .fd-field .fd-pair { grid-template-columns:1fr; } }
+
+  /* ---- Saved Flows page: hierarchy, simpler filters, themed cards ---- */
+  #panel-library-flows .flows-header { align-items:center; margin-bottom:22px; padding-bottom:18px; border-bottom:1px solid var(--ink-line); }
+  #panel-library-flows .flows-title { font-size:30px; letter-spacing:-0.03em; }
+  .flows-stats { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .flows-stat { display:inline-flex; align-items:baseline; gap:6px; padding:5px 12px; border-radius:999px; font-size:12px; color:var(--paper-dim);
+    border:1px solid var(--ink-line); background:rgba(255,255,255,0.03); }
+  .flows-stat b { font-size:14px; color:var(--paper); font-weight:700; }
+  .flows-stat.ios b { color:#7DB8FF; } .flows-stat.android b { color:#9BDB6A; } .flows-stat.pass b { color:var(--circuit); } .flows-stat.fail b { color:#FFB27A; }
+  #panel-library-flows .flows-create-btn { padding:11px 22px; font-size:13.5px; font-weight:700; box-shadow:0 8px 24px -10px var(--circuit); }
+  #panel-library-flows .flows-toolbar { padding:10px; border:1px solid var(--ink-line); border-radius:14px; background:rgba(255,255,255,0.02); margin-bottom:12px; gap:12px; }
+  #panel-library-flows .flows-toolbar .view-toggle { margin-left:auto; }
+  #panel-library-flows .flows-search { display:flex; flex:0 1 280px; height:36px; }
+  .flows-color-btn { width:32px; height:30px; border-radius:8px; border:1px solid var(--ink-line); background:var(--ink); color:var(--paper-dim); cursor:pointer; font-size:14px; }
+  .flows-color-btn.on { color:var(--signal); border-color:var(--signal); }
+  #panel-library-flows .flows-folder-bar { margin:0 0 18px; gap:8px; align-items:center; }
+  #panel-library-flows .folder-pill { padding:6px 13px; font-size:12.5px; }
+  #panel-library-flows .folder-pill.active { background:var(--paper); color:var(--ink); border-color:var(--paper); font-weight:600; }
+  #panel-library-flows .folder-pill.active b { opacity:.6; }
+  .folder-pill-quiet { border-style:dashed; font-size:11.5px; }
+  .flows-folder-actions { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .flows-folder-actions .copy { padding:6px 14px; font-size:12px; border-radius:9px; }
+  .flows-folder-actions .copy.ghost { background:transparent; color:var(--paper); border:1px solid var(--ink-line); }
+  .flows-folder-actions .copy.ghost:hover { background:var(--ink-line); }
+
+  /* themed cards: --ct is a hue picked from the flow's folder (or its platform) */
+  .flows-grid .flow-card { --ct:215; border-radius:16px; padding:16px 16px 14px; overflow:hidden;
+    background:linear-gradient(165deg, hsl(var(--ct) 80% 60% / 0.13), hsl(var(--ct) 80% 60% / 0.02) 48%, transparent), var(--ink-raised);
+    border-color:hsl(var(--ct) 60% 60% / 0.22);
+    transition:border-color .18s, transform .18s, box-shadow .18s; }
+  .flows-grid .flow-card::before { content:""; position:absolute; left:0; right:0; top:0; height:3px; background:linear-gradient(90deg, hsl(var(--ct) 85% 62%), hsl(calc(var(--ct) + 40) 85% 62%)); opacity:.9; }
+  .flows-grid .flow-card:hover { border-color:hsl(var(--ct) 80% 62% / 0.7); transform:translateY(-3px); box-shadow:0 14px 34px -16px hsl(var(--ct) 90% 55% / 0.55); }
+  .flows-grid .flow-card.selected { border-color:hsl(var(--ct) 85% 65%); box-shadow:0 0 0 2px hsl(var(--ct) 85% 60% / 0.35), 0 14px 34px -16px hsl(var(--ct) 90% 55% / 0.55); }
+  .flows-grid .flow-card.checked { border-color:hsl(var(--ct) 85% 65%); }
+  .flows-grid.flows-theme-plain .flow-card { background:var(--ink-raised); border-color:var(--ink-line); }
+  .flows-grid.flows-theme-plain .flow-card::before { display:none; }
+  .flow-card-head { display:flex; gap:11px; align-items:flex-start; }
+  .flow-card-ico { flex:0 0 38px; width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:16px;
+    color:hsl(var(--ct) 90% 78%); background:hsl(var(--ct) 70% 55% / 0.18); border:1px solid hsl(var(--ct) 70% 60% / 0.3); }
+  .flow-card-head > div { min-width:0; }
+  .flow-card-title { overflow-wrap:anywhere; }
+  .flow-card-slug { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .flows-grid .flow-card-footer { border-top-color:hsl(var(--ct) 40% 60% / 0.16); }
+  .flows-grid .flow-card-stats { gap:6px; }
+  .flows-grid .flow-card-stats > div { padding:3px 9px; border-radius:8px; background:rgba(255,255,255,0.05); min-width:38px; }
+  .flows-grid .flow-card-play { background:hsl(var(--ct) 85% 62%); color:#06121a; transition:transform .15s, box-shadow .15s; }
+  .flows-grid .flow-card-play:hover { background:hsl(var(--ct) 90% 70%); transform:scale(1.1); box-shadow:0 6px 16px -4px hsl(var(--ct) 90% 55%); }
+  .flows-grid .flow-card-last-run.failing { color:#FFB27A; }
+  .flows-grid.list-view .flow-card-head { flex:1; }
 </style>
 </head>
 <body>
@@ -1884,6 +1983,7 @@
       <div>
         <h1 class="flows-title">Saved flows</h1>
         <p class="hint" style="margin:2px 0 0; font-size:13.5px;">Recorded flows replay step by step, with no LLM calls.</p>
+        <div class="flows-stats" id="flowsStats"></div>
       </div>
       <button type="button" class="copy flows-create-btn" id="createFlowBtn">+ Create flow</button>
     </div>
@@ -1905,6 +2005,7 @@
           <button type="button" class="view-toggle-btn on" data-view="grid" title="Grid view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
           <button type="button" class="view-toggle-btn" data-view="list" title="List view"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg></button>
         </div>
+        <button type="button" class="flows-color-btn on" id="flowsColorBtn" title="Colour-code flow cards by folder">◐</button>
         <button type="button" class="util-icon-btn flows-icon-btn" id="refreshFlowsBtn" title="Refresh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
       </div>
       <div id="savedFlowsFolderBar" class="flows-folder-bar"></div>
@@ -4636,6 +4737,13 @@ ${clone.innerHTML}
   const FLOWS_GRID_PAGE_SIZE = 8;
   let savedFlowsExpanded = false;
 
+  let flowsColorOn = (() => { try { return localStorage.getItem('habiFlowsColor') !== '0'; } catch (e) { return true; } })();
+  let foldersShowEmpty = false;
+  const FLOW_THEME_HUES = [210, 160, 285, 35, 335, 190, 95, 12];
+  function flowThemeHue(f) {
+    if (f.module) { let h = 0; for (const ch of f.module) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return FLOW_THEME_HUES[h % FLOW_THEME_HUES.length]; }
+    return f.platform === 'Android' ? 140 : 215;
+  }
   function renderSavedFlowsPlatformFilter() {
     const filterEl = document.getElementById('savedFlowsPlatformFilter');
     const counts = {iOS: 0, Android: 0};
@@ -4693,6 +4801,21 @@ ${clone.innerHTML}
     const countEl = document.getElementById('flowsTabCountMy');
     if (countEl) countEl.textContent = lastLoadedFlows.length;
     renderSavedFlowsPlatformFilter();
+    (function () {
+      const st = document.getElementById('flowsStats'); if (!st) return;
+      const n = p => lastLoadedFlows.filter(f => f.platform === p).length;
+      const steps = lastLoadedFlows.reduce((a, f) => a + (f.step_count || 0), 0);
+      const tests = lastLoadedFlows.reduce((a, f) => a + (f.test_count || 0), 0);
+      const passed = lastLoadedFlows.filter(f => (flowRunState[f.slug] || {}).badgeClass === 'status-pass').length;
+      const failed = lastLoadedFlows.filter(f => (flowRunState[f.slug] || {}).badgeClass === 'status-fail').length;
+      st.innerHTML = `<span class="flows-stat"><b>${lastLoadedFlows.length}</b> flows</span>`
+        + `<span class="flows-stat"><b>${tests}</b> test cases</span>`
+        + `<span class="flows-stat"><b>${steps}</b> steps</span>`
+        + `<span class="flows-stat ios"><b>${n('iOS')}</b> iOS</span><span class="flows-stat android"><b>${n('Android')}</b> Android</span>`
+        + (passed ? `<span class="flows-stat pass"><b>${passed}</b> passed this session</span>` : '')
+        + (failed ? `<span class="flows-stat fail"><b>${failed}</b> failing</span>` : '');
+    })();
+    listEl.classList.toggle('flows-theme-plain', !flowsColorOn);
     // A selection only means something for flows that still exist.
     const knownSlugs = new Set(lastLoadedFlows.map(f => f.slug));
     Array.from(selectedMoveSlugs).forEach(slug => { if (!knownSlugs.has(slug)) selectedMoveSlugs.delete(slug); });
@@ -4778,7 +4901,7 @@ ${clone.innerHTML}
     const lastRun = flowLastRunInfo(state);
     const platformClass = f.platform === 'Android' ? 'android' : 'ios';
     return `
-      <div class="flow-card ${opts.selected ? 'selected' : ''} ${selectedMoveSlugs.has(f.slug) ? 'checked' : ''}" data-slug="${escapeHtml(f.slug)}">
+      <div class="flow-card ${opts.selected ? 'selected' : ''} ${selectedMoveSlugs.has(f.slug) ? 'checked' : ''}" data-slug="${escapeHtml(f.slug)}" style="--ct:${flowThemeHue(f)}">
         <div class="flow-card-top">
           <span class="flow-card-top-left">
             <input type="checkbox" class="flow-card-select" data-select-slug="${escapeHtml(f.slug)}" title="Select to move into a folder" ${selectedMoveSlugs.has(f.slug) ? 'checked' : ''}>
@@ -4787,8 +4910,13 @@ ${clone.innerHTML}
           </span>
           <button type="button" class="flow-card-fav ${isFav ? 'on' : ''}" data-fav-slug="${escapeHtml(f.slug)}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '★' : '☆'}</button>
         </div>
-        <div class="flow-card-title">${escapeHtml(humanizeFlowName(f.name))}</div>
-        <div class="flow-card-slug">${escapeHtml(f.name)}</div>
+        <div class="flow-card-head">
+          <span class="flow-card-ico">${escapeHtml((humanizeFlowName(f.name) || '?').trim().charAt(0).toUpperCase())}</span>
+          <div>
+            <div class="flow-card-title">${escapeHtml(humanizeFlowName(f.name))}</div>
+            <div class="flow-card-slug" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
+          </div>
+        </div>
         ${f.goal ? `<div class="flow-card-desc">${escapeHtml(f.goal)}</div>` : ''}
         <div class="flow-card-footer">
           <div class="flow-card-last-run ${lastRun.cls}"><span class="flow-card-status-dot"></span><span>${lastRun.label}</span></div>
@@ -4878,23 +5006,29 @@ ${clone.innerHTML}
       <button type="button" class="folder-pill ${savedFlowsModuleFilter === value ? 'active' : ''} ${count ? '' : 'empty'}" data-folder="${escapeHtml(value)}">
         ${FOLDER_ICON}<span>${escapeHtml(label)}</span> <b>${count}</b>${extra || ''}
       </button>`;
-    const pills = [pill('all', 'All folders', inPlatform.length)]
-      .concat(flowModules.map(m => pill(m.name, m.name, counts[m.name] || 0,
-        m.default ? '' : `<span class="folder-pill-x" data-delete-folder="${escapeHtml(m.name)}" title="Delete this folder (its flows are kept)">×</span>`)))
-      .concat([pill('__none__', 'No folder', none)]);
+    // Only folders that hold flows are shown (plus the one being viewed); the
+    // empty ones sit behind a single "Empty (n)" chip so the row stays short.
+    const mods = flowModules.map(m => ({m, c: counts[m.name] || 0}));
+    const shown = mods.filter(x => x.c || savedFlowsModuleFilter === x.m.name || foldersShowEmpty);
+    const hiddenEmpty = mods.filter(x => !x.c && savedFlowsModuleFilter !== x.m.name).length;
+    const pills = [pill('all', 'All', inPlatform.length)]
+      .concat(shown.map(x => pill(x.m.name, x.m.name, x.c,
+        x.m.default ? '' : `<span class="folder-pill-x" data-delete-folder="${escapeHtml(x.m.name)}" title="Delete this folder (its flows are kept)">×</span>`)))
+      .concat(none ? [pill('__none__', 'Unfiled', none)] : [])
+      .concat(hiddenEmpty ? [`<button type="button" class="folder-pill folder-pill-quiet" data-folder-toggle-empty>${foldersShowEmpty ? 'Hide empty' : `Empty (${hiddenEmpty})`}</button>`] : []);
     const n = selectedMoveSlugs.size;
     const create = folderCreateOpen
       ? `<input type="text" id="folderNewInput" class="folder-new-input" maxlength="40" placeholder="Folder name">
          <button type="button" class="copy" data-folder-create style="padding:5px 12px; font-size:12px;">Create${n ? ` + move ${n}` : ''}</button>
          <button type="button" class="copy" data-folder-cancel style="padding:5px 12px; font-size:12px; background:var(--ink-line); color:var(--paper);">Cancel</button>`
-      : `<button type="button" class="folder-pill folder-pill-new" data-folder-new>+ New folder</button>`;
+      : `<button type="button" class="folder-pill folder-pill-new" data-folder-new title="Create a new folder">+ Folder</button>`;
     const runnable = (savedFlowsModuleFilter === 'all') ? [] : flowsInFolder(savedFlowsModuleFilter);
     const runBtn = runnable.length
       ? `<button type="button" class="copy" data-folder-run ${folderRun && folderRun.running ? 'disabled' : ''} style="padding:5px 14px; font-size:12px;" title="Run every flow in this folder one after another and get one combined report">▶ ${folderRun && folderRun.running ? 'Running folder…' : `Run folder (${runnable.length} flow${runnable.length === 1 ? '' : 's'})`}</button>`
       : '';
-    const multiBtn = `<button type="button" class="copy" data-folders-run-open ${folderRun && folderRun.running ? 'disabled' : ''} style="padding:5px 14px; font-size:12px; background:var(--ink-line); color:var(--paper);" title="Pick several folders and run them together with one combined report">▶ Run folders…</button>`;
-    const uploadBtn = `<button type="button" class="copy" data-report-upload style="padding:5px 14px; font-size:12px; background:var(--ink-line); color:var(--paper);" title="Upload a report .html you downloaded earlier (e.g. folder_run_….html) to the team S3 bucket">⬆ Upload report file…</button><input type="file" id="reportUploadInput" accept=".html,text/html" style="display:none;"><span id="reportUploadStatus" style="font-size:12px; margin-left:8px;">${reportUploadStatusHtml}</span>`;
-    el.innerHTML = pills.join('') + create + runBtn + multiBtn + uploadBtn;
+    const multiBtn = `<button type="button" class="copy ghost" data-folders-run-open ${folderRun && folderRun.running ? 'disabled' : ''} title="Pick several folders and run them together with one combined report">▶ Run folders</button>`;
+    const uploadBtn = `<button type="button" class="copy ghost" data-report-upload title="Upload a report .html you downloaded earlier (e.g. folder_run_….html) to the team S3 bucket">⬆ Upload report</button><input type="file" id="reportUploadInput" accept=".html,text/html" style="display:none;"><span id="reportUploadStatus" style="font-size:12px; margin-left:8px;">${reportUploadStatusHtml}</span>`;
+    el.innerHTML = pills.join('') + create + `<span class="flows-folder-actions">${runBtn}${multiBtn}${uploadBtn}</span>`;
     if (folderCreateOpen) { const inp = document.getElementById('folderNewInput'); if (inp) inp.focus(); }
   }
 
@@ -5544,6 +5678,7 @@ ${clone.outerHTML}
       renderFlowsSidebarPage();
       return;
     }
+    if (e.target.closest('[data-folder-toggle-empty]')) { foldersShowEmpty = !foldersShowEmpty; renderFolderBar(); return; }
     if (e.target.closest('[data-folder-new]')) { folderCreateOpen = true; renderFolderBar(); return; }
     if (e.target.closest('[data-folder-cancel]')) { folderCreateOpen = false; renderFolderBar(); return; }
     if (e.target.closest('[data-folder-create]')) await submitNewFolder();
@@ -5683,109 +5818,130 @@ ${clone.outerHTML}
     const state = flowRunState[slug];
     const hasLog = !!(state && state.logs && state.logs.length);
 
+    const E = escapeHtml;
+    const scriptBlock = (cls, target, setVal, cbCls, title, desc, runLabel, setLabel, changeLabel, tip) => `
+        <div class="${cls} fd-script ${setVal ? 'is-set' : ''}" title="${E(tip)}">
+          <div class="fd-script-t">${E(title)}</div>
+          ${setVal ? `
+          <div class="fd-script-d"><code style="font-size:11px;">${E(setVal)}</code></div>
+          <label title="${E(setVal)}">
+            <input type="checkbox" class="${cbCls}" data-slug="${E(f.slug)}" style="width:auto; flex-shrink:0; margin-top:2px;">
+            <span>${E(runLabel)}</span>
+          </label>` : `<div class="fd-script-d">${E(desc)}</div>`}
+          <button class="copy flow-setup-script-toggle-btn" data-slug="${E(f.slug)}" data-target="${target}">${setVal ? E(changeLabel) : E(setLabel)}</button>
+          <div class="flow-setup-script-picker" data-slug="${E(f.slug)}" data-target="${target}" style="display:none; margin-top:10px; border:1px solid var(--ink-line); border-radius:8px; padding:10px;"></div>
+        </div>`;
+
     wrap.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
-        <div style="min-width:0; overflow-wrap:anywhere;">
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="font-weight:700; font-size:15px;">${escapeHtml(f.name)}</span>
-            <span class="status-badge" style="background:var(--ink-line); color:var(--paper); font-size:9px;">${escapeHtml(f.platform)}</span>
-            <span class="status-badge flow-status-badge ${state ? state.badgeClass : ''}" data-status-for="${escapeHtml(f.slug)}"
-                  style="${state && state.badgeText ? '' : 'display:none;'}">${state ? escapeHtml(state.badgeText || '') : ''}</span>
+    <div class="fd">
+      <div class="fd-hero">
+        <div style="min-width:0; flex:1 1 280px;">
+          <div class="fd-chips">
+            <span class="fd-chip">${E(f.platform)}</span>
+            <span class="status-badge flow-status-badge ${state ? state.badgeClass : ''}" data-status-for="${E(f.slug)}"
+                  style="${state && state.badgeText ? '' : 'display:none;'}">${state ? E(state.badgeText || '') : ''}</span>
           </div>
-          <div class="hint" style="font-size:11.5px; margin-top:2px;">${f.test_count} test(s) · ${escapeHtml(f.goal || '')}</div>
+          <div class="fd-title">${E(f.name)}</div>
+          <div class="fd-meta"><b style="color:var(--paper);">${f.test_count}</b> test case${f.test_count === 1 ? '' : 's'}${f.goal ? ' · ' + E(f.goal) : ''}</div>
         </div>
-        <div style="display:flex; gap:6px; flex-shrink:0;">
-          <button class="copy flow-run-btn" data-slug="${escapeHtml(f.slug)}" data-name="${escapeHtml(f.name)}" style="padding:6px 10px; font-size:12px;">${state && state.status === 'running' ? 'Running…' : 'Run'}</button>
-          <button class="copy flow-edit-btn" data-slug="${escapeHtml(f.slug)}" title="Load this flow's steps into Test Builder to fix a locator, insert a step, or extend it - saving there updates this same flow in place." style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Edit</button>
-          <button class="copy flow-gen-tests-btn" data-slug="${escapeHtml(f.slug)}" data-name="${escapeHtml(f.name)}" title="Generate a page object + pytest test class from this flow's steps" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Generate tests</button>
-          <button class="copy flow-share-btn" data-slug="${escapeHtml(f.slug)}" title="Share this flow with the team (S3) so teammates can import it" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Share with team</button>
-          <button class="copy flow-delete-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Delete</button>
+        <div class="fd-actions">
+          <button class="copy flow-run-btn fd-run" data-slug="${E(f.slug)}" data-name="${E(f.name)}">${state && state.status === 'running' ? 'Running…' : 'Run'}</button>
+          <button class="copy flow-edit-btn fd-ghost" data-slug="${E(f.slug)}" title="Load this flow's steps into Test Builder to fix a locator, insert a step, or extend it - saving there updates this same flow in place.">Edit</button>
+          <button class="copy flow-gen-tests-btn fd-ghost" data-slug="${E(f.slug)}" data-name="${E(f.name)}" title="Generate a page object + pytest test class from this flow's steps">Generate tests</button>
+          <button class="copy flow-share-btn fd-ghost" data-slug="${E(f.slug)}" title="Share this flow with the team (S3) so teammates can import it">Share</button>
+          <button class="copy flow-delete-btn fd-ghost fd-danger" data-slug="${E(f.slug)}">Delete</button>
         </div>
       </div>
 
-      <div class="hint flow-share-status" data-share-status-for="${escapeHtml(f.slug)}" style="font-size:11.5px; margin-top:6px;"></div>
+      <div class="hint flow-share-status" data-share-status-for="${E(f.slug)}" style="font-size:11.5px;"></div>
 
-      <div class="flow-setup-script-block" style="margin-top:12px; overflow-wrap:anywhere;">
-        ${f.setup_script ? `
-        <label style="display:flex; align-items:center; gap:5px; font-size:11px; cursor:pointer; flex-wrap:wrap;" title="${escapeHtml(f.setup_script)}">
-          <input type="checkbox" class="flow-run-setup-checkbox" data-slug="${escapeHtml(f.slug)}" style="width:auto; flex-shrink:0;">
-          <span>Run setup script first — <code style="font-size:10.5px;">${escapeHtml(f.setup_script)}</code></span>
-        </label>` : `<span class="hint" style="font-size:11px;">No setup script set for this flow.</span>`}
-        <button class="copy flow-setup-script-toggle-btn" data-slug="${escapeHtml(f.slug)}" data-target="setup" style="display:block; margin-top:6px; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">${f.setup_script ? 'Change setup script' : 'Set setup script'}</button>
-        <div class="flow-setup-script-picker" data-slug="${escapeHtml(f.slug)}" data-target="setup" style="display:none; margin-top:8px; border:1px solid var(--ink-line); border-radius:8px; padding:10px;"></div>
+      <div class="fd-card">
+        <div class="fd-card-h"><h4>Run settings</h4><span>Apply to this run only unless noted</span></div>
+        <div class="fd-grid">
+          <div class="fd-field" title="Which app this run launches (Appium's bundleId capability) - a one-off override for just this run, not saved back to the flow. Leave blank to use whatever app this flow is already set up for.">
+            <span class="fd-lab">App under test</span>
+            <div class="fd-stack">
+              <select class="flow-bundle-id-env" data-slug="${E(f.slug)}">
+                ${renderEnvironmentOptions(f.platform, "— use this flow's own app —", f.bundle_id || '')}
+              </select>
+              <input type="text" class="flow-bundle-id" data-slug="${E(f.slug)}" value="${E(f.bundle_id || '')}" placeholder="or type a custom bundle/package id">
+            </div>
+          </div>
+
+          <div class="fd-field" title="Optional - replays a saved precondition (e.g. login) deterministically, on the same app session, right before this flow's own steps. Aborts before this flow starts if the precondition itself fails.">
+            <span class="fd-lab">Start from</span>
+            <select class="flow-precondition" data-slug="${E(f.slug)}" data-platform="${E(f.platform)}">
+              ${renderFlowPreconditionOptions(f.platform)}
+            </select>
+            <div class="fd-field-note">Replays a saved precondition before this flow's steps.</div>
+          </div>
+
+          <div class="fd-field" title="Close the app first if it is already running, then open it again, so the run starts from the app's normal start screen instead of wherever it was left. Swiping it away in the app switcher is how you'd do it by hand (iOS); it falls back to a direct kill if that doesn't work.">
+            <span class="fd-lab">App at start</span>
+            <select class="flow-fresh-start" data-slug="${E(f.slug)}">
+              <option value="">Use as is (default)</option>
+              <option value="swipe">Close and reopen fresh - swipe it away in the app switcher (iOS)</option>
+              <option value="terminate">Close and reopen fresh - kill it directly</option>
+            </select>
+          </div>
+
+          <div class="fd-field" title="How long to pause between steps. Fast is just enough for the UI to settle (0.4s) - use Human speed to make a run watchable in real time, e.g. for a demo or to eyeball what's happening on screen.">
+            <span class="fd-lab">Playback speed</span>
+            <select class="flow-step-delay" data-slug="${E(f.slug)}">
+              <option value="">Fast (default)</option>
+              <option value="2">Human speed (~2s/step)</option>
+            </select>
+          </div>
+
+          ${f.login_email !== null && f.login_email !== undefined ? `
+          <div class="fd-field fd-span2" title="Overrides this flow's single login step and saves it back to the flow file - leave unchanged to keep using the current account.">
+            <span class="fd-lab">Login account <span style="font-weight:400;">(saved back to the flow)</span></span>
+            <div class="fd-pair">
+              <input type="text" class="flow-login-email" data-slug="${E(f.slug)}" value="${E(f.login_email)}" placeholder="email">
+              <input type="password" class="flow-login-password" data-slug="${E(f.slug)}" value="${E(f.login_password)}" placeholder="password">
+            </div>
+          </div>` : ''}
+
+          <div class="fd-field fd-span2 flow-precondition-login" data-slug="${E(f.slug)}" style="display:none;" title="This precondition has its own single login step - override it for just this run. Not saved back to the precondition, so every other flow that starts from it is unaffected.">
+            <span class="fd-lab">Precondition login <span style="font-weight:400;">(this run only)</span></span>
+            <div class="fd-pair">
+              <input type="text" class="flow-precondition-email" data-slug="${E(f.slug)}" placeholder="email">
+              <input type="password" class="flow-precondition-password" data-slug="${E(f.slug)}" placeholder="password">
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="flow-api-script-block" style="margin-top:12px; overflow-wrap:anywhere;" title="Runs AFTER this flow's own steps finish - validates the backend/API state those steps should have produced, independent of anything the accessibility tree can see.">
-        ${f.api_script ? `
-        <label style="display:flex; align-items:center; gap:5px; font-size:11px; cursor:pointer; flex-wrap:wrap;" title="${escapeHtml(f.api_script)}">
-          <input type="checkbox" class="flow-run-api-script-checkbox" data-slug="${escapeHtml(f.slug)}" style="width:auto; flex-shrink:0;">
-          <span>Run API validation script after this flow — <code style="font-size:10.5px;">${escapeHtml(f.api_script)}</code></span>
-        </label>` : `<span class="hint" style="font-size:11px;">No API validation script set for this flow.</span>`}
-        <button class="copy flow-setup-script-toggle-btn" data-slug="${escapeHtml(f.slug)}" data-target="api" style="display:block; margin-top:6px; padding:4px 10px; font-size:11px; background:var(--ink-line); color:var(--paper);">${f.api_script ? 'Change API validation script' : 'Set API validation script'}</button>
-        <div class="flow-setup-script-picker" data-slug="${escapeHtml(f.slug)}" data-target="api" style="display:none; margin-top:8px; border:1px solid var(--ink-line); border-radius:8px; padding:10px;"></div>
+      <div class="fd-card">
+        <div class="fd-card-h"><h4>Scripts</h4><span>Optional hooks around the flow</span></div>
+        <div class="fd-scripts">
+          ${scriptBlock('flow-setup-script-block', 'setup', f.setup_script, 'flow-run-setup-checkbox', 'Setup script', 'Nothing runs before this flow.', 'Run setup script first', 'Set setup script', 'Change setup script', 'Runs BEFORE this flow - e.g. seed data.')}
+          ${scriptBlock('flow-api-script-block', 'api', f.api_script, 'flow-run-api-script-checkbox', 'API validation script', 'No backend check after this flow.', 'Run API validation script after this flow', 'Set API validation script', 'Change API validation script', "Runs AFTER this flow's own steps finish - validates the backend/API state those steps should have produced, independent of anything the accessibility tree can see.")}
+        </div>
       </div>
 
-      ${f.login_email !== null && f.login_email !== undefined ? `
-      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px; font-size:11px;" title="Overrides this flow's single login step and saves it back to the flow file - leave unchanged to keep using the current account.">
-        <span class="hint" style="font-size:11px; flex-shrink:0;">Login as:</span>
-        <input type="text" class="flow-login-email" data-slug="${escapeHtml(f.slug)}" value="${escapeHtml(f.login_email)}" placeholder="email" style="width:auto; flex:1 1 200px; min-width:120px; font-size:11px; padding:3px 6px;">
-        <input type="password" class="flow-login-password" data-slug="${escapeHtml(f.slug)}" value="${escapeHtml(f.login_password)}" placeholder="password" style="width:auto; flex:1 1 130px; min-width:90px; font-size:11px; padding:3px 6px;">
-      </div>` : ''}
+      <div class="hint flow-gen-tests-status" data-gen-status-for="${E(f.slug)}" style="font-size:11.5px;"></div>
 
-      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px; font-size:11px;" title="Which app this run launches (Appium's bundleId capability) - a one-off override for just this run, not saved back to the flow. Leave blank to use whatever app this flow is already set up for.">
-        <span class="hint" style="font-size:11px; flex-shrink:0;">App bundle ID:</span>
-        <select class="flow-bundle-id-env" data-slug="${escapeHtml(f.slug)}" style="width:auto; flex:1 1 200px; font-size:11px; padding:3px 6px;">
-          ${renderEnvironmentOptions(f.platform, "— use this flow's own app —", f.bundle_id || '')}
-        </select>
-        <input type="text" class="flow-bundle-id" data-slug="${escapeHtml(f.slug)}" value="${escapeHtml(f.bundle_id || '')}" placeholder="or type a custom bundle/package id" style="width:auto; flex:1 1 220px; min-width:160px; font-size:11px; padding:3px 6px;">
+      <div class="fd-card fd-trace">
+        <div class="fd-card-h"><h4>Execution trace</h4><span>${hasLog ? 'Latest run' : 'Live output appears here'}</span></div>
+        <div class="terminal flow-log" data-log-for="${E(f.slug)}" style="${hasLog ? '' : 'display:none;'} max-height:340px; overflow-y:auto; font-size:11.5px;">${hasLog ? E(state.logs.join('\n')) : ''}</div>
+        ${!hasLog ? '<div class="fd-empty"><b>No run yet</b><span>Click <b>Run</b> to watch every step execute live.</span></div>' : ''}
       </div>
 
-      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px; font-size:11px;" title="How long to pause between steps. Fast is just enough for the UI to settle (0.4s) - use Human speed to make a run watchable in real time, e.g. for a demo or to eyeball what's happening on screen.">
-        <span class="hint" style="font-size:11px; flex-shrink:0;">Playback speed:</span>
-        <select class="flow-step-delay" data-slug="${escapeHtml(f.slug)}" style="width:auto; flex:1 1 160px; font-size:11px; padding:3px 6px;">
-          <option value="">Fast (default)</option>
-          <option value="2">Human speed (~2s/step)</option>
-        </select>
+      <div class="flow-report-actions" data-report-actions-for="${E(f.slug)}" style="display:${state && state.reportPath ? 'block' : 'none'};">
+        <div class="fd-card">
+          <div class="fd-card-h"><h4>Report</h4><span class="flow-report-path" data-report-path-for="${E(f.slug)}"></span></div>
+          <div class="fd-reports">
+            <button class="copy flow-download-report-btn" data-slug="${E(f.slug)}">Download HTML</button>
+            <button class="copy flow-download-csv-btn" data-slug="${E(f.slug)}">CSV summary</button>
+            <button class="copy flow-download-pdf-btn" data-slug="${E(f.slug)}">PDF summary</button>
+            <button class="copy flow-publish-report-s3-btn" data-slug="${E(f.slug)}" title="Uploads this same report to the team's S3 reports bucket, where it shows up in the report browser under mobile test run results.">Publish to S3</button>
+          </div>
+          <div class="hint flow-report-publish-status" data-slug="${E(f.slug)}" style="font-size:11.5px; margin-top:8px;"></div>
+        </div>
       </div>
-
-      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px; font-size:11px;" title="Close the app first if it is already running, then open it again, so the run starts from the app's normal start screen instead of wherever it was left. Swiping it away in the app switcher is how you'd do it by hand (iOS); it falls back to a direct kill if that doesn't work.">
-        <span class="hint" style="font-size:11px; flex-shrink:0;">App at start:</span>
-        <select class="flow-fresh-start" data-slug="${escapeHtml(f.slug)}" style="width:auto; flex:1 1 200px; font-size:11px; padding:3px 6px;">
-          <option value="">Use as is (default)</option>
-          <option value="swipe">Close and reopen fresh - swipe it away in the app switcher (iOS)</option>
-          <option value="terminate">Close and reopen fresh - kill it directly</option>
-        </select>
-      </div>
-
-      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px; font-size:11px;" title="Optional - replays a saved precondition (e.g. login) deterministically, on the same app session, right before this flow's own steps. Aborts before this flow starts if the precondition itself fails.">
-        <span class="hint" style="font-size:11px; flex-shrink:0;">Start from:</span>
-        <select class="flow-precondition" data-slug="${escapeHtml(f.slug)}" data-platform="${escapeHtml(f.platform)}" style="width:auto; flex:1 1 200px; font-size:11px; padding:3px 6px;">
-          ${renderFlowPreconditionOptions(f.platform)}
-        </select>
-      </div>
-      <div class="flow-precondition-login" data-slug="${escapeHtml(f.slug)}" style="display:none; gap:6px; align-items:center; flex-wrap:wrap; margin-top:6px; font-size:11px;" title="This precondition has its own single login step - override it for just this run. Not saved back to the precondition, so every other flow that starts from it is unaffected.">
-        <span class="hint" style="font-size:11px; flex-shrink:0;">Precondition login:</span>
-        <input type="text" class="flow-precondition-email" data-slug="${escapeHtml(f.slug)}" placeholder="email" style="width:auto; flex:1 1 200px; min-width:120px; font-size:11px; padding:3px 6px;">
-        <input type="password" class="flow-precondition-password" data-slug="${escapeHtml(f.slug)}" placeholder="password" style="width:auto; flex:1 1 130px; min-width:90px; font-size:11px; padding:3px 6px;">
-      </div>
-
-      <div class="hint flow-gen-tests-status" data-gen-status-for="${escapeHtml(f.slug)}" style="font-size:11.5px; margin-top:8px;"></div>
-
-      <div style="margin-top:16px;">
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.05em; color:var(--paper-dim); font-weight:600; margin-bottom:6px;">Execution trace</div>
-        <div class="terminal flow-log" data-log-for="${escapeHtml(f.slug)}" style="${hasLog ? '' : 'display:none;'} max-height:300px; overflow-y:auto; font-size:11.5px;">${hasLog ? escapeHtml(state.logs.join('\n')) : ''}</div>
-        ${!hasLog ? '<div class="empty-hint" style="font-size:11.5px;">No run yet — click Run to see the live trace here.</div>' : ''}
-      </div>
-
-      <div class="flow-report-actions" data-report-actions-for="${escapeHtml(f.slug)}" style="display:${state && state.reportPath ? 'flex' : 'none'}; margin-top:8px; gap:8px; flex-wrap:wrap; align-items:center;">
-        <button class="copy flow-download-report-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download HTML report</button>
-        <button class="copy flow-download-csv-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download CSV summary</button>
-        <button class="copy flow-download-pdf-btn" data-slug="${escapeHtml(f.slug)}" style="padding:6px 10px; font-size:12px; background:var(--ink-line); color:var(--paper);">Download PDF summary</button>
-        <button class="copy flow-publish-report-s3-btn" data-slug="${escapeHtml(f.slug)}" title="Uploads this same report to the team's S3 reports bucket, where it shows up in the report browser under mobile test run results." style="padding:6px 10px; font-size:12px;">Publish to S3</button>
-        <span class="hint flow-report-path" data-report-path-for="${escapeHtml(f.slug)}" style="font-size:11px;"></span>
-      </div>
-      <div class="hint flow-report-publish-status" data-slug="${escapeHtml(f.slug)}" style="font-size:11.5px; margin-top:4px;"></div>
-      <div class="flow-report" data-report-for="${escapeHtml(f.slug)}" style="margin-top:8px;"></div>
+      <div class="flow-report" data-report-for="${E(f.slug)}"></div>
+    </div>
     `;
 
     // Re-attach an already-fetched report (from before the user switched
@@ -5812,6 +5968,15 @@ ${clone.outerHTML}
     }
   }
   loadSavedFlows();
+  (function () {
+    const b = document.getElementById('flowsColorBtn'); if (!b) return;
+    b.classList.toggle('on', flowsColorOn);
+    b.addEventListener('click', () => {
+      flowsColorOn = !flowsColorOn; b.classList.toggle('on', flowsColorOn);
+      try { localStorage.setItem('habiFlowsColor', flowsColorOn ? '1' : '0'); } catch (e) {}
+      renderFlowsSidebarPage();
+    });
+  })();
   document.getElementById('refreshFlowsBtn').addEventListener('click', () => { loadFlowModules(); loadPreconditions(); loadSavedFlows(); });
 
   // -------- Shared Flows: publish/import via the team's shared repo --------
