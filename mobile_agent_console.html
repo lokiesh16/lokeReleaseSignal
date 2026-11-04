@@ -4893,7 +4893,8 @@ ${clone.innerHTML}
       ? `<button type="button" class="copy" data-folder-run ${folderRun && folderRun.running ? 'disabled' : ''} style="padding:5px 14px; font-size:12px;" title="Run every flow in this folder one after another and get one combined report">▶ ${folderRun && folderRun.running ? 'Running folder…' : `Run folder (${runnable.length} flow${runnable.length === 1 ? '' : 's'})`}</button>`
       : '';
     const multiBtn = `<button type="button" class="copy" data-folders-run-open ${folderRun && folderRun.running ? 'disabled' : ''} style="padding:5px 14px; font-size:12px; background:var(--ink-line); color:var(--paper);" title="Pick several folders and run them together with one combined report">▶ Run folders…</button>`;
-    el.innerHTML = pills.join('') + create + runBtn + multiBtn;
+    const uploadBtn = `<button type="button" class="copy" data-report-upload style="padding:5px 14px; font-size:12px; background:var(--ink-line); color:var(--paper);" title="Upload a report .html you downloaded earlier (e.g. folder_run_….html) to the team S3 bucket">⬆ Upload report file…</button><input type="file" id="reportUploadInput" accept=".html,text/html" style="display:none;"><span id="reportUploadStatus" style="font-size:12px; margin-left:8px;">${reportUploadStatusHtml}</span>`;
+    el.innerHTML = pills.join('') + create + runBtn + multiBtn + uploadBtn;
     if (folderCreateOpen) { const inp = document.getElementById('folderNewInput'); if (inp) inp.focus(); }
   }
 
@@ -4975,6 +4976,45 @@ ${clone.innerHTML}
   function flowsInFolder(value) {
     const flows = savedFlowsPlatformFilter === 'all' ? lastLoadedFlows : lastLoadedFlows.filter(f => f.platform === savedFlowsPlatformFilter);
     return value === '__none__' ? flows.filter(f => !f.module) : flows.filter(f => f.module === value);
+  }
+
+  let reportUploadStatusHtml = '';
+  function setReportUploadStatus(html) {
+    reportUploadStatusHtml = html;
+    const e = document.getElementById('reportUploadStatus');
+    if (e) e.innerHTML = html;
+  }
+  // Uploads a report .html saved earlier to the team S3 bucket (same route and
+  // @habitnu.com sign-in as Publish). The counts are read from the file itself.
+  async function uploadReportFile(file) {
+    if (!file) return;
+    setReportUploadStatus(`Reading ${escapeHtml(file.name)}…`);
+    try {
+      const doc = await file.text();
+      const title = ((doc.match(/<title>([^<]*)<\/title>/i) || [])[1] || file.name.replace(/\.html?$/i, '')).trim();
+      const counts = {pass: 0, fail: 0, error: 0, skipped: 0};
+      for (const m of doc.matchAll(/class="rep-case[^"]*"[^>]*?data-status="(pass|fail|error|skipped)"|data-status="(pass|fail|error|skipped)"[^>]*?class="rep-case/g)) counts[m[1] || m[2]]++;
+      const total = counts.pass + counts.fail + counts.error + counts.skipped;
+      const failed = counts.fail + counts.error;
+      const platform = /android/i.test(doc.slice(0, 400000)) ? 'android' : (/\bios\b/i.test(doc.slice(0, 400000)) ? 'ios' : 'android');
+      const slug = (title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'report');
+      const report = {
+        goal: title, flow_name: title, final_status: failed ? 'fail' : 'pass',
+        final_note: `${counts.pass} of ${total} test cases passed` + (failed ? `, ${failed} failed` : ''),
+        step_count: 0, tests: Array.from({length: total}, () => ({})),
+        started_at: new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z'),
+      };
+      setReportUploadStatus(`Uploading ${(doc.length / 1048576).toFixed(1)} MB…`);
+      const res = await bridgeFetchAuthed('/api/publish-folder-report-s3', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({platform, slug, html: doc, report}),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'upload failed');
+      setReportUploadStatus(`<span style="color:var(--circuit);">✓ Uploaded: <a href="${escapeHtml(result.url)}" target="_blank" rel="noopener">${escapeHtml(result.url)}</a></span>`);
+    } catch (e) {
+      setReportUploadStatus(`<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`);
+    }
   }
 
   async function runFolders(values) {
@@ -5346,13 +5386,24 @@ ${clone.outerHTML}
     URL.revokeObjectURL(url);
   }
 
-  // Same GitHub-Pages publish route a single flow's report uses. The hosted
-  // URL is remembered on the run so "Post to Slack" can reuse it.
+  // Publishes to the team S3 reports bucket (needs the @habitnu.com Google
+  // sign-in, handled by bridgeFetchAuthed) - no size limit, shows up in the
+  // report browser. The URL is remembered on the run so "Post to Slack" reuses it.
   async function publishFolderReport(rootEl, withShots) {
     const {doc, title} = await buildFolderReportDoc(rootEl, withShots);
-    const res = await fetch(BRIDGE_URL + '/api/publish-flow-report', {
+    const t = folderRunTotals(folderRun);
+    const plats = folderPlatforms(folderRun).map(x => String(x).toLowerCase());
+    const platform = plats.includes('android') ? 'android' : (plats.includes('ios') ? 'ios' : 'android');
+    const slug = folderFileName(title);
+    const report = {
+      goal: title, flow_name: title, final_status: t.fail ? 'fail' : 'pass',
+      final_note: `${t.pass} of ${t.tests} test cases passed` + (t.fail ? `, ${t.fail} failed` : ''),
+      step_count: t.steps, tests: Array.from({length: t.tests}, () => ({})),
+      started_at: new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z'),
+    };
+    const res = await bridgeFetchAuthed('/api/publish-folder-report-s3', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({filename: folderFileName(title) + '_' + Date.now() + '.html', html: doc}),
+      body: JSON.stringify({platform, slug, html: doc, report}),
     });
     const result = await res.json();
     if (!res.ok) throw new Error(result.error || 'publish failed');
@@ -5474,6 +5525,13 @@ ${clone.outerHTML}
       return;
     }
     if (e.target.closest('[data-folder-run]')) { runFolder(); return; }
+    if (e.target.closest('[data-report-upload]')) {
+      const inp = document.getElementById('reportUploadInput');
+      inp.value = '';
+      inp.onchange = () => uploadReportFile(inp.files[0]);
+      inp.click();
+      return;
+    }
     if (e.target.closest('[data-folders-run-open]')) {
       folderPick = new Set(savedFlowsModuleFilter !== 'all' && flowsInFolder(savedFlowsModuleFilter).length ? [savedFlowsModuleFilter] : []);
       renderFolderPicker();
@@ -7765,6 +7823,10 @@ ${clone.outerHTML}
   function lsDynamicOptionsText(el) {
     const text = String(el.label || el.text || '').trim();
     if (!text) return [];
+    // Android buttons/cards usually carry their words in content-desc, not
+    // text - a text-based pattern would match nothing on them.
+    const useDesc = (document.getElementById('lsPlatform') || {}).value === 'Android'
+      && !!el.accessibility_id && !String(el.text || '').trim();
     const kinds = [];
     let m;
     if (/^[A-Za-z]{3,9} \d{1,2}, \d{4}.*\d{1,2}:\d{2}/.test(text)) {
@@ -7796,7 +7858,7 @@ ${clone.outerHTML}
       // the same removed, and it contains at least one digit.
       const stripped = text.replace(/[0-9.,]/g, '').replace(/\s+/g, ' ').trim();
       kinds.push({key: 'textnum', label: `Same text, any number ("${shown}")`, rx,
-        xp: /["]/.test(stripped) || !/[:\\\/()]/.test(text) ? null : `//*[normalize-space(translate(@text,"0123456789.,",""))="${stripped}" and translate(@text,"0123456789","")!=@text]`});
+        xp: /["]/.test(stripped) || !/[:\\\/()]/.test(text) ? null : `//*[normalize-space(translate(@${useDesc ? 'content-desc' : 'text'},"0123456789.,",""))="${stripped}" and translate(@${useDesc ? 'content-desc' : 'text'},"0123456789","")!=@${useDesc ? 'content-desc' : 'text'}]`});
     }
     const android = (document.getElementById('lsPlatform') || {}).value === 'Android';
     // The scraped text is trimmed for detection, but the element's real text
@@ -7810,7 +7872,7 @@ ${clone.outerHTML}
       key: k.key,
       label: k.label,
       strategy: android ? (k.xp ? 'xpath' : '-android uiautomator') : '-ios predicate string',
-      value: android ? (k.xp || `new UiSelector().textMatches("${k.rx}")`) : `label MATCHES '${k.rx}'`,
+      value: android ? (k.xp || `new UiSelector().${useDesc ? 'descriptionMatches' : 'textMatches'}("${k.rx}")`) : `label MATCHES '${k.rx}'`,
     }));
   }
 
@@ -7930,6 +7992,7 @@ ${clone.outerHTML}
                 <option value="type_text">Type text into it</option>
                 <option value="clear">Clear it</option>
                 <option value="swipe">Swipe</option>
+                <option value="scroll_to">Scroll until it's visible</option>
                 <option value="wait">Wait</option>
                 <option value="assert_visible">Check it's visible</option>
                 <option value="assert_value">Check its value</option>
@@ -7954,6 +8017,10 @@ ${clone.outerHTML}
           <select class="ls-act-direction" style="display:none; width:auto; flex:0 0 100px;">
             <option value="up">up</option><option value="down">down</option><option value="left">left</option><option value="right">right</option>
           </select>
+          <select class="ls-act-scrolldir" title="Auto works out the direction itself: it heads toward the element when it can see where it is, otherwise scrolls to the bottom and then back up. Pick a direction only to force it. It stops when the element is in the middle of the screen, clear of the tab bar." style="display:none; width:auto; flex:0 0 230px;">
+            <option value="auto">auto - find it (either way)</option><option value="up">scroll down (to reach lower)</option><option value="down">scroll up (to reach higher)</option><option value="left">scroll right</option><option value="right">scroll left</option>
+          </select>
+          <input class="ls-act-maxscroll" type="number" min="1" max="40" step="1" value="10" title="Give up after this many scrolls" style="display:none; width:auto; flex:0 0 80px;">
           <input class="ls-act-seconds" type="number" step="0.5" placeholder="seconds" style="display:none; width:auto; flex:0 0 90px;">
           <span class="ls-act-sentence-is" style="display:none; font-size:12px; color:var(--paper-dim);">— its value</span>
           <select class="ls-act-compare" style="display:none; width:auto; flex:0 0 190px;">
@@ -8172,6 +8239,8 @@ ${clone.outerHTML}
       const row = sel.closest('.ls-act-panel');
       const textField = row.querySelector('.ls-act-text');
       const directionField = row.querySelector('.ls-act-direction');
+      const scrollDirField = row.querySelector('.ls-act-scrolldir');
+      const maxScrollField = row.querySelector('.ls-act-maxscroll');
       const secondsField = row.querySelector('.ls-act-seconds');
       const attributeField = row.querySelector('.ls-act-attribute');
       const extractField = row.querySelector('.ls-act-extract');
@@ -8201,6 +8270,8 @@ ${clone.outerHTML}
         textField.style.display = t === 'type_text' ? 'block' : 'none';
         randomSel.style.display = t === 'type_text' ? 'block' : 'none';
         directionField.style.display = t === 'swipe' ? 'block' : 'none';
+        scrollDirField.style.display = t === 'scroll_to' ? 'block' : 'none';
+        maxScrollField.style.display = t === 'scroll_to' ? 'block' : 'none';
         secondsField.style.display = t === 'wait' ? 'block' : 'none';
         const isAssertValue = t === 'assert_value';
         const isParseLabel = t === 'parse_label';
@@ -8368,6 +8439,10 @@ ${clone.outerHTML}
           if (typedAs) { payload.save_as = typedAs; step.save_as = typedAs; }
         }
         if (actionType === 'swipe') { payload.direction = details.querySelector('.ls-act-direction').value; step.direction = payload.direction; }
+        if (actionType === 'scroll_to') {
+          payload.direction = details.querySelector('.ls-act-scrolldir').value; step.direction = payload.direction;
+          payload.max_scrolls = Math.max(1, parseInt(details.querySelector('.ls-act-maxscroll').value, 10) || 10); step.max_scrolls = payload.max_scrolls;
+        }
         if (actionType === 'wait') { payload.seconds = parseFloat(details.querySelector('.ls-act-seconds').value || '1'); step.seconds = payload.seconds; }
         if (actionType === 'assert_value' || actionType === 'parse_label') {
           const attribute = details.querySelector('.ls-act-attribute').value;
@@ -8436,6 +8511,7 @@ ${clone.outerHTML}
   const LS_ACTION_ACCENTS = {
     tap: {fg: '#2EB0E6', bg: 'rgba(46,176,230,0.16)'},
     type_text: {fg: '#2EB0E6', bg: 'rgba(46,176,230,0.16)'},
+    scroll_to: {fg: '#2EB0E6', bg: 'rgba(46,176,230,0.16)'},
     clear: {fg: '#2EB0E6', bg: 'rgba(46,176,230,0.16)'},
     swipe: {fg: '#2EB0E6', bg: 'rgba(46,176,230,0.16)'},
     wait: {fg: '#A3A9B5', bg: 'rgba(163,169,181,0.16)'},
@@ -8461,7 +8537,7 @@ ${clone.outerHTML}
   async function lsExecuteCapturedStep(i) {
     const s = lsCapturedSteps[i];
     const payload = {...s};
-    delete payload.label; delete payload.description; delete payload.optional; delete payload.splitBefore; delete payload.tag; delete payload.dynKind; delete payload.posName;
+    delete payload.label; delete payload.description; delete payload.optional; delete payload.skip_on_fail; delete payload.splitBefore; delete payload.tag; delete payload.dynKind; delete payload.posName;
     const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/act', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -8527,6 +8603,7 @@ ${clone.outerHTML}
       case 'type_text': return `Type "${s.text ?? ''}" into ${target}`;
       case 'clear': return `Clear ${target}`;
       case 'swipe': return s.direction ? `Swipe ${s.direction}` : 'Swipe';
+      case 'scroll_to': { const tgt = s.label ? '"' + s.label + '"' : 'the element'; const d = s.direction || 'auto'; return d === 'auto' ? `Scroll to ${tgt} until it is visible` : `Scroll ${({up: 'down', down: 'up', left: 'right', right: 'left'})[d]} until ${tgt} is visible`; }
       case 'wait': return `Wait ${s.seconds ?? 2}s`;
       case 'assert_visible': return `Check ${target} is visible`;
       case 'assert_value': {
@@ -8588,7 +8665,7 @@ ${clone.outerHTML}
 
   // ---- Column layout + test-case grouping for the captured-steps list ----
   const LS_VERBS = {
-    tap: 'Tap', type_text: 'Type', clear: 'Clear', swipe: 'Swipe', wait: 'Wait',
+    tap: 'Tap', type_text: 'Type', clear: 'Clear', swipe: 'Swipe', scroll_to: 'Scroll to', wait: 'Wait',
     assert_visible: 'Assert visible', assert_value: 'Assert value', assert_expr: 'Assert',
     parse_label: 'Remember', compute: 'Compute', switch_app: 'Switch app',
     restart_app: 'Restart app', note: 'Note', run_api_script: 'API script', back: 'Back',
@@ -8601,7 +8678,7 @@ ${clone.outerHTML}
     let target = s.label || '';
     let targetTitle = s.strategy ? `${s.strategy}: ${s.value}` : '';
     if (s.dynKind) { target = `${s.dynKind.toLowerCase()} (pattern)`; }
-    else if (s.strategy && s.value != null && ['tap','type_text','clear','assert_visible','assert_value','parse_label'].includes(s.action)) { target = s.value; }
+    else if (s.strategy && s.value != null && ['tap','type_text','clear','scroll_to','assert_visible','assert_value','parse_label'].includes(s.action)) { target = s.value; }
     else if (s.x != null && s.y != null && s.x2 == null) { target = `position (${s.x}, ${s.y})`; targetTitle = target; }
     if (s.action === 'swipe') {
       target = s.x2 != null ? `(${s.x}, ${s.y}) → (${s.x2}, ${s.y2})` : (s.direction || '');
@@ -8746,6 +8823,7 @@ ${clone.outerHTML}
       // toggle below, instead of every step permanently taking 6-8 rows of
       // mostly-empty inputs whether or not there's anything to edit on it.
       const statusTags = [
+        s.skip_on_fail ? `<span title="If this step fails, it is skipped and the test carries on" style="font-size:10px; font-weight:600; color:var(--signal); border:1px solid var(--signal); border-radius:8px; padding:0 6px;">skip if fails</span>` : '',
         s.optional ? `<span title="Optional - won't fail the test if this element isn't present" style="font-size:10px; font-weight:600; color:var(--signal); border:1px solid var(--signal); border-radius:8px; padding:0 6px;">optional</span>` : '',
         (s.splitBefore && i > 0) ? `<span title="${escapeHtml(splitLabel)}" style="font-size:10px; color:var(--circuit); border:1px solid var(--circuit); border-radius:8px; padding:0 6px;">✂ split</span>` : '',
         s.description ? `<span title="${escapeHtml(s.description)}" style="font-size:10px; color:var(--paper-dim);">📝</span>` : '',
@@ -8779,6 +8857,10 @@ ${clone.outerHTML}
             <label style="display:flex; align-items:center; gap:5px; margin-top:5px; font-size:11px; color:var(--paper-dim); cursor:pointer;" title="Won't fail the test if this element isn't on screen this run - for things like an iOS system alert (notifications/Face ID/save-password) that only shows up once, or intermittently, not on every launch.">
               <input type="checkbox" class="ls-step-optional" data-step-optional="${i}" ${s.optional ? 'checked' : ''} style="width:auto;">
               Optional — skip if this element isn't present
+            </label>
+            <label style="display:flex; align-items:center; gap:5px; margin-top:5px; font-size:11px; color:var(--paper-dim); cursor:pointer;" title="If this step fails for any reason (wrong value, timeout, element missing), mark it skipped and carry on with the rest of the test. The failure reason is still shown in the report.">
+              <input type="checkbox" class="ls-step-skipfail" data-step-skipfail="${i}" ${s.skip_on_fail ? 'checked' : ''} style="width:auto;">
+              Skip if this step fails — carry on with the next step
             </label>
             ${i > 0 ? `
             <label style="display:flex; align-items:center; gap:5px; margin-top:5px; font-size:11px; color:var(--paper-dim); cursor:pointer;" title="Uses the note above as the new test case's description.">
@@ -8942,6 +9024,13 @@ ${clone.outerHTML}
     listEl.querySelectorAll('[data-step-optional]').forEach(cb => {
       cb.addEventListener('change', () => {
         lsCapturedSteps[Number(cb.dataset.stepOptional)].optional = cb.checked;
+      });
+    });
+    listEl.querySelectorAll('[data-step-skipfail]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const st = lsCapturedSteps[Number(cb.dataset.stepSkipfail)];
+        st.skip_on_fail = cb.checked || undefined;
+        renderLsCapturedSteps();
       });
     });
     listEl.querySelectorAll('[data-remove-step]').forEach(btn => {
