@@ -7903,34 +7903,54 @@ ${clone.outerHTML}
   // ones that land on THIS element (matching bounds), nudging the position
   // number when the element list's order differs from the screen's. Options
   // that never land are removed, so what's left is known to work right now.
+  // Background checks must never hold up the user's own tap: Appium handles one
+  // request at a time, so a long queue of "does this locator match?" probes
+  // makes a real Tap wait behind them. lsVerifyGen is bumped whenever the user
+  // picks another element or presses Do it, which makes pending probes stop.
+  let lsVerifyGen = 0;
+  async function lsProbeLocator(strategy, value, ms) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms || 8000);
+    try {
+      const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/test_locator', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, signal: ctl.signal,
+        body: JSON.stringify({strategy, value}),
+      });
+      const data = await res.json();
+      return {ok: res.ok, data};
+    } catch (e) {
+      if (e && e.name === 'AbortError') { const err = new Error('the phone is busy - could not check in time'); err.timeout = true; throw err; }
+      throw e;
+    } finally { clearTimeout(t); }
+  }
   async function lsVerifyNear(sel, el) {
     if (!lsSessionId || !el || el._nearChecked === lsSessionId + '|' + lsLastElements.length) return;
+    const gen = lsVerifyGen;
     const opts = lsNeighborOptions(el);
     const me = lsCenterPoint(el);
     if (!opts.length || !me) return;
     el._nearOk = el._nearOk || {};
     const near = (b) => b && Math.abs(b.x + b.width / 2 - me.x) <= 4 && Math.abs(b.y + b.height / 2 - me.y) <= 4;
     for (const o of opts) {
-      if (!sel.isConnected) return;
+      if (!sel.isConnected || gen !== lsVerifyGen) return;
       const optEl = Array.from(sel.options).find(x => x.value === o.key);
       if (!optEl || el._nearOk[o.key]) continue;
       let hit = null;
-      for (const c of [o.cnt, o.cnt + 1, o.cnt - 1, o.cnt + 2, o.cnt - 2]) {
+      for (const c of [o.cnt, o.cnt + 1, o.cnt - 1]) {
         if (c < 1) continue;
+        if (gen !== lsVerifyGen) return;
         const value = o.build(c);
         try {
-          const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/test_locator', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({strategy: 'xpath', value}),
-          });
-          const data = await res.json();
-          if (!res.ok) break;
+          const r = await lsProbeLocator('xpath', value, 7000);
+          if (gen !== lsVerifyGen) return;
+          const data = r.data;
+          if (!r.ok) break;
           const ms = data.matches || [];
           const k = ms.findIndex(m => near(m.bounds));
           if (k >= 0) { hit = {value, index: ms.length > 1 ? k : null}; break; }
         } catch (e) { return; }
       }
-      if (!sel.isConnected) return;
+      if (!sel.isConnected || gen !== lsVerifyGen) return;
       if (hit) {
         el._nearOk[o.key] = hit;
         optEl.textContent = o.label.replace(/ ✓$/, '') + ' ✓';
@@ -8480,6 +8500,7 @@ ${clone.outerHTML}
       });
     });
 
+    lsVerifyGen++;
     container.querySelectorAll('.ls-act-style').forEach(sel => {
       const wrap = sel.parentElement;
       const statusEl = wrap.querySelector('.ls-act-style-status');
@@ -8514,12 +8535,9 @@ ${clone.outerHTML}
         const prevIdx = matchSel ? matchSel.value : '';
         statusEl.innerHTML = '<span style="color:var(--paper-dim);">checking…</span>';
         try {
-          const res = await fetch(BRIDGE_URL + '/api/scrape/' + lsSessionId + '/test_locator', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({strategy: dyn.strategy, value: dyn.value}),
-          });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'check failed');
+          const r = await lsProbeLocator(dyn.strategy, dyn.value, 8000);
+          const data = r.data;
+          if (!r.ok) throw new Error(data.error || 'check failed');
           lastMatches = data.matches || [];
           if (!data.found) {
             statusEl.innerHTML = '<span style="color:var(--alert);">✗ matches nothing on the current screen' + (dyn.isRelDate ? ' (is that date visible in the calendar?)' : '') + '</span>';
@@ -8539,7 +8557,9 @@ ${clone.outerHTML}
             statusEl.innerHTML = '<span style="color:var(--circuit);">✓ matches exactly 1 element</span>';
           }
         } catch (e) {
-          statusEl.innerHTML = `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
+          statusEl.innerHTML = e.timeout
+            ? `<span style="color:var(--paper-dim);">check skipped - the phone is busy (the action itself still works)</span>`
+            : `<span style="color:var(--alert);">${escapeHtml(e.message)}</span>`;
         }
       };
       // Highlight the chosen match on the screenshot so it's obvious which one it is
@@ -8552,12 +8572,20 @@ ${clone.outerHTML}
       if (matchSel) matchSel.addEventListener('change', showChosen);
       sel.addEventListener('change', refresh);
       refresh();   // check once up front so a many-match locator offers the picker straight away
-      if (Array.from(sel.options).some(o => o.value.startsWith('near'))) lsVerifyNear(sel, lsLastElements[Number(sel.dataset.index)]);
+      // "Next to a label" options are checked against the phone only when the
+      // list is opened, not on every element click (that flood of probes is
+      // what used to leave the Tap waiting).
+      if (Array.from(sel.options).some(o => o.value.startsWith('near'))) {
+        const once = () => { sel.removeEventListener('mousedown', once); sel.removeEventListener('focus', once);
+          lsVerifyNear(sel, lsLastElements[Number(sel.dataset.index)]); };
+        sel.addEventListener('mousedown', once); sel.addEventListener('focus', once);
+      }
       if (offInput) offInput.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(refresh, 350); });
     });
 
     container.querySelectorAll('.ls-act-run-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
+        lsVerifyGen++;   // stop any background checks so they don't queue ahead of this action
         const el = lsLastElements[Number(btn.dataset.index)];
         const details = btn.closest('.ls-act-panel');
         const statusEl = details.querySelector('.ls-act-status');
