@@ -8762,11 +8762,14 @@ ${clone.outerHTML}
     btn.disabled = true;
     btn.textContent = 'Running…';
     try {
+      const skippedSteps = [];
       for (const {s, i} of runnable) {
         statusEl.innerHTML = `<span style="color:var(--paper-dim);">Running step ${i + 1}/${lsCapturedSteps.length} (${escapeHtml(s.action)})…</span>`;
         try {
           await lsExecuteCapturedStep(i);
         } catch (e) {
+          // Step is marked "skip if this step fails": note it and carry on.
+          if (s.skip_on_fail) { skippedSteps.push(i + 1); continue; }
           // Same "a failing fixed step stops the rest" rule replay.py's own
           // replay_flow uses for a real saved-flow run - continuing past a
           // failure here would just cascade into unrelated failures against
@@ -8775,7 +8778,7 @@ ${clone.outerHTML}
           return;
         }
       }
-      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Test case passed - ${runnable.length} step(s) run.</span>`;
+      statusEl.innerHTML = `<span style="color:var(--circuit);">✓ Test case passed - ${runnable.length} step(s) run${skippedSteps.length ? ` (skipped after failing: step ${skippedSteps.join(', ')})` : ''}.</span>`;
     } finally {
       btn.disabled = false;
       btn.textContent = 'Run this test case';
